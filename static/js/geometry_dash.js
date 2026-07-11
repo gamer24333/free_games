@@ -1,187 +1,162 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// Spielvariablen
 let gameSpeed = 5;
 let score = 0;
+let level = 1;
 let isGameOver = false;
+const floorY = 340;
 
-// Spieler (Das Viereck)
 const player = {
-    x: 100,
-    y: 300,
-    size: 40,
-    vy: 0,
-    gravity: 0.6,
-    jumpForce: -12,
-    isGrounded: false,
-    rotation: 0
+    x: 80, y: 300, size: 35, vy: 0,
+    gravity: 0.6, jumpForce: -11.5, isGrounded: false, rotation: 0
 };
 
-// Hindernisse (Die Dreiecke)
 let obstacles = [];
-const floorY = 340; // Höhe des Bodens
+let spawnTimeout;
 
-// Steuerung (Leertaste am PC, Klick/Touch auf dem iPad)
 function doJump() {
     if (player.isGrounded && !isGameOver) {
         player.vy = player.jumpForce;
         player.isGrounded = false;
     }
-    if (isGameOver) {
-        resetGame();
-    }
+    if (isGameOver) resetGame();
 }
 
-window.addEventListener('keydown', (e) => {
-    if (e.code === 'Space') {
-        e.preventDefault(); // Verhindert das Scrollen der Seite beim Springen
-        doJump();
-    }
-});
+window.addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); doJump(); } });
+canvas.addEventListener('touchstart', (e) => { e.preventDefault(); doJump(); });
+canvas.addEventListener('mousedown', doJump);
 
-canvas.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    doJump();
-});
-
-canvas.addEventListener('mousedown', () => {
-    doJump();
-});
-
-// Funktion zum Erstellen eines neuen Hindernisses
 function spawnObstacle() {
     if (isGameOver) return;
+
+    // Unterschiede: Zufall entscheidet zwischen Typ 1 (Dreieck) oder Typ 2 (Block)
+    let type = Math.random() > 0.4 ? 'spike' : 'block';
     
-    obstacles.push({
-        x: canvas.width,
-        y: floorY,
-        width: 30,
-        height: 40
-    });
+    if (type === 'spike') {
+        obstacles.push({ x: canvas.width, y: floorY, width: 30, height: 35, type: 'spike' });
+    } else {
+        // Ein Block, der in der Luft schwebt (man kann drunter durchlaufen) oder auf dem Boden steht
+        let onFloor = Math.random() > 0.5;
+        obstacles.push({
+            x: canvas.width,
+            y: onFloor ? floorY : floorY - 65,
+            width: 35, height: 35, type: 'block'
+        });
+    }
 
-    // Zufälliges Timing für das nächste Hindernis (zwischen 1 und 2.5 Sekunden)
-    let nextSpawn = 1000 + Math.random() * 1500;
-    setTimeout(spawnObstacle, nextSpawn / (gameSpeed / 5));
+    let nextSpawn = 1200 + Math.random() * 1600;
+    spawnTimeout = setTimeout(spawnObstacle, nextSpawn / (gameSpeed / 5));
 }
 
-// Spiel zurücksetzen
+async function sendScoreToServer(finalScore) {
+    try {
+        await fetch('/api/submit-score', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ score: finalScore })
+        });
+    } catch (e) { console.error("Score-Übertragungsfehler", e); }
+}
+
 function resetGame() {
+    clearTimeout(spawnTimeout);
     obstacles = [];
-    score = 0;
-    gameSpeed = 5;
+    score = 0; level = 1; gameSpeed = 5;
+    player.y = floorY - player.size; player.vy = 0; player.rotation = 0;
     isGameOver = false;
-    player.y = floorY - player.size;
-    player.vy = 0;
-    player.rotation = 0;
+    spawnObstacle();
 }
 
-// Haupt-Gameloop
 function update() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1. Boden zeichnen
-    ctx.fillStyle = '#333';
-    ctx.fillRect(0, floorY, canvas.width, canvas.height - floorY);
-    ctx.strokeStyle = '#00adb5';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(0, floorY);
-    ctx.lineTo(canvas.width, floorY);
-    ctx.stroke();
+    // Hintergrund & Boden zeichnen
+    ctx.fillStyle = '#181818'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#292929'; ctx.fillRect(0, floorY, canvas.width, canvas.height - floorY);
+    ctx.strokeStyle = '#00adb5'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(0, floorY); ctx.lineTo(canvas.width, floorY); ctx.stroke();
 
-    // 2. Spieler-Physik (Schwerkraft)
+    // Physik
     player.vy += player.gravity;
     player.y += player.vy;
 
-    // Am Boden stoppen
     if (player.y >= floorY - player.size) {
-        player.y = floorY - player.size;
-        player.vy = 0;
-        player.isGrounded = true;
-        // Rotation auf das nächste Vielfache von 90 Grad ausrichten beim Landen
+        player.y = floorY - player.size; player.vy = 0; player.isGrounded = true;
         player.rotation = Math.round(player.rotation / (Math.PI / 2)) * (Math.PI / 2);
     } else {
-        // In der Luft rotieren
-        player.rotation += 0.08;
+        player.rotation += 0.09;
     }
 
-    // 3. Spieler zeichnen (mit Rotation)
+    // Spieler zeichnen
     ctx.save();
-    ctx.translate(player.x + player.size / 2, player.y + player.size / 2);
+    ctx.translate(player.x + player.size/2, player.y + player.size/2);
     ctx.rotate(player.rotation);
-    ctx.fillStyle = '#00adb5';
-    ctx.fillRect(-player.size / 2, -player.size / 2, player.size, player.size);
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(-player.size / 2, -player.size / 2, player.size, player.size);
+    ctx.fillStyle = '#00adb5'; ctx.fillRect(-player.size/2, -player.size/2, player.size, player.size);
+    ctx.strokeStyle = '#fff'; ctx.strokeRect(-player.size/2, -player.size/2, player.size, player.size);
     ctx.restore();
 
-    // 4. Hindernisse bewegen und zeichnen
+    // Hindernisse updaten
     for (let i = obstacles.length - 1; i >= 0; i--) {
         let obs = obstacles[i];
-        if (!isGameOver) {
-            obs.x -= gameSpeed;
+        if (!isGameOver) obs.x -= gameSpeed;
+
+        // Unterschiede beim Zeichnen der Objekte
+        if (obs.type === 'spike') {
+            ctx.fillStyle = '#ff2e63';
+            ctx.beginPath();
+            ctx.moveTo(obs.x, obs.y);
+            ctx.lineTo(obs.x + obs.width/2, obs.y - obs.height);
+            ctx.lineTo(obs.x + obs.width, obs.y);
+            ctx.closePath(); ctx.fill();
+        } else {
+            ctx.fillStyle = '#f9d423'; // Gelbe Blöcke
+            ctx.fillRect(obs.x, obs.y - obs.height, obs.width, obs.height);
+            ctx.strokeStyle = '#fff'; ctx.strokeRect(obs.x, obs.y - obs.height, obs.width, obs.height);
         }
 
-        // Dreieck zeichnen
-        ctx.fillStyle = '#ff2e63';
-        ctx.beginPath();
-        ctx.moveTo(obs.x, obs.y);
-        ctx.lineTo(obs.x + obs.width / 2, obs.y - obs.height);
-        ctx.lineTo(obs.x + obs.width, obs.y);
-        ctx.closePath();
-        ctx.fill();
-
-        // Kollisionserkennung (Hitbox)
+        // Kollisionsprüfung
         if (
             player.x < obs.x + obs.width &&
             player.x + player.size > obs.x &&
-            player.y + player.size > obs.y - obs.height
+            player.y + player.size > obs.y - obs.height &&
+            player.y < obs.y
         ) {
-            isGameOver = true;
-        }
-
-        // Punkte zählen, wenn das Hindernis hinter dem Spieler ist
-        if (obs.x + obs.width < player.x && !obs.passed) {
-            obs.passed = true;
-            score++;
-            // Spiel wird alle 3 Punkte ein bisschen schneller
-            if (score % 3 === 0) {
-                gameSpeed += 0.8;
+            if (!isGameOver) {
+                isGameOver = true;
+                sendScoreToServer(score); // Sendet Score live an die Klassenliste!
             }
         }
 
-        // Aus dem Bildschirm gelaufene Hindernisse löschen
-        if (obs.x < -obs.width) {
-            obstacles.splice(i, 1);
+        // Punkte & Levelaufstieg
+        if (obs.x + obs.width < player.x && !obs.passed) {
+            obs.passed = true;
+            score++;
+            if (score % 5 === 0) {
+                level++;
+                gameSpeed += 1.2; // Wird spürbar schneller pro Level
+            }
         }
+
+        if (obs.x < -obs.width) obstacles.splice(i, 1);
     }
 
-    // 5. Score anzeigen
-    ctx.fillStyle = '#fff';
-    ctx.font = '24px Arial';
-    ctx.fillText(`Score: ${score}`, 20, 40);
+    // UI Texte
+    ctx.fillStyle = '#fff'; ctx.font = '20px Arial';
+    ctx.fillText(`Score: ${score}`, 20, 35);
+    ctx.fillText(`Level: ${level}`, 150, 35);
 
-    // Game Over Text anzeigen
     if (isGameOver) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.fillStyle = '#ff2e63';
-        ctx.font = 'bold 40px Arial';
-        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ff2e63'; ctx.font = 'bold 36px Arial'; ctx.textAlign = 'center';
         ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
-        
-        ctx.fillStyle = '#fff';
-        ctx.font = '20px Arial';
-        ctx.fillText('Tippe oder drücke Leertaste zum Neustarten', canvas.width / 2, canvas.height / 2 + 20);
-        ctx.textAlign = 'left'; // Reset für Score-Anzeige
+        ctx.fillStyle = '#fff'; ctx.font = '18px Arial';
+        ctx.fillText('Tippen zum Speichern & Neustarten', canvas.width / 2, canvas.height / 2 + 20);
+        ctx.textAlign = 'left';
     }
 
     requestAnimationFrame(update);
 }
 
-// Erstes Hindernis triggern und Game-Loop starten
-setTimeout(spawnObstacle, 2000);
+spawnObstacle();
 update();
