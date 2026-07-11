@@ -15,7 +15,7 @@
             padding: 20px;
             display: flex;
             flex-direction: column;
-            height: 400px;
+            height: 450px;
         }
         .chat-box {
             flex-grow: 1;
@@ -50,6 +50,7 @@
             border: 1px solid #333;
             background: #2d2d2d;
             color: white;
+            font-size: 16px;
         }
         .chat-input-area button {
             padding: 10px 20px;
@@ -59,6 +60,7 @@
             border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
+            font-size: 16px;
         }
     </style>
 </head>
@@ -79,16 +81,50 @@
             {% endfor %}
         </div>
 
-        <form class="chat-input-area" method="POST">
+        <form class="chat-input-area" method="POST" action="/chat">
             <input type="text" name="message" placeholder="Schreibe eine Nachricht..." autocomplete="off" required>
             <button type="submit">Senden</button>
         </form>
     </div>
 
     <script>
-        // Automatisches Herunterscrollen zu den neuesten Nachrichten
-        const chatBox = document.getElementById('chatBox');
-        chatBox.scrollTop = chatBox.scrollHeight;
+        function scrollToBottom() {
+            const chatBox = document.getElementById('chatBox');
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+        
+        // Beim ersten Laden direkt nach unten scrollen
+        scrollToBottom();
+
+        // Alle 3 Sekunden neue Nachrichten vom Flask-Server ziehen
+        setInterval(async () => {
+            try {
+                const response = await fetch('/api/chat-messages');
+                if (response.ok) {
+                    const nachrichten = await response.json();
+                    const chatBox = document.getElementById('chatBox');
+                    
+                    // Aktuellen Scroll-Status prüfen
+                    const wasAtBottom = chatBox.scrollHeight - chatBox.clientHeight <= chatBox.scrollTop + 50;
+                    
+                    // Box leeren und neu befüllen
+                    chatBox.innerHTML = '';
+                    nachrichten.forEach(msg => {
+                        const msgDiv = document.createElement('div');
+                        msgDiv.className = 'message';
+                        msgDiv.innerHTML = `<b>${msg.name}</b><span>${msg.text}</span>`;
+                        chatBox.appendChild(msgDiv);
+                    });
+                    
+                    // Nur nach unten scrollen, wenn der User vorher auch ganz unten war
+                    if (wasAtBottom) {
+                        scrollToBottom();
+                    }
+                }
+            } catch (error) {
+                console.error("Fehler beim Abrufen der Nachrichten:", error);
+            }
+        }, 3000);
     </script>
 
 </body>
