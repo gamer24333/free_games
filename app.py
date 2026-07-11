@@ -156,5 +156,30 @@ def logout():
     session.pop('username', None)
     return redirect(url_for('login'))
 
+@app.route('/chat/<room>/delete/<int:msg_index>', methods=['POST'])
+def delete_message(room, msg_index):
+    if 'username' not in session:
+        return {"error": "Login erforderlich"}, 401
+    
+    data, sha = load_all_data()
+    current_user = session['username']
+    
+    # Raumnamen für private Chats ermitteln
+    actual_room = room
+    if room != "global":
+        actual_room = get_private_room_name(current_user, room)
+        
+    if actual_room in data["chats"]:
+        raum_nachrichten = data["chats"][actual_room]
+        
+        # Sicherheitcheck: Nur der Absender der Nachricht darf sie löschen!
+        if 0 <= msg_index < len(raum_nachrichten):
+            if raum_nachrichten[msg_index]["name"] == current_user:
+                # Nachricht entfernen
+                raum_nachrichten.pop(msg_index)
+                save_all_data(data, sha)
+                
+    return redirect(url_for('chat', room=room))
+
 if __name__ == '__main__':
     app.run(debug=True)
