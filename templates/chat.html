@@ -38,9 +38,15 @@
             <h3>Aktueller Chat: {% if room == 'global' %}Gruppen-Chat{% else %}{{ room }}{% endif %}</h3>
             <div class="chat-box" id="chatBox">
                 {% for msg in nachrichten %}
-                <div class="message">
+                <div class="message" style="position: relative; padding-right: 40px;">
                     <b>{{ msg.name }}</b>
                     <span>{{ msg.text }}</span>
+                    
+                    {% if msg.name == session['username'] %}
+                    <form action="/chat/{{ room }}/delete/{{ loop.index0 }}" method="POST" style="position: absolute; right: 8px; top: 8px; margin: 0;">
+                        <button type="submit" style="background: none; border: none; color: #ff2e63; cursor: pointer; font-size: 14px; padding: 0;">🗑️</button>
+                    </form>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
@@ -55,16 +61,34 @@
         const chatBox = document.getElementById('chatBox');
         chatBox.scrollTop = chatBox.scrollHeight;
 
+        const currentUsername = "{{ session['username'] }}";
+
         setInterval(async () => {
             try {
                 const response = await fetch('/api/chat-messages/{{ room }}');
                 if (response.ok) {
                     const nachrichten = await response.json();
                     const wasAtBottom = chatBox.scrollHeight - chatBox.clientHeight <= chatBox.scrollTop + 50;
+                    
                     chatBox.innerHTML = '';
-                    nachrichten.forEach(msg => {
-                        chatBox.innerHTML += `<div class="message"><b>${msg.name}</b><span>${msg.text}</span></div>`;
+                    nachrichten.forEach((msg, index) => {
+                        let deleteButton = '';
+                        // Wenn die Nachricht von dir ist, baue das Lösch-Formular ein
+                        if (msg.name === currentUsername) {
+                            deleteButton = `
+                            <form action="/chat/{{ room }}/delete/${index}" method="POST" style="position: absolute; right: 8px; top: 8px; margin: 0;">
+                                <button type="submit" style="background: none; border: none; color: #ff2e63; cursor: pointer; font-size: 14px; padding: 0;">🗑️</button>
+                            </form>`;
+                        }
+    
+                        chatBox.innerHTML += `
+                        <div class="message" style="position: relative; padding-right: 40px;">
+                            <b>${msg.name}</b>
+                            <span>${msg.text}</span>
+                            ${deleteButton}
+                        </div>`;
                     });
+                    
                     if (wasAtBottom) chatBox.scrollTop = chatBox.scrollHeight;
                 }
             } catch (e) { console.error(e); }
