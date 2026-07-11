@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Klassen-Portal Login</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; background-color: #222; color: white; }
+        .login-box { background: #333; padding: 30px; display: inline-block; border-radius: 10px; }
+        input, button { padding: 10px; margin: 10px; border-radius: 5px; border: none; }
+        button { background-color: #00adb5; color: white; cursor: pointer; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+
+    <div class="login-box">
+        <h2>Wer bist du?</h2>
+        {% if fehler %}
+            <p class="error">{{ fehler }}</p>
+        {% endif %}
+        <form method="POST">
+            <input type="text" name="nutzername" placeholder="Dein Vorname" required><br>
+            <button type="submit">Einlass fordern</button>
+        </form>
+    </div>
+
+</body>
+</html>
