@@ -1,1 +1,31 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fake Geometry Dash</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        canvas {
+            background-color: #222;
+            display: block;
+            margin: 20px auto;
+            border: 4px solid #00adb5;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 173, 181, 0.4);
+        }
+    </style>
+</head>
+<body>
 
+    <br>
+    <a href="/welcome" class="btn btn-back">⬅️ Zurück zum Dashboard</a>
+
+    <h1>🎮 Fake Geometry Dash</h1>
+    <p>Drücke die <b>Leertaste</b> oder <b>Klicke</b>, um zu springen!</p>
+
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+
+    <script src="{{ url_for('static', filename='js/geometry_dash.js') }}"></script>
+</body>
+</html>
