@@ -5,6 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Klassen YouTube</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .search-container {
+            margin: 20px auto;
+            max-width: 500px;
+        }
+        .search-bar {
+            width: 100%;
+            padding: 12px 20px;
+            font-size: 16px;
+            border: 2px solid #333;
+            border-radius: 25px;
+            background-color: #1e1e1e;
+            color: white;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .search-bar:focus {
+            border-color: #00adb5;
+        }
+        .no-results {
+            display: none;
+            color: #ff2e63;
+            margin-top: 20px;
+            font-size: 18px;
+        }
+    </style>
 </head>
 <body>
 
@@ -12,11 +38,16 @@
     <a href="/welcome" class="btn btn-back">⬅️ Zurück zum Dashboard</a>
 
     <h1>📺 Unser Klassen-YouTube</h1>
-    <p>Hier sind die coolsten Clips!</p>
+    
+    <div class="search-container">
+        <input type="text" id="searchBar" class="search-bar" placeholder="Videos nach Titel oder Kategorie durchsuchen...">
+    </div>
 
-    <div class="video-grid">
+    <p id="noResultsMessage" class="no-results">Keine Videos gefunden 😢</p>
+
+    <div class="video-grid" id="videoGrid">
         {% for video in videos %}
-        <div class="video-card">
+        <div class="video-card" data-title="{{ video.title | lower }}" data-category="{{ video.category | lower }}">
             <h3>{{ video.title }}</h3>
             <iframe src="https://www.youtube.com/embed/{{ video.youtube_id }}" 
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
@@ -27,5 +58,6 @@
         {% endfor %}
     </div>
 
+    <script src="{{ url_for('static', filename='js/youtube.js') }}"></script>
 </body>
 </html>
