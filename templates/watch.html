@@ -1,1 +1,31 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klassen YouTube</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
 
+    <br>
+    <a href="/welcome" class="btn btn-back">⬅️ Zurück zum Dashboard</a>
+
+    <h1>📺 Unser Klassen-YouTube</h1>
+    <p>Hier sind die coolsten Clips!</p>
+
+    <div class="video-grid">
+        {% for video in videos %}
+        <div class="video-card">
+            <h3>{{ video.title }}</h3>
+            <iframe src="https://www.youtube.com/embed/{{ video.youtube_id }}" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowfullscreen>
+            </iframe>
+            <p style="color: #888; font-size: 14px;">Kategorie: {{ video.category }}</p>
+        </div>
+        {% endfor %}
+    </div>
+
+</body>
+</html>
