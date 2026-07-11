@@ -3,129 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Klassen-Chat</title>
+    <title>Klassen-Chat System</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        .chat-container {
-            max-width: 600px;
-            margin: 20px auto;
-            background: #1e1e1e;
-            border: 2px solid #333;
-            border-radius: 12px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            height: 450px;
-        }
-        .chat-box {
-            flex-grow: 1;
-            overflow-y: auto;
-            text-align: left;
-            padding: 10px;
-            border-bottom: 1px solid #333;
-            margin-bottom: 15px;
-        }
-        .message {
-            margin-bottom: 10px;
-            padding: 8px 12px;
-            border-radius: 8px;
-            background: #2d2d2d;
-            max-width: 80%;
-            width: fit-content;
-        }
-        .message b {
-            color: #00adb5;
-            display: block;
-            font-size: 12px;
-            margin-bottom: 2px;
-        }
-        .chat-input-area {
-            display: flex;
-            gap: 10px;
-        }
-        .chat-input-area input {
-            flex-grow: 1;
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid #333;
-            background: #2d2d2d;
-            color: white;
-            font-size: 16px;
-        }
-        .chat-input-area button {
-            padding: 10px 20px;
-            background: #00adb5;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 16px;
-        }
+        .layout { display: flex; max-width: 900px; margin: 20px auto; gap: 20px; }
+        .sidebar { width: 250px; background: #1e1e1e; border: 2px solid #333; border-radius: 12px; padding: 15px; height: 500px; overflow-y: auto; text-align: left; }
+        .sidebar h3 { margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 5px; }
+        .sidebar a { display: block; padding: 8px 12px; color: #ccc; text-decoration: none; border-radius: 6px; margin-bottom: 5px; font-size: 14px; }
+        .sidebar a:hover, .sidebar a.active { background: #00adb5; color: white; }
+        .chat-main { flex-grow: 1; background: #1e1e1e; border: 2px solid #333; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; height: 500px; }
+        .chat-box { flex-grow: 1; overflow-y: auto; text-align: left; padding: 10px; margin-bottom: 15px; }
+        .message { margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; background: #2d2d2d; max-width: 80%; width: fit-content; }
+        .message b { color: #00adb5; display: block; font-size: 12px; }
+        .chat-input-area { display: flex; gap: 10px; }
+        .chat-input-area input { flex-grow: 1; padding: 10px; border-radius: 8px; border: 1px solid #333; background: #2d2d2d; color: white; }
+        .chat-input-area button { padding: 10px 20px; background: #00adb5; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
+    <br><a href="/welcome" class="btn btn-back">⬅️ Dashboard</a>
+    <h1>💬 Chat-Zentrale</h1>
 
-    <br>
-    <a href="/welcome" class="btn btn-back">⬅️ Zurück zum Dashboard</a>
-
-    <h1>💬 Unser geheimer Klassen-Chat</h1>
-
-    <div class="chat-container">
-        <div class="chat-box" id="chatBox">
-            {% for msg in nachrichten %}
-            <div class="message">
-                <b>{{ msg.name }}</b>
-                <span>{{ msg.text }}</span>
-            </div>
+    <div class="layout">
+        <div class="sidebar">
+            <h3>Räume</h3>
+            <a href="/chat" class="{% if room == 'global' %}active{% endif %}">🌍 Gruppen-Chat</a>
+            <h3>Direktnachrichten</h3>
+            {% for p in partner %}
+                <a href="/chat/{{ p }}" class="{% if room == p %}active{% endif %}">👤 {{ p }}</a>
             {% endfor %}
         </div>
 
-        <form class="chat-input-area" method="POST" action="/chat">
-            <input type="text" name="message" placeholder="Schreibe eine Nachricht..." autocomplete="off" required>
-            <button type="submit">Senden</button>
-        </form>
+        <div class="chat-main">
+            <h3>Aktueller Chat: {% if room == 'global' %}Gruppen-Chat{% else %}{{ room }}{% endif %}</h3>
+            <div class="chat-box" id="chatBox">
+                {% for msg in nachrichten %}
+                <div class="message">
+                    <b>{{ msg.name }}</b>
+                    <span>{{ msg.text }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            <form class="chat-input-area" method="POST" action="/chat/{{ room }}/send">
+                <input type="text" name="message" placeholder="Schreibe etwas..." autocomplete="off" required>
+                <button type="submit">Senden</button>
+            </form>
+        </div>
     </div>
 
     <script>
-        function scrollToBottom() {
-            const chatBox = document.getElementById('chatBox');
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-        
-        // Beim ersten Laden direkt nach unten scrollen
-        scrollToBottom();
+        const chatBox = document.getElementById('chatBox');
+        chatBox.scrollTop = chatBox.scrollHeight;
 
-        // Alle 3 Sekunden neue Nachrichten vom Flask-Server ziehen
         setInterval(async () => {
             try {
-                const response = await fetch('/api/chat-messages');
+                const response = await fetch('/api/chat-messages/{{ room }}');
                 if (response.ok) {
                     const nachrichten = await response.json();
-                    const chatBox = document.getElementById('chatBox');
-                    
-                    // Aktuellen Scroll-Status prüfen
                     const wasAtBottom = chatBox.scrollHeight - chatBox.clientHeight <= chatBox.scrollTop + 50;
-                    
-                    // Box leeren und neu befüllen
                     chatBox.innerHTML = '';
                     nachrichten.forEach(msg => {
-                        const msgDiv = document.createElement('div');
-                        msgDiv.className = 'message';
-                        msgDiv.innerHTML = `<b>${msg.name}</b><span>${msg.text}</span>`;
-                        chatBox.appendChild(msgDiv);
+                        chatBox.innerHTML += `<div class="message"><b>${msg.name}</b><span>${msg.text}</span></div>`;
                     });
-                    
-                    // Nur nach unten scrollen, wenn der User vorher auch ganz unten war
-                    if (wasAtBottom) {
-                        scrollToBottom();
-                    }
+                    if (wasAtBottom) chatBox.scrollTop = chatBox.scrollHeight;
                 }
-            } catch (error) {
-                console.error("Fehler beim Abrufen der Nachrichten:", error);
-            }
+            } catch (e) { console.error(e); }
         }, 3000);
     </script>
-
 </body>
 </html>
