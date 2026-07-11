@@ -3,28 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fake Geometry Dash</title>
+    <title>Geometry Dash & Rangliste</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        canvas {
-            background-color: #222;
-            display: block;
-            margin: 20px auto;
-            border: 4px solid #00adb5;
-            border-radius: 8px;
-            box-shadow: 0 0 20px rgba(0, 173, 181, 0.4);
-        }
+        .game-layout { display: flex; justify-content: center; gap: 20px; max-width: 1100px; margin: 0 auto; padding: 10px; }
+        canvas { background-color: #222; border: 4px solid #00adb5; border-radius: 8px; }
+        .leaderboard-box { background: #1e1e1e; border: 2px solid #333; border-radius: 8px; width: 250px; padding: 15px; text-align: left; }
+        .leaderboard-table { width: 100%; border-collapse: collapse; }
+        .leaderboard-table th, .leaderboard-table td { padding: 8px; border-bottom: 1px solid #333; }
+        .leaderboard-table tr:nth-child(2) td { color: #ffd700; font-weight: bold; } /* Gold für Platz 1 */
     </style>
 </head>
 <body>
-
-    <br>
-    <a href="/welcome" class="btn btn-back">⬅️ Zurück zum Dashboard</a>
-
+    <br><a href="/welcome" class="btn btn-back">⬅️ Dashboard</a>
     <h1>🎮 Fake Geometry Dash</h1>
-    <p>Drücke die <b>Leertaste</b> oder <b>Klicke</b>, um zu springen!</p>
 
-    <canvas id="gameCanvas" width="800" height="400"></canvas>
+    <div class="game-layout">
+        <div>
+            <canvas id="gameCanvas" width="750" height="400"></canvas>
+            <p>Drücke <b>Leertaste</b> oder <b>Tippe das Feld an</b> zum Springen!</p>
+        </div>
+        
+        <div class="leaderboard-box">
+            <h3>🏆 Klassen-Rangliste</h3>
+            <table class="leaderboard-table">
+                <thead>
+                    <tr><th>Platz</th><th>Name</th><th>Score</th></tr>
+                </thead>
+                <tbody>
+                    {% for player, score in leaderboard %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ player }}</td>
+                        <td>{{ score }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 
     <script src="{{ url_for('static', filename='js/geometry_dash.js') }}"></script>
 </body>
