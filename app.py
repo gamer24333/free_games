@@ -5,10 +5,8 @@ import requests
 from flask import Flask, redirect, render_template, request, session, url_for
 
 app = Flask(__name__)
-# Holt den Secret Key aus den Umgebungsvariablen
 app.secret_key = os.environ.get("SECRET_KEY")
 
-# 1. Deine vollständige Klassenliste
 KLASSEN_LISTE = [
     "Till", "Ben", "Matteo", "Louis", "Maxim", "Jonah P", "Jonah S", 
     "Mateo", "Hanna", "Emma", "Lia", "Mia", "Lena S", "Lena G", 
@@ -16,26 +14,19 @@ KLASSEN_LISTE = [
     "Janne", "Tom", "Levin", "Liam", "Tim", "Nathalie", "Richard"
 ]
 
-# --- GITHUB KONFIGURATION ---
-# Die geheimen Daten werden jetzt sicher über das System geladen!
+# --- GITHUB CONFIGURATION ---
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 REPO_OWNER = "gamer24333"
 REPO_NAME = "free_games"
-FILE_PATH = "chat_verlauf.json"
+FILE_PATH = "portal_daten.json"  # Wir speichern alles in EINER Datei (Chat + Highscores)
 
 GITHUB_API_URL = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
 
-# Die Headers werden nur gebaut, wenn ein Token da ist (verhindert Abstürze beim lokalen Starten)
-headers = {}
-if GITHUB_TOKEN:
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json"
-    }
+headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"} if GITHUB_TOKEN else {}
 
-def load_messages_from_github():
+def load_all_data():
     if not GITHUB_TOKEN:
-        return [{"name": "System", "text": "Fehler: GITHUB_TOKEN wurde nicht auf Render eingerichtet!"}], None
+        return {"chats": {"global": [{"name": "System", "text": "Token fehlt!"}]}, "scores": {}}, None
     try:
         response = requests.get(GITHUB_API_URL, headers=headers)
         if response.status_code == 200:
@@ -43,86 +34,122 @@ def load_messages_from_github():
             content = base64.b64decode(file_data['content']).decode('utf-8')
             return json.loads(content), file_data['sha']
         else:
-            default_data = [{"name": "System", "text": "Willkommen im permanenten Klassen-Chat! 🤫"}]
+            # Standard-Struktur, falls Datei noch nicht existiert
+            default_data = {
+                "chats": {"global": [{"name": "System", "text": "Willkommen im Klassen-Chat! 🤫"}]},
+                "scores": {}
+            }
             return default_data, None
     except Exception:
-        return [{"name": "System", "text": "Verbindungsfehler zu GitHub."}], None
+        return {"chats": {"global": [{"name": "System", "text": "Verbindungsfehler."}]}, "scores": {}}, None
 
-def save_message_to_github(name, text):
-    if not GITHUB_TOKEN:
-        return
-    messages, sha = load_messages_from_github()
-    messages.append({"name": name, "text": text})
-    
-    json_string = json.dumps(messages, ensure_ascii=False, indent=4)
+def save_all_data(data, sha):
+    json_string = json.dumps(data, ensure_ascii=False, indent=4)
     content_base64 = base64.b64encode(json_string.encode('utf-8')).decode('utf-8')
-    
-    data = {
-        "message": f"Neuer Chat-Beitrag von {name}",
-        "content": content_base64
-    }
+    payload = {"message": "Portal Daten aktualisiert", "content": content_base64}
     if sha:
-        data["sha"] = sha
+        payload["sha"] = sha
+    requests.put(GITHUB_API_URL, headers=headers, json=payload)
 
-    requests.put(GITHUB_API_URL, headers=headers, json=data)
+# Helper, um für zwei Personen immer denselben Raumnamen zu generieren (z.B. "Ben_Till")
+def get_private_room_name(user1, user2):
+    return "_".join(sorted([user1, user2]))
 
 
 # --- ROUTEN ---
 
 @app.route('/')
 def index():
-    if 'username' in session:
-        return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
+    return redirect(url_for('dashboard')) if 'username' in session else redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if 'username' in session:
-        return redirect(url_for('dashboard'))
-        
     if request.method == 'POST':
         eingabe_name = request.form.get('nutzername', '').strip()
-        
         if eingabe_name in KLASSEN_LISTE:
             session['username'] = eingabe_name
             return redirect(url_for('dashboard'))
-        else:
-            return render_template('login.html', fehler="Du bist leider nicht auf der Gästeliste!")
-            
+        return render_template('login.html', fehler="Du bist nicht auf der Liste!")
     return render_template('login.html')
 
 @app.route('/welcome')
 def dashboard():
-    if 'username' not in session:
-        return redirect(url_for('login'))
+    if 'username' not in session: return redirect(url_for('login'))
     return render_template('dashboard.html', name=session['username'])
 
-@app.route('/chat', methods=['GET', 'POST'])
-def chat():
-    if 'username' not in session:
-        return redirect(url_for('login'))
+# NEU: Chat-Übersicht & Räume
+@app.route('/chat')
+@app.route('/chat/<room>')
+def chat(room="global"):
+    if 'username' not in session: return redirect(url_for('login'))
     
-    if request.method == 'POST':
-        nachricht_text = request.form.get('message', '').strip()
-        if nachricht_text:
-            save_message_to_github(session['username'], nachricht_text)
-            return redirect(url_for('chat'))
+    data, _ = load_all_data()
+    current_user = session['username']
+    
+    # Filter für die Liste der Mitschüler (ohne sich selbst)
+    chpartner = [schueler for schueler in KLASSEN_LISTE if schueler != current_user]
+    
+    # Raumnamen ermitteln, falls es ein privater Chat ist
+    actual_room = room
+    if room != "global":
+        actual_room = get_private_room_name(current_user, room)
+        
+    raum_nachrichten = data["chats"].get(actual_room, [])
+    
+    return render_template('chat.html', room=room, nachrichten=raum_nachrichten, partner=chpartner)
 
-    nachrichten, _ = load_messages_from_github()
-    return render_template('chat.html', nachrichten=nachrichten)
+@app.route('/chat/<room>/send', methods=['POST'])
+def send_message(room):
+    if 'username' not in session: return {"error": "Logn erforderlich"}, 401
+    
+    nachricht_text = request.form.get('message', '').strip()
+    if not nachricht_text: return redirect(url_for('chat', room=room))
+    
+    data, sha = load_all_data()
+    current_user = session['username']
+    
+    actual_room = room
+    if room != "global":
+        actual_room = get_private_room_name(current_user, room)
+        
+    if actual_room not in data["chats"]:
+        data["chats"][actual_room] = []
+        
+    data["chats"][actual_room].append({"name": current_user, "text": nachricht_text})
+    save_all_data(data, sha)
+    
+    return redirect(url_for('chat', room=room))
 
-@app.route('/api/chat-messages')
-def get_api_messages():
-    if 'username' not in session:
-        return {"error": "Nicht autorisiert"}, 401
-    nachrichten, _ = load_messages_from_github()
-    return json.dumps(nachrichten, ensure_ascii=False)
+# API für Live-Updates im Chat
+@app.route('/api/chat-messages/<room>')
+def get_api_messages(room):
+    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
+    data, _ = load_all_data()
+    actual_room = room if room == "global" else get_private_room_name(session['username'], room)
+    return json.dumps(data["chats"].get(actual_room, []), ensure_ascii=False)
 
+# Geometry Dash & Rangliste
 @app.route('/geometry-dash')
 def game():
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    return render_template('game.html')
+    if 'username' not in session: return redirect(url_for('login'))
+    data, _ = load_all_data()
+    # Sortiert die Rangliste nach Highscore (höchste zuerst)
+    leaderboard = sorted(data["scores"].items(), key=lambda x: x[1], reverse=True)
+    return render_template('game.html', leaderboard=leaderboard)
+
+@app.route('/api/submit-score', methods=['POST'])
+def submit_score():
+    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
+    score = int(request.json.get('score', 0))
+    current_user = session['username']
+    
+    data, sha = load_all_data()
+    # Nur speichern, wenn es besser als der alte Highscore ist
+    old_score = data["scores"].get(current_user, 0)
+    if score > old_score:
+        data["scores"][current_user] = score
+        save_all_data(data, sha)
+    return {"status": "success"}
 
 @app.route('/logout')
 def logout():
