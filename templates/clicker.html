@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klassen-Clicker</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 50px; }
+        .btn { display: inline-block; padding: 12px 24px; background: #00adb5; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
+        .btn:hover { background: #007c82; }
+        .btn-back { background: #555; margin-bottom: 20px; }
+        
+        .game-layout { display: flex; justify-content: center; align-items: flex-start; gap: 40px; max-width: 900px; margin: 0 auto; padding: 20px; flex-wrap: wrap; }
+        
+        /* Spielfeld */
+        .game-box { background: #333; border: 3px solid #00adb5; border-radius: 12px; padding: 30px; width: 350px; text-align: center; box-sizing: border-box; }
+        .click-btn { width: 160px; height: 160px; border-radius: 50%; background: #00adb5; color: white; font-size: 20px; font-weight: bold; border: none; cursor: pointer; box-shadow: 0 0 15px rgba(0,173,181,0.4); transition: transform 0.05s; margin: 20px 0; user-select: none; -webkit-user-select: none; }
+        .click-btn:active { transform: scale(0.95); background: #008c9e; }
+        .click-btn:disabled { background: #555; box-shadow: none; cursor: not-allowed; }
+        .stats { font-size: 22px; margin: 10px 0; }
+        
+        /* Rangliste */
+        .leaderboard-box { background: #333; border: 2px solid #444; border-radius: 12px; width: 300px; padding: 20px; box-sizing: border-box; text-align: left; }
+        .leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .leaderboard-table th, .leaderboard-table td { padding: 8px; border-bottom: 1px solid #444; text-align: left; }
+        .leaderboard-table th { color: #00adb5; }
+        .leaderboard-table tr:nth-child(1) td { color: #ffd700; font-weight: bold; } /* Platz 1 Gold */
+    </style>
+</head>
+<body>
+
+    <a href="/welcome" class="btn btn-back">⬅️ Zum Dashboard</a>
+    <h1>⚡ Der 10-Sekunden-Clicker-Test</h1>
+
+    <div class="game-layout">
+        <div class="game-box">
+            <div class="stats">Zeit: <b id="timer" style="color: #ff2e63;">10</b>s</div>
+            <div class="stats">Klicks: <b id="score" style="color: #00adb5;">0</b></div>
+            
+            <button id="clickMe" class="click-btn">KLICK MICH!</button>
+            
+            <p id="hint" style="color: #aaa;">Klicke einmal, um zu starten!</p>
+            <button id="resetBtn" class="btn" style="display:none; margin-top:10px; background: #ff2e63;">Nochmal versuchen</button>
+        </div>
+        
+        <div class="leaderboard-box">
+            <h3 style="margin-top: 0; color: #f9d423; text-align: center;">🏆 Clicker-Rangliste</h3>
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>Platz</th>
+                        <th>Name</th>
+                        <th>Klicks</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for player, score in leaderboard %}
+                    <tr>
+                        <td>{{ loop.index }}.</td>
+                        <td>{{ player }}</td>
+                        <td>{{ score }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let clicks = 0;
+        let timeLeft = 10;
+        let gameActive = false;
+        let hasStarted = false;
+        let timerInterval;
+
+        const clickBtn = document.getElementById('clickMe');
+        const timerEl = document.getElementById('timer');
+        const scoreEl = document.getElementById('score');
+        const hintEl = document.getElementById('hint');
+        const resetBtn = document.getElementById('resetBtn');
+
+        clickBtn.addEventListener('click', () => {
+            // Spiel startet beim allerersten Klick
+            if (!hasStarted) {
+                hasStarted = true;
+                gameActive = true;
+                hintEl.textContent = "SCHNELLER! 🔥";
+                
+                timerInterval = setInterval(() => {
+                    timeLeft--;
+                    timerEl.textContent = timeLeft;
+                    
+                    if (timeLeft <= 0) {
+                        endGame();
+                    }
+                }, 1000);
+            }
+
+            if (gameActive) {
+                clicks++;
+                scoreEl.textContent = clicks;
+            }
+        });
+
+        async function endGame() {
+            gameActive = false;
+            clearInterval(timerInterval);
+            clickBtn.disabled = true;
+            hintEl.textContent = `Fertig! Du hast ${clicks} Klicks geschafft.`;
+            resetBtn.style.display = "inline-block";
+
+            // Highscore per POST an Flask senden
+            try {
+                const response = await fetch('/api/submit-clicker', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ score: clicks })
+                });
+                
+                if (response.ok) {
+                    // Nach 1.5 Sekunden die Seite neu laden, damit die Rangliste aktualisiert wird
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                }
+            } catch (e) { 
+                console.error("Fehler beim Senden des Scores:", e); 
+            }
+        }
+
+        resetBtn.addEventListener('click', () => {
+            clicks = 0;
+            timeLeft = 10;
+            gameActive = false;
+            hasStarted = false;
+            timerEl.textContent = timeLeft;
+            scoreEl.textContent = clicks;
+            clickBtn.disabled = false;
+            hintEl.textContent = "Klicke einmal, um zu starten!";
+            resetBtn.style.display = "none";
+        });
+    </script>
+</body>
+</html>
