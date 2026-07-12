@@ -14,9 +14,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///local_portal.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-# Sorgt dafür, dass die Tabellen auch auf Render (unter Gunicorn) automatisch erstellt werden
-with app.app_context():
-    db.create_all()
+
 
 # Feste Klassenliste
 KLASSEN_LISTE = [
@@ -554,7 +552,9 @@ def logout():
     session.pop('username', None)
     return redirect(url_for('login'))
 
+# --- HIER HIN: ERZWINGT DAS ERSTELLEN BEIM LADEN DER DATEI ---
+with app.app_context():
+    db.create_all()
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all() # Erzeugt die Tabellen beim Start automatisch in Neon!
     app.run(debug=True)
