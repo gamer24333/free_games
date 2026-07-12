@@ -25,7 +25,7 @@ headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.
 
 def load_all_data():
     if not GITHUB_TOKEN:
-        return {"chats": {"global": []}, "scores": {}, "clicker_scores": {}, "flappy_scores": {}, "reaction_scores": {}, "pins": {}, "tictactoe": {}}, None
+        return {"chats": {"global": []}, "scores": {}, "clicker_scores": {}, "flappy_scores": {}, "reaction_scores": {}, "pins": {}, "tictactoe": {}, "admins": ["Till"]}, None
     try:
         response = requests.get(GITHUB_API_URL, headers=headers)
         if response.status_code == 200:
@@ -40,11 +40,18 @@ def load_all_data():
             if "reaction_scores" not in parsed_data: parsed_data["reaction_scores"] = {}
             if "pins" not in parsed_data: parsed_data["pins"] = {}
             if "tictactoe" not in parsed_data: parsed_data["tictactoe"] = {}
+            
+            # NEU: Falls noch keine Admin-Struktur existiert, bist du der Standard-Admin
+            if "admins" not in parsed_data: 
+                parsed_data["admins"] = ["Till"]
+            elif "Till" not in parsed_data["admins"]:
+                parsed_data["admins"].append("Till") # Sicherheitshalber bist du immer drin
+                
             return parsed_data, file_data['sha']
         else:
-            return {"chats": {"global": []}, "scores": {}, "clicker_scores": {}, "flappy_scores": {}, "reaction_scores": {}, "pins": {}, "tictactoe": {}}, None
+            return {"chats": {"global": []}, "scores": {}, "clicker_scores": {}, "flappy_scores": {}, "reaction_scores": {}, "pins": {}, "tictactoe": {}, "admins": ["Till"]}, None
     except Exception:
-        return {"chats": {"global": []}, "scores": {}, "clicker_scores": {}, "flappy_scores": {}, "reaction_scores": {}, "pins": {}, "tictactoe": {}}, None
+        return {"chats": {"global": []}, "scores": {}, "clicker_scores": {}, "flappy_scores": {}, "reaction_scores": {}, "pins": {}, "tictactoe": {}, "admins": ["Till"]}, None
 
 def save_all_data(data, sha):
     json_string = json.dumps(data, ensure_ascii=False, indent=4)
@@ -72,7 +79,6 @@ def games_menu():
     ttt_games = data.get("tictactoe", {})
     me = session['username']
     
-    # Hier filtern wir die Tic-Tac-Toe Einladungen direkt für das Spiele-Menü heraus
     aktive_einladungen = []
     for g_id, g_data in ttt_games.items():
         if g_data["gegner"] == me and g_data["status"] == "eingeladen":
@@ -131,7 +137,8 @@ def dashboard():
         if (g_data["ersteller"] == me or g_data["gegner"] == me) and g_data["status"] == "aktiv":
             aktive_matches.append({"id": g_id, "von": "Dein Match läuft!", "is_active": True})
 
-    is_admin = (me == "Till")
+    # DYNAMISCH: Prüft, ob du in der Admin-Liste stehst
+    is_admin = (me in data.get("admins", ["Till"]))
     return render_template('dashboard.html', name=me, einladungen=aktive_matches, is_admin=is_admin)
 
 @app.route('/api/dashboard-stats')
@@ -153,19 +160,55 @@ def dashboard_stats():
         "private_messages_stats": private_chats_stats
     }
 
+# --- 🛠️ DAS DYNAMISCHE ADMIN PANEL ROUTEN ---
 @app.route('/admin')
 def admin_panel():
-    if 'username' not in session or session['username'] != "Till":
-        return "Zugriff verweigert! ❌", 403
-        
+    if 'username' not in session: return redirect(url_for('login'))
     data, _ = load_all_data()
-    return render_template('admin.html', pins=data.get("pins", {}))
+    
+    # Prüfen, ob der User Admin-Rechte besitzt
+    if session['username'] not in data.get("admins", ["Till"]):
+        return "Zugriff verweigert! ❌ Du bist kein Admin.", 403
+        
+    return render_template('admin.html', pins=data.get("pins", {}), admins=data.get("admins", []), klassen_liste=KLASSEN_LISTE)
+
+# NEU: Route um jemanden zum Admin zu machen
+@app.route('/admin/make-admin', methods=['POST'])
+def make_admin():
+    if 'username' not in session: return "403", 403
+    data, sha = load_all_data()
+    
+    if session['username'] not in data.get("admins", ["Till"]): return "403", 403
+    
+    neuer_admin = request.form.get('schueler')
+    if neuer_admin in KLASSEN_LISTE and neuer_admin not in data["admins"]:
+        data["admins"].append(neuer_admin)
+        save_all_data(data, sha)
+        
+    return redirect(url_for('admin_panel'))
+
+# NEU: Route um jemanden als Admin zu entfernen
+@app.route('/admin/remove-admin/<schueler>', methods=['POST'])
+def remove_admin(schueler):
+    if 'username' not in session: return "403", 403
+    data, sha = load_all_data()
+    
+    if session['username'] not in data.get("admins", ["Till"]): return "403", 403
+    
+    # "Till" darf sich zur Sicherheit nicht selbst löschen!
+    if schueler in data["admins"] and schueler != "Till":
+        data["admins"].remove(schueler)
+        save_all_data(data, sha)
+        
+    return redirect(url_for('admin_panel'))
 
 @app.route('/admin/reset-pin/<schueler>', methods=['POST'])
 def admin_reset_pin(schueler):
-    if 'username' not in session or session['username'] != "Till": return "403", 403
-    
+    if 'username' not in session: return "403", 403
     data, sha = load_all_data()
+    
+    if session['username'] not in data.get("admins", ["Till"]): return "403", 403
+    
     if schueler in data["pins"]:
         del data["pins"][schueler]
         save_all_data(data, sha)
@@ -174,9 +217,11 @@ def admin_reset_pin(schueler):
 
 @app.route('/admin/clear-chat', methods=['POST'])
 def admin_clear_chat():
-    if 'username' not in session or session['username'] != "Till": return "403", 403
-    
+    if 'username' not in session: return "403", 403
     data, sha = load_all_data()
+    
+    if session['username'] not in data.get("admins", ["Till"]): return "403", 403
+    
     data["chats"]["global"] = [{"name": "System", "text": "Der Chat wurde vom Admin aufgeräumt! 🧹"}]
     save_all_data(data, sha)
     
@@ -265,7 +310,7 @@ def delete_message(room, msg_index):
                 nachrichten.pop(msg_index)
                 save_all_data(data, sha)
                 
-    return redirect(url_for('chat', room=room)) # KORRIGIERT: Führt nun zurück zu /chat/<room>
+    return redirect(url_for('chat', room=room))
 
 # --- GAME 1: GEOMETRY DASH ---
 
@@ -276,10 +321,9 @@ def game():
     data, _ = load_all_data()
     scores_data = data.get("scores", {})
     
-    # KORRIGIERT: Zeigt jeden Schüler mit 0 an, wenn er noch nicht gespielt hat
     vollstaendige_liste = [(s, scores_data.get(s, 0)) for s in KLASSEN_LISTE]
     leaderboard = sorted(vollstaendige_liste, key=lambda x: x[1], reverse=True)
-    return render_template('geometry_dash.html', leaderboard=leaderboard)
+    return render_template('game.html', leaderboard=leaderboard)
     
 @app.route('/api/submit-score', methods=['POST'])
 def submit_score():
@@ -360,7 +404,6 @@ def tictactoe_accept(game_id):
         save_all_data(data, sha)
     return redirect(url_for('tictactoe_game', game_id=game_id))
 
-# NEUE ROUTE: Anfragen sauber wegklicken / löschen
 @app.route('/tictactoe/decline/<game_id>', methods=['POST'])
 def tictactoe_decline(game_id):
     if 'username' not in session: return redirect(url_for('login'))
@@ -369,6 +412,15 @@ def tictactoe_decline(game_id):
         del data["tictactoe"][game_id]
         save_all_data(data, sha)
     return redirect(url_for('games_menu'))
+
+@app.route('/tictactoe/delete-match/<game_id>', methods=['POST'])
+def delete_match(game_id):
+    if 'username' not in session: return redirect(url_for('login'))
+    data, sha = load_all_data()
+    if "tictactoe" in data and game_id in data["tictactoe"]:
+        del data["tictactoe"][game_id]
+        save_all_data(data, sha)
+    return redirect(url_for('dashboard'))
 
 @app.route('/tictactoe/game/<game_id>')
 def tictactoe_game(game_id):
@@ -408,17 +460,6 @@ def ttt_move(game_id):
             
     return {"status": "invalid_move"}, 400
 
-@app.route('/tictactoe/delete-match/<game_id>', methods=['POST'])
-def delete_match(game_id):
-    if 'username' not in session: return redirect(url_for('login'))
-    
-    data, sha = load_all_data()
-    if "tictactoe" in data and game_id in data["tictactoe"]:
-        del data["tictactoe"][game_id] # Löscht das Match komplett
-        save_all_data(data, sha)
-        
-    return redirect(url_for('dashboard'))
-
 # --- 🦘 FLAPPY BIRD ROUTES ---
 @app.route('/flappy')
 def flappy_game():
@@ -426,7 +467,6 @@ def flappy_game():
     data, _ = load_all_data()
     scores = data.get("flappy_scores", {})
     
-    # KORRIGIERT: Zeigt jeden Schüler mit 0 an, wenn er noch nicht gespielt hat
     leaderboard_data = [(s, scores.get(s, 0)) for s in KLASSEN_LISTE]
     leaderboard = sorted(leaderboard_data, key=lambda x: x[1], reverse=True)
     return render_template('flappy.html', leaderboard=leaderboard)
@@ -452,7 +492,6 @@ def reaction_game():
     data, _ = load_all_data()
     scores = data.get("reaction_scores", {})
     
-    # KORRIGIERT: Zeigt jeden Schüler an. Wenn noch kein Score da ist -> 9999 ms
     leaderboard_data = [(s, scores.get(s, 9999)) for s in KLASSEN_LISTE]
     leaderboard = sorted(leaderboard_data, key=lambda x: x[1], reverse=False)
     return render_template('reaction.html', leaderboard=leaderboard)
