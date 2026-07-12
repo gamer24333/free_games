@@ -30,7 +30,7 @@
             "ersteller": "Maxim",
             "gegner": "Till",
             "board": [
-                "",
+                "O",
                 "",
                 "",
                 "",
@@ -40,7 +40,7 @@
                 "",
                 "X"
             ],
-            "turn": "Till",
+            "turn": "Maxim",
             "status": "aktiv"
         }
     }
