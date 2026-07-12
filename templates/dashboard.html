@@ -58,32 +58,44 @@
     <a href="/logout" style="color: #ff2e63; text-decoration: none; font-weight: bold;">Abmelden</a>
 
     <script>
-        async function checkNewMessages() {
-            try {
-                const response = await fetch('/api/dashboard-stats');
-                if (response.ok) {
-                    const stats = await response.json();
-                    
-                    // Wie viele Nachrichten hat der User zuletzt im Chat gesehen?
-                    const lastSeenCount = localStorage.getItem('last_seen_messages') || 0;
-                    const totalMessages = stats.global_messages_count;
-                    
-                    const newMessages = totalMessages - lastSeenCount;
-                    const badge = document.getElementById('chatBadge');
-                    
-                    if (newMessages > 0) {
-                        badge.textContent = newMessages;
-                        badge.style.display = 'inline-block';
-                    } else {
-                        badge.style.display = 'none';
+    async function checkNewMessages() {
+        try {
+            const response = await fetch('/api/dashboard-stats');
+            if (response.ok) {
+                const stats = await response.json();
+                
+                // 1. Globale Nachrichten auswerten
+                const lastSeenGlobal = localStorage.getItem('last_seen_messages_global') || 0;
+                const newGlobal = stats.global_messages_count - lastSeenGlobal;
+                
+                // 2. Private Nachrichten auswerten
+                let newPrivateTotal = 0;
+                const localPrivateStorage = JSON.parse(localStorage.getItem('last_seen_messages_private') || '{}');
+                
+                for (const [partner, currentCount] of Object.entries(stats.private_messages_stats)) {
+                    const lastSeenPrivate = localPrivateStorage[partner] || 0;
+                    if (currentCount > lastSeenPrivate) {
+                        newPrivateTotal += (currentCount - lastSeenPrivate);
                     }
                 }
-            } catch (e) { console.error(e); }
-        }
+                
+                // 3. Gesamtzahl berechnen und anzeigen
+                const totalNewMessages = (newGlobal > 0 ? newGlobal : 0) + newPrivateTotal;
+                const badge = document.getElementById('chatBadge');
+                
+                if (totalNewMessages > 0) {
+                    badge.textContent = totalNewMessages;
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+        } catch (e) { console.error(e); }
+    }
 
-        // Alle 5 Sekunden prüfen, ob jemand im Chat geschrieben hat
-        setInterval(checkNewMessages, 5000);
-        checkNewMessages();
-    </script>
+    // Alle 5 Sekunden prüfen
+    setInterval(checkNewMessages, 5000);
+    checkNewMessages();
+</script>
 </body>
 </html>
