@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Tic-Tac-Toe Matchmaking</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <br><a href="/welcome" class="btn btn-back">⬅️ Dashboard</a>
+    <h1>❌ Tic-Tac-Toe Duell-Zentrale ⭕</h1>
+    
+    <div style="background: #1e1e1e; padding: 25px; border-radius: 12px; max-width: 400px; margin: 40px auto; border: 2px solid #333;">
+        <h3>Wen willst du herausfordern?</h3>
+        <form action="/tictactoe/invite" method="POST">
+            <select name="gegner" style="width: 100%; padding: 10px; background: #2d2d2d; color: white; border-radius: 6px; margin-bottom: 20px; font-size: 16px;">
+                {% for g in gegner_liste %}
+                    <option value="{{ g }}">{{ g }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn" style="width: 100%; background: #ff2e63;">Herausforderung senden! ⚔️</button>
+        </form>
+    </div>
+</body>
+</html>
