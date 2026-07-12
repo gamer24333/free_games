@@ -131,12 +131,24 @@ def get_api_messages(room):
 # Geometry Dash & Rangliste
 @app.route('/geometry-dash')
 def game():
-    if 'username' not in session: return redirect(url_for('login'))
+    if 'username' not in session: 
+        return redirect(url_for('login'))
+    
     data, _ = load_all_data()
-    # Sortiert die Rangliste nach Highscore (höchste zuerst)
-    leaderboard = sorted(data["scores"].items(), key=lambda x: x[1], reverse=True)
+    scores_data = data.get("scores", {})
+    
+    # Hier bauen wir die vollständige Liste für ALLE Schüler
+    vollstaendige_liste = []
+    for schueler in KLASSEN_LISTE:
+        # Falls der Schüler schon gespielt hat, nimm seinen Score, sonst 0
+        score = scores_data.get(schueler, 0)
+        vollstaendige_liste.append((schueler, score))
+    
+    # Jetzt sortieren wir alle Schüler nach ihrem Score (höchster zuerst)
+    leaderboard = sorted(vollstaendige_liste, key=lambda x: x[1], reverse=True)
+    
     return render_template('game.html', leaderboard=leaderboard)
-
+    
 @app.route('/api/submit-score', methods=['POST'])
 def submit_score():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
