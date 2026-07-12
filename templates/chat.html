@@ -69,6 +69,10 @@
     </div>
 
     <script>
+    // Speichert, wie viele Nachrichten beim Laden da waren, um den Dashboard-Zähler zurückzusetzen
+    const totalLoadedMessages = {{ nachrichten|length }};
+    localStorage.setItem('last_seen_messages', totalLoadedMessages);
+        
     const chatBox = document.getElementById('chatBox');
     const chatForm = document.querySelector('.chat-input-area');
     const inputField = chatForm.querySelector('input[name="message"]');
