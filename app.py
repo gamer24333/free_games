@@ -72,6 +72,14 @@ def get_ttt_id(p1, p2):
 
 # --- ROUTEN ---
 
+@app.route('/games')
+def games_menu():
+    if 'username' not in session: 
+        return redirect(url_for('login'))
+    return render_template('games.html')
+
+
+
 @app.route('/')
 def index():
     return redirect(url_for('dashboard')) if 'username' in session else redirect(url_for('login'))
