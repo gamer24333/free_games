@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Tic-Tac-Toe Match</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .ttt-grid { display: grid; grid-template-columns: repeat(3, 100px); grid-gap: 10px; justify-content: center; margin: 20px auto; }
+        .cell { width: 100px; height: 100px; background: #2d2d2d; border: 2px solid #333; border-radius: 8px; font-size: 36px; font-weight: bold; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; user-select: none; }
+        .cell:hover { background: #444; }
+        #statusLabel { font-size: 20px; font-weight: bold; margin-bottom: 20px; color: #00adb5; }
+    </style>
+</head>
+<body>
+    <br><a href="/welcome" class="btn btn-back">⬅️ Zum Dashboard fliehen</a>
+    <h1>⚔️ Das Duell</h1>
+    
+    <div id="statusLabel">Lade Spielstatus...</div>
+
+    <div class="ttt-grid">
+        <div class="cell" onclick="makeMove(0)"></div>
+        <div class="cell" onclick="makeMove(1)"></div>
+        <div class="cell" onclick="makeMove(2)"></div>
+        <div class="cell" onclick="makeMove(3)"></div>
+        <div class="cell" onclick="makeMove(4)"></div>
+        <div class="cell" onclick="makeMove(5)"></div>
+        <div class="cell" onclick="makeMove(6)"></div>
+        <div class="cell" onclick="makeMove(7)"></div>
+        <div class="cell" onclick="makeMove(8)"></div>
+    </div>
+
+    <script>
+        const gameId = "{{ game_id }}";
+        const me = "{{ me }}";
+        let myTurn = false;
+
+        async function updateBoard() {
+            try {
+                const response = await fetch(`/api/tictactoe/status/${gameId}`);
+                if (response.ok) {
+                    const game = await response.json();
+                    const cells = document.querySelectorAll('.cell');
+                    
+                    // Spielfeld füllen
+                    game.board.forEach((val, index) => {
+                        cells[index].textContent = val;
+                        if (val === "X") cells[index].style.color = "#ff2e63";
+                        if (val === "O") cells[index].style.color = "#00adb5";
+                    });
+
+                    // Status verarbeiten
+                    if (game.status === "eingeladen") {
+                        document.getElementById('statusLabel').textContent = "Warte darauf, dass der Gegner annimmt...";
+                        myTurn = false;
+                    } else if (game.status === "aktiv") {
+                        if (game.turn === me) {
+                            document.getElementById('statusLabel').textContent = "DU bist dran! 🟢";
+                            myTurn = true;
+                        } else {
+                            document.getElementById('statusLabel').textContent = `Warte auf ${game.turn}... ⏳`;
+                            myTurn = false;
+                        }
+                    } else if (game.status.startsWith("gewonnen")) {
+                        const winner = game.status.split("_")[1];
+                        document.getElementById('statusLabel').textContent = winner === me ? "🎉 DU HAST GEWONNEN! 🎉" : `❌ ${winner} hat gewonnen!`;
+                        myTurn = false;
+                    } else if (game.status === "unentschieden") {
+                        document.getElementById('statusLabel').textContent = "🤝 Unentschieden!";
+                        myTurn = false;
+                    }
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function makeMove(index) {
+            if (!myTurn) return;
+            
+            // Sofort lokal sperren, um Doppel-Klicks zu vermeiden
+            myTurn = false; 
+
+            try {
+                const response = await fetch(`/api/tictactoe/move/${gameId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cell: index })
+                });
+                if (response.ok) {
+                    updateBoard();
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // Alle 2 Sekunden das Spielfeld aktualisieren
+        setInterval(updateBoard, 2000);
+        updateBoard();
+    </script>
+</body>
+</html>
