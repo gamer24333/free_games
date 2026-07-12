@@ -222,31 +222,38 @@ def send_message(room):
     return {"status": "success"}
 
 @app.route('/api/chat-messages/<room>')
-def get_api_messages(room):
+def api_chat_messages(room):
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
-    data, _ = load_all_data()
-    actual_room = room if room == "global" else get_private_room_name(session['username'], room)
-    return json.dumps(data["chats"].get(actual_room, []), ensure_ascii=False)
-
-@app.route('/chat/<room>/delete/<int:msg_index>', methods=['POST'])
-def delete_message(room, msg_index):
-    if 'username' not in session: return {"error": "Login erforderlich"}, 401
-    
     data, sha = load_all_data()
     current_user = session['username']
     
-    actual_room = room
+    nachrichten = data["chats"].get(room, [])
+    
+    # "Gelesen"-Logik nur für private DMs (nicht für den globalen Chat)
     if room != "global":
-        actual_room = get_private_room_name(current_user, room)
+        # Wer ist der Partner? (Der Raumname ist der Name des Partners)
+        partner = room
+        room_id = get_private_room_name(current_user, partner)
+        nachrichten = data["chats"].get(room_id, [])
         
-    if actual_room in data["chats"]:
-        raum_nachrichten = data["chats"][actual_room]
-        if 0 <= msg_index < len(raum_nachrichten):
-            if raum_nachrichten[msg_index]["name"] == current_user:
-                raum_nachrichten.pop(msg_index)
-                save_all_data(data, sha)
-                
-    return redirect(url_for('chat', room=room))
+        # Wir merken uns, dass der aktuelle User alle bisherigen Nachrichten gesehen hat
+        if "read_status" not in data:
+            data["read_status"] = {}
+        if room_id not in data["read_status"]:
+            data["read_status"][room_id] = {}
+            
+        # Speichern, wie viele Nachrichten der aktuelle User jetzt gesehen hat
+        data["read_status"][room_id][current_user] = len(nachrichten)
+        save_all_data(data, sha) # Direkt auf GitHub sichern
+        
+        # Jetzt fügen wir für das Frontend die Info hinzu, ob der Partner die Nachricht schon gesehen hat
+        partner_seen_count = data["read_status"][room_id].get(partner, 0)
+        
+        for index, msg in enumerate(nachrichten):
+            # Wenn der Index der Nachricht kleiner ist als das, was der Partner gesehen hat -> Gelesen!
+            msg["gelesen"] = (index < partner_seen_count)
+
+    return jsonify(nachrichten)
 
 
 # --- GAME 1: GEOMETRY DASH ---
