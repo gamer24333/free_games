@@ -50,5 +50,8 @@
     },
     "flappy_scores": {
         "Till": 7
+    },
+    "reaction_scores": {
+        "Till": 256
     }
 }
