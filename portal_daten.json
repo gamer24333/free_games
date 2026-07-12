@@ -24,5 +24,23 @@
     "clicker_scores": {
         "Till": 5809
     },
-    "tictactoe": {}
+    "tictactoe": {
+        "Maxim_vs_Till": {
+            "ersteller": "Maxim",
+            "gegner": "Till",
+            "board": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+            ],
+            "turn": "Maxim",
+            "status": "eingeladen"
+        }
+    }
 }
