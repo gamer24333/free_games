@@ -243,7 +243,11 @@ def chat(room="global"):
         actual_room = get_private_room_name(current_user, room)
         
     raum_nachrichten = data["chats"].get(actual_room, [])
-    return render_template('chat.html', room=room, nachrichten=raum_nachrichten, partner=chpartner)
+    
+    # NEU: Wir holen uns die Admin-Liste aus den Daten (Standard: Till)
+    aktuelle_admins = data.get("admins", ["Till"])
+    
+    return render_template('chat.html', room=room, nachrichten=raum_nachrichten, partner=chpartner, admins=aktuelle_admins)
 
 @app.route('/chat/<room>/send', methods=['POST'])
 def send_message(room):
