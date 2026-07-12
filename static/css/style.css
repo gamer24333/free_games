@@ -92,3 +92,28 @@ iframe {
 .emoji-btn:active {
     transform: scale(0.9);
 }
+
+/* Das Haupt-Layout für den Chat */
+.chat-container {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* Für Handys: Spalten untereinander statt nebeneinander */
+@media (max-width: 768px) {
+    .chat-container {
+        flex-direction: column;
+    }
+    
+    /* Die Raum-Liste/Sidebar bekommt auf dem Handy volle Breite oder wird einklappbar */
+    .chat-sidebar {
+        width: 100% !important;
+        margin-bottom: 15px;
+    }
+    
+    .chat-main {
+        width: 100% !important;
+    }
+}
