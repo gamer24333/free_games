@@ -15,6 +15,8 @@ KLASSEN_LISTE = [
     "Janne", "Tom", "Levin", "Liam", "Tim", "Nathalie", "Richard"
 ]
 
+partner = sorted([p for p in KLASSEN_LISTE if p != current_user])
+
 # --- GITHUB CONFIGURATION ---
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 REPO_OWNER = "gamer24333"
