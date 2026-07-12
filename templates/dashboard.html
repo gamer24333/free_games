@@ -10,7 +10,7 @@
         .btn:hover { background: #007c82; }
         .badge { background: #ff2e63; color: white; border-radius: 50%; padding: 3px 8px; font-size: 12px; position: absolute; top: -8px; right: -8px; display: none; box-shadow: 0 0 8px rgba(255,46,99,0.6); }
         .invite-box { background: #333; padding: 15px; border-radius: 8px; max-width: 500px; margin: 25px auto; border: 2px solid #ff2e63; text-align: left; }
-        .invite-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .invite-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; }
         .admin-box { margin-top: 40px; border-top: 2px dashed #555; padding-top: 20px; }
     </style>
 </head>
@@ -25,7 +25,6 @@
             <span id="chatBadge" class="badge">0</span>
         </a>
         
-        
         <a href="/games" class="btn" style="background: #2ecc71;">🎮 Spiele-Zentrale</a>
     </div>
 
@@ -36,7 +35,12 @@
             <div class="invite-item">
                 {% if einl.is_active %}
                     <span style="color: #00adb5;">Ein Live-Spiel läuft gerade!</span>
-                    <a href="/tictactoe/game/{{ einl.id }}" class="btn" style="padding: 6px 12px; font-size: 14px; margin: 0;">Weiterspielen</a>
+                    <div style="display: flex; gap: 8px;">
+                        <a href="/tictactoe/game/{{ einl.id }}" class="btn" style="padding: 6px 12px; font-size: 14px; margin: 0; background: #00adb5;">Weiterspielen</a>
+                        <form action="/tictactoe/delete-match/{{ einl.id }}" method="POST" style="margin: 0;">
+                            <button type="submit" class="btn" style="background: #ff2e63; padding: 6px 12px; font-size: 14px; margin: 0; border: none; cursor: pointer;">❌ Löschen</button>
+                        </form>
+                    </div>
                 {% else %}
                     <span><b>{{ einl.von }}</b> fordert dich heraus!</span>
                     <form action="/tictactoe/accept/{{ einl.id }}" method="POST" style="margin: 0;">
