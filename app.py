@@ -134,13 +134,22 @@ def dashboard():
 def dashboard_stats():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
     data, _ = load_all_data()
+    current_user = session['username']
     
+    # Anzahl der globalen Nachrichten
     global_chat_len = len(data["chats"].get("global", []))
     
+    # Hier zählen wir die Nachrichten für jeden privaten Chatraum
+    private_chats_stats = {}
+    for schueler in KLASSEN_LISTE:
+        if schueler != current_user:
+            room_id = get_private_room_name(current_user, schueler)
+            private_chats_stats[schueler] = len(data["chats"].get(room_id, []))
+    
     return {
-        "global_messages_count": global_chat_len
+        "global_messages_count": global_chat_len,
+        "private_messages_stats": private_chats_stats
     }
-
 # --- 🛠️ DAS ADMIN PANEL ROUTEN ---
 @app.route('/admin')
 def admin_panel():
