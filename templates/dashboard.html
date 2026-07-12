@@ -4,9 +4,11 @@
     <meta charset="UTF-8">
     <title>Dashboard</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; }
-        .btn { display: inline-block; padding: 20px 40px; margin: 20px; background: #00adb5; color: white; text-decoration: none; border-radius: 8px; font-size: 20px; }
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 50px; }
+        .btn { display: inline-block; padding: 15px 30px; margin: 10px; background: #00adb5; color: white; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold; }
         .btn:hover { background: #007c82; }
+        .invite-box { background: #333; padding: 15px; border-radius: 8px; max-width: 500px; margin: 25px auto; border: 2px solid #ff2e63; text-align: left; }
+        .invite-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -14,12 +16,34 @@
     <h1>Willkommen, {{ name }}! 👋</h1>
     <p>Schön, dass du da bist. Was willst du machen?</p>
 
-    
-    <a href="/geometry-dash" class="btn">🎮 Fake Geometry Dash</a>
-    <a href="/chat" class="btn">💬 Klassen-Chat</a>
+    <div style="margin: 30px 0;">
+        <a href="/chat" class="btn" style="background: #3498db;">💬 Klassen-Chat & DM</a>
+        <a href="/geometry-dash" class="btn">🎮 Fake Geometry Dash</a>
+        <a href="/clicker" class="btn" style="background: #f9d423; color: black;">⚡ Clicker Game</a>
+        <a href="/tictactoe" class="btn" style="background: #ff2e63;">❌ Tic-Tac-Toe Duell ⭕</a>
+    </div>
+
+    {% if einladungen %}
+    <div class="invite-box">
+        <h3 style="margin-top: 0; color: #ff2e63;">⚔️ Match-Benachrichtigungen:</h3>
+        {% for einl in einladungen %}
+            <div class="invite-item">
+                {% if einl.is_active %}
+                    <span style="color: #00adb5;">Ein Live-Spiel läuft gerade!</span>
+                    <a href="/tictactoe/game/{{ einl.id }}" class="btn" style="padding: 6px 12px; font-size: 14px; margin: 0;">Weiterspielen</a>
+                {% else %}
+                    <span><b>{{ einl.von }}</b> fordert dich heraus!</span>
+                    <form action="/tictactoe/accept/{{ einl.id }}" method="POST" style="margin: 0;">
+                        <button type="submit" class="btn" style="background: #2ecc71; padding: 6px 12px; font-size: 14px; margin: 0; border: none; cursor: pointer;">Annehmen</button>
+                    </form>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}
     
     <br><br>
-    <a href="/logout" style="color: #ff2e63;">Abmelden</a>
+    <a href="/logout" style="color: #ff2e63; text-decoration: none; font-weight: bold;">Abmelden</a>
 
 </body>
 </html>
