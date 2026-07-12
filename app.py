@@ -152,10 +152,12 @@ def chat(room="global"):
 
 @app.route('/chat/<room>/send', methods=['POST'])
 def send_message(room):
-    if 'username' not in session: return {"error": "Logn erforderlich"}, 401
+    if 'username' not in session: 
+        return {"error": "Login erforderlich"}, 401
     
     nachricht_text = request.form.get('message', '').strip()
-    if not nachricht_text: return redirect(url_for('chat', room=room))
+    if not nachricht_text: 
+        return {"status": "empty"}, 400
     
     data, sha = load_all_data()
     current_user = session['username']
@@ -168,9 +170,12 @@ def send_message(room):
         data["chats"][actual_room] = []
         
     data["chats"][actual_room].append({"name": current_user, "text": nachricht_text})
+    
+    # Das hier schickt es im Hintergrund zu GitHub
     save_all_data(data, sha)
     
-    return redirect(url_for('chat', room=room))
+    # NEU: Wir antworten dem JavaScript sofort mit Erfolg, ohne die Seite neu zu laden!
+    return {"status": "success"}
 
 # API für Live-Updates im Chat
 @app.route('/api/chat-messages/<room>')
