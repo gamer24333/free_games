@@ -65,3 +65,30 @@ iframe {
     font-size: 14px;
     padding: 10px 20px;
 }
+
+/* --- EMOJI BAR STYLING --- */
+.emoji-bar {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-start;
+    padding: 5px 2px;
+    user-select: none; /* Verhindert, dass man den Text aus Versehen markiert */
+}
+
+.emoji-btn {
+    font-size: 22px;
+    cursor: pointer;
+    transition: transform 0.1s ease, filter 0.1s ease;
+    display: inline-block;
+}
+
+/* Kleiner Effekt, wenn man mit der Maus drübergeht oder tippt */
+.emoji-btn:hover {
+    transform: scale(1.2);
+    filter: brightness(1.2);
+}
+
+/* Effekt direkt beim Draufdrücken (perfekt fürs iPad) */
+.emoji-btn:active {
+    transform: scale(0.9);
+}
