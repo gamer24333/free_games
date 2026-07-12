@@ -62,12 +62,20 @@
             <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">👍</span>
             <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">👀</span>
             <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">💯</span>
+            
+                
         </div>
 
-        <form class="chat-input-area" method="POST" action="/chat/{{ room }}/send">
-            <input type="text" name="message" id="messageInput" placeholder="Schreibe etwas..." autocomplete="off" required>
-            <button type="submit">Senden</button>
+        <form class="chat-input-area" id="chatForm" style="display: flex; gap: 8px; align-items: center;">
+            <input type="file" id="imageInput" accept="image/*" style="display: none;">
+            <button type="button" onclick="document.getElementById('imageInput').click()" class="btn" style="background: #27ae60; padding: 12px; margin: 0;">🖼️</button>
+
+            <button type="button" id="voiceBtn" class="btn" style="background: #e74c3c; padding: 12px; margin: 0;">🎙️</button>
+
+            <input type="text" name="message" id="messageInput" placeholder="Schreibe etwas..." autocomplete="off" required style="flex-grow: 1;">
+            <button type="submit" class="btn" style="margin: 0;">Senden</button>
         </form>
+        <span id="voiceStatus" style="color: #ff2e63; font-size: 12px; display: block; text-align: left; margin-top: 5px;"></span>
         </div>
     </div>
 
