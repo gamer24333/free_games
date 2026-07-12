@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>🛠️ Admin-Steuerung</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #222; color: white; padding: 30px; text-align: center; }
+        .btn { display: inline-block; padding: 10px 20px; background: #555; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; }
+        .container { max-width: 600px; margin: 0 auto; background: #333; padding: 20px; border-radius: 12px; text-align: left; }
+        .danger-btn { background: #ff2e63; }
+        .danger-btn:hover { background: #cc244f; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 10px; border-bottom: 1px solid #444; }
+    </style>
+</head>
+<body>
+
+    <a href="/welcome" class="btn">⬅️ Zurück zum Dashboard</a>
+    <h1>🛠️ Admin-Steuerung (Nur für dich)</h1>
+
+    <div class="container">
+        <h3>🧹 Chat-Verwaltung</h3>
+        <form action="/admin/clear-chat" method="POST" onsubmit="return confirm('Wirklich den gesamten globalen Chat löschen?');">
+            <button type="submit" class="btn danger-btn">Globalen Chat komplett leeren</button>
+        </form>
+        
+        <br>
+        <h3>🔒 Registrierte PINs zurücksetzen</h3>
+        <p style="color: #aaa; font-size: 14px;">Falls ein Mitschüler seine PIN vergessen hat, kannst du sie hier löschen. Er kann sich dann beim nächsten Login einfach eine neue aussuchen.</p>
+        
+        <table>
+            <thead>
+                <tr><th>Name</th><th>Aktion</th></tr>
+            </thead>
+            <tbody>
+                {% for schueler, pin in pins.items() %}
+                <tr>
+                    <td><b>{{ schueler }}</b></td>
+                    <td>
+                        <form action="/admin/reset-pin/{{ schueler }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn danger-btn" style="padding: 5px 10px; font-size: 12px;">PIN löschen</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</body>
+</html>
