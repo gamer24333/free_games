@@ -394,6 +394,65 @@ def ttt_move(game_id):
             
     return {"status": "invalid_move"}, 400
 
+
+
+# --- 🦘 FLAPPY BIRD ROUTES ---
+@app.route('/flappy')
+def flappy_game():
+    if 'username' not in session: return redirect(url_for('login'))
+    data, _ = load_all_data()
+    scores = data.get("flappy_scores", {})
+    
+    # Sortieren: Höchster Score oben
+    leaderboard = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    return render_template('flappy.html', leaderboard=leaderboard)
+
+@app.route('/api/submit-flappy', methods=['POST'])
+def submit_flappy():
+    if 'username' not in session: return {"error": "401"}, 401
+    user = session['username']
+    val = request.json.get('score', 0)
+    
+    data, sha = load_all_data()
+    if "flappy_scores" not in data: data["flappy_scores"] = {}
+    
+    # Nur speichern, wenn es ein neuer persönlicher Highscore ist
+    if val > data["flappy_scores"].get(user, -1):
+        data["flappy_scores"][user] = val
+        save_all_data(data, sha)
+    return {"status": "ok"}
+
+
+# --- ⏱️ REFLEX-TEST ROUTES ---
+@app.route('/reaction')
+def reaction_game():
+    if 'username' not in session: return redirect(url_for('login'))
+    data, _ = load_all_data()
+    scores = data.get("reaction_scores", {})
+    
+    # Sortieren: KLEINSTE Millisekunden ganz oben!
+    leaderboard = sorted(scores.items(), key=lambda x: x[1], reverse=False)
+    return render_template('reaction.html', leaderboard=leaderboard)
+
+@app.route('/api/submit-reaction', methods=['POST'])
+def submit_reaction():
+    if 'username' not in session: return {"error": "401"}, 401
+    user = session['username']
+    val = request.json.get('score', 9999)
+    
+    data, sha = load_all_data()
+    if "reaction_scores" not in data: data["reaction_scores"] = {}
+    
+    # Nur speichern, wenn die neue Zeit SCHNELLER (kleiner) als die alte ist
+    if val < data["reaction_scores"].get(user, 9999):
+        data["reaction_scores"][user] = val
+        save_all_data(data, sha)
+    return {"status": "ok"}
+
+
+
+
+
 @app.route('/logout')
 def logout():
     session.pop('username', None)
