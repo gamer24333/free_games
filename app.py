@@ -408,6 +408,17 @@ def ttt_move(game_id):
             
     return {"status": "invalid_move"}, 400
 
+@app.route('/tictactoe/delete-match/<game_id>', methods=['POST'])
+def delete_match(game_id):
+    if 'username' not in session: return redirect(url_for('login'))
+    
+    data, sha = load_all_data()
+    if "tictactoe" in data and game_id in data["tictactoe"]:
+        del data["tictactoe"][game_id] # Löscht das Match komplett
+        save_all_data(data, sha)
+        
+    return redirect(url_for('dashboard'))
+
 # --- 🦘 FLAPPY BIRD ROUTES ---
 @app.route('/flappy')
 def flappy_game():
