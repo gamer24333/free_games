@@ -300,12 +300,19 @@ def clicker_game():
     if 'username' not in session: return redirect(url_for('login'))
     
     data, _ = load_all_data()
-    click_data = data.get("clicker_scores", {})
+    scores = data.get("clicker_scores", {})
     
-    clicker_liste = [(s, click_data.get(s, 0)) for s in KLASSEN_LISTE]
-    leaderboard = sorted(clicker_liste, key=lambda x: x[1], reverse=True)
-    return render_template('clicker.html', leaderboard=leaderboard)
-
+    # Hier zwingen wir JEDEN Schüler aus der Liste in die Rangliste
+    leaderboard_data = []
+    for schueler in KLASSEN_LISTE:
+        # Holt den Score des Schülers. Wenn nicht vorhanden, nimm 0
+        schueler_score = scores.get(schueler, 0)
+        leaderboard_data.append((schueler, schueler_score))
+        
+    # Sortieren: Höchste Klickzahl zuerst
+    leaderboard_sorted = sorted(leaderboard_data, key=lambda x: x[1], reverse=True)
+    
+    return render_template('clicker.html', leaderboard=leaderboard_sorted)
 @app.route('/api/submit-clicker', methods=['POST'])
 def submit_clicker():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
