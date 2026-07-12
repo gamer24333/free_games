@@ -49,5 +49,10 @@
     },
     "reaction_scores": {
         "Till": 256
+    },
+    "read_status": {
+        "Maxim_Till": {
+            "Till": 1
+        }
     }
 }
