@@ -16,7 +16,7 @@
         .message { margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; background: #2d2d2d; max-width: 80%; width: fit-content; }
         .message b { color: #00adb5; display: block; font-size: 12px; }
         .chat-input-area { display: flex; gap: 10px; }
-        .chat-input-area input { flex-grow: 1; padding: 10px; border-radius: 8px; border: 1px solid #333; background: #2d2d2d; color: white; }
+        .chat-input-area input[type="text"] { flex-grow: 1; padding: 10px; border-radius: 8px; border: 1px solid #333; background: #2d2d2d; color: white; font-size: 16px !important; }
         .chat-input-area button { padding: 10px 20px; background: #00adb5; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
@@ -39,11 +39,20 @@
 
         <div class="chat-main">
             <h3>Aktueller Chat: {% if room == 'global' %}Gruppen-Chat{% else %}{{ room }}{% endif %}</h3>
+            
             <div class="chat-box" id="chatBox">
                 {% for msg in nachrichten %}
                 <div class="message" style="position: relative; padding-right: 40px;">
                     <b>{{ msg.name }}</b>
-                    <span>{{ msg.text }}</span>
+                    <span>
+                        {% if msg.text.startswith('[IMAGE]') %}
+                            <img src="{{ msg.text.replace('[IMAGE]', '') }}" style="max-width: 200px; border-radius: 8px; display: block; margin-top: 5px; cursor: pointer;" onclick="window.open(this.src)">
+                        {% elif msg.text.startswith('[AUDIO]') %}
+                            <audio controls src="{{ msg.text.replace('[AUDIO]', '') }}" style="display: block; margin-top: 5px; max-width: 100%;"></audio>
+                        {% else %}
+                            {{ msg.text }}
+                        {% endif %}
+                    </span>
                     
                     {% if msg.name == session['username'] %}
                     <form action="/chat/{{ room }}/delete/{{ loop.index0 }}" method="POST" style="position: absolute; right: 8px; top: 8px; margin: 0;">
@@ -53,78 +62,81 @@
                 </div>
                 {% endfor %}
             </div>
+
             <div class="emoji-bar" style="text-align: left; margin-bottom: 5px; padding: 5px 0;">
-            <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">😀</span>
-            <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">😂</span>
-            <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">💀</span>
-            <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">🔥</span>
-            <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">🤫</span>
-            <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">👍</span>
-            <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">👀</span>
-            <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">💯</span>
-            
-                
-        </div>
+                <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">😀</span>
+                <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">😂</span>
+                <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">💀</span>
+                <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">🔥</span>
+                <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">🤫</span>
+                <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">👍</span>
+                <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">👀</span>
+                <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">💯</span>
+            </div>
 
-        <form class="chat-input-area" id="chatForm" style="display: flex; gap: 8px; align-items: center;">
-            <input type="file" id="imageInput" accept="image/*" style="display: none;">
-            <button type="button" onclick="document.getElementById('imageInput').click()" class="btn" style="background: #27ae60; padding: 12px; margin: 0;">🖼️</button>
+            <form class="chat-input-area" id="chatForm" style="display: flex; gap: 8px; align-items: center;">
+                <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                <button type="button" onclick="document.getElementById('imageInput').click()" class="btn" style="background: #27ae60; padding: 12px; margin: 0;">🖼️</button>
 
-            <button type="button" id="voiceBtn" class="btn" style="background: #e74c3c; padding: 12px; margin: 0;">🎙️</button>
+                <button type="button" id="voiceBtn" class="btn" style="background: #e74c3c; padding: 12px; margin: 0;">🎙️</button>
 
-            <input type="text" name="message" id="messageInput" placeholder="Schreibe etwas..." autocomplete="off" required style="flex-grow: 1;">
-            <button type="submit" class="btn" style="margin: 0;">Senden</button>
-        </form>
-        <span id="voiceStatus" style="color: #ff2e63; font-size: 12px; display: block; text-align: left; margin-top: 5px;"></span>
+                <input type="text" name="message" id="messageInput" placeholder="Schreibe etwas..." autocomplete="off" required style="flex-grow: 1;">
+                <button type="submit" class="btn" style="margin: 0;">Senden</button>
+            </form>
+            <span id="voiceStatus" style="color: #ff2e63; font-size: 12px; display: block; text-align: left; margin-top: 5px;"></span>
         </div>
     </div>
 
-    <script>
+<script>
     const currentRoom = "{{ room }}";
     const totalLoadedMessages = {{ nachrichten|length }};
+    const currentUsername = "{{ session['username'] }}";
+    const chatBox = document.getElementById('chatBox');
+    const chatForm = document.getElementById('chatForm');
+    const messageInput = document.getElementById('messageInput');
+    const emojiButtons = document.querySelectorAll('.emoji-btn');
 
+    // Sync localStorage counters
     if (currentRoom === "global") {
-        // Zähler für den globalen Chat zurücksetzen
         localStorage.setItem('last_seen_messages_global', totalLoadedMessages);
     } else {
-        // Zähler für den privaten Chat mit dieser Person zurücksetzen
         let localPrivateStorage = JSON.parse(localStorage.getItem('last_seen_messages_private') || '{}');
         localPrivateStorage[currentRoom] = totalLoadedMessages;
         localStorage.setItem('last_seen_messages_private', JSON.stringify(localPrivateStorage));
     }
         
-    const chatBox = document.getElementById('chatBox');
-    const chatForm = document.querySelector('.chat-input-area');
-    const inputField = chatForm.querySelector('input[name="message"]');
-    const currentUsername = "{{ session['username'] }}";
-
-    // Scrollt nach ganz unten
     function scrollToBottom() {
         chatBox.scrollTop = chatBox.scrollHeight;
     }
     scrollToBottom();
     
-    // Emojis per Klick ins Textfeld einfügen
-    const messageInput = document.getElementById('messageInput');
-    const emojiButtons = document.querySelectorAll('.emoji-btn');
-
+    // Emojis per Klick einfügen
     emojiButtons.forEach(button => {
         button.addEventListener('click', () => {
-            // Emoji an der aktuellen Stelle im Textfeld einfügen
             messageInput.value += button.textContent;
-            // Textfeld wieder fokussieren, damit man direkt weiterschreiben kann
             messageInput.focus();
         });
     });
+
+    // Hilfsfunktion: Wandelt Medien-Präfixe in valides HTML um
+    function formatMessageText(text) {
+        if (text.startsWith('[IMAGE]')) {
+            const base64Data = text.replace('[IMAGE]', '');
+            return `<img src="${base64Data}" style="max-width: 200px; border-radius: 8px; display: block; margin-top: 5px; cursor: pointer;" onclick="window.open(this.src)">`;
+        }
+        if (text.startsWith('[AUDIO]')) {
+            const base64Data = text.replace('[AUDIO]', '');
+            return `<audio controls src="${base64Data}" style="display: block; margin-top: 5px; max-width: 100%;"></audio>`;
+        }
+        return text;
+    }
         
-    // BLITZSCHNELLES SENDEN (Optimistic UI)
+    // --- TEXTNACHRICHTEN SENDEN (Optimistic UI) ---
     chatForm.addEventListener('submit', async (e) => {
-        e.preventDefault(); // Verhindert das Neuladen der Seite!
-        
-        const text = inputField.value.strip ? inputField.value.strip() : inputField.value.trim();
+        e.preventDefault();
+        const text = messageInput.value.trim();
         if (!text) return;
 
-        // 1. Nachricht SOFORT lokal in die Chatbox zeichnen
         const tempIndex = chatBox.children.length;
         chatBox.innerHTML += `
         <div class="message" style="position: relative; padding-right: 40px; opacity: 0.6;" id="msg-temp-${tempIndex}">
@@ -133,33 +145,35 @@
             <span style="position: absolute; right: 8px; top: 8px; font-size: 10px; color: #aaa;">⏳</span>
         </div>`;
         
-        // Input-Feld sofort leeren für die nächste Nachricht
-        inputField.value = '';
+        messageInput.value = '';
         scrollToBottom();
 
-        // 2. Im Hintergrund an Flask senden
+        await sendMediaMessage(text);
+    });
+
+    // --- HELPER ZUM SENDEN AN BACKEND ---
+    async function sendMediaMessage(mediaData) {
         try {
             const formData = new FormData();
-            formData.append('message', text);
+            formData.append('message', mediaData);
 
-            const response = await fetch('/chat/{{ room }}/send', {
+            const response = await fetch(`/chat/${currentRoom}/send`, {
                 method: 'POST',
                 body: formData
             });
 
             if (response.ok) {
-                // Wenn gespeichert, lade Nachrichten sofort neu, um die Sanduhr zu entfernen
                 loadMessages();
             }
         } catch (err) {
             console.error("Sende-Fehler:", err);
         }
-    });
+    }
 
-    // Funktion zum Nachrichten laden
+    // --- LIVE UPDATER (Alle 3 Sekunden) ---
     async function loadMessages() {
         try {
-            const response = await fetch('/api/chat-messages/{{ room }}');
+            const response = await fetch(`/api/chat-messages/${currentRoom}`);
             if (response.ok) {
                 const nachrichten = await response.json();
                 const wasAtBottom = chatBox.scrollHeight - chatBox.clientHeight <= chatBox.scrollTop + 50;
@@ -169,7 +183,7 @@
                     let deleteButton = '';
                     if (msg.name === currentUsername) {
                         deleteButton = `
-                        <form action="/chat/{{ room }}/delete/${index}" method="POST" style="position: absolute; right: 8px; top: 8px; margin: 0;">
+                        <form action="/chat/${currentRoom}/delete/${index}" method="POST" style="position: absolute; right: 8px; top: 8px; margin: 0;">
                             <button type="submit" style="background: none; border: none; color: #ff2e63; cursor: pointer; font-size: 14px; padding: 0;">🗑️</button>
                         </form>`;
                     }
@@ -177,7 +191,7 @@
                     chatBox.innerHTML += `
                     <div class="message" style="position: relative; padding-right: 40px;">
                         <b>${msg.name}</b>
-                        <span>${msg.text}</span>
+                        <span>${formatMessageText(msg.text)}</span>
                         ${deleteButton}
                     </div>`;
                 });
@@ -186,50 +200,95 @@
             }
         } catch (e) { console.error(e); }
     }
-
-    // Jede 3 Sekunden im Hintergrund synchronisieren
     setInterval(loadMessages, 3000);
 
+    // --- 🖼️ BILD-UPLOAD ---
+    const imageInput = document.getElementById('imageInput');
+    imageInput.addEventListener('change', function() {
+        const file = this.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onloadend = async function() {
+            const base64String = '[IMAGE]' + reader.result;
+            await sendMediaMessage(base64String);
+        };
+        reader.readAsDataURL(file);
+        imageInput.value = ""; 
+    });
+
+    // --- 🎙️ SPRACHNACHRICHTEN ---
+    let mediaRecorder;
+    let audioChunks = [];
+    const voiceBtn = document.getElementById('voiceBtn');
+    const voiceStatus = document.getElementById('voiceStatus');
+
+    voiceBtn.addEventListener('click', async () => {
+        if (!mediaRecorder || mediaRecorder.state === "inactive") {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = event => { audioChunks.push(event.data); };
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                    const reader = new FileReader();
+                    reader.onloadend = async function() {
+                        const base64Audio = '[AUDIO]' + reader.result;
+                        await sendMediaMessage(base64Audio);
+                    };
+                    reader.readAsDataURL(audioBlob);
+                    voiceStatus.textContent = "";
+                    voiceBtn.style.background = "#e74c3c";
+                };
+
+                mediaRecorder.start();
+                voiceStatus.textContent = "🔴 Aufnahme läuft... (Nochmal drücken zum Stoppen)";
+                voiceBtn.style.background = "#2c3e50";
+            } catch (err) {
+                alert("Mikrofon-Zugriff verweigert oder nicht unterstützt!");
+            }
+        } else {
+            mediaRecorder.stop();
+        }
+    });
+
+    // --- DM COMPANION LIVE BADGES ---
     async function checkPrivateBadges() {
-    try {
-        const response = await fetch('/api/dashboard-stats');
-        if (response.ok) {
-            const stats = await response.json();
-            const localPrivateStorage = JSON.parse(localStorage.getItem('last_seen_messages_private') || '{}');
-            
-            // Gehe alle Mitschüler durch, die von der API geliefert werden
-            for (const [partner, currentCount] of Object.entries(stats.private_messages_stats)) {
-                const badgeElement = document.getElementById(`badge-${partner}`);
+        try {
+            const response = await fetch('/api/dashboard-stats');
+            if (response.ok) {
+                const stats = await response.json();
+                const localPrivateStorage = JSON.parse(localStorage.getItem('last_seen_messages_private') || '{}');
                 
-                if (badgeElement) {
-                    // Wenn wir uns gerade im Chat mit DIESEM Partner befinden, setzen wir den Zähler direkt zurück
-                    if (currentRoom === partner) {
-                        localPrivateStorage[partner] = currentCount;
-                        localStorage.setItem('last_seen_messages_private', JSON.stringify(localPrivateStorage));
-                        badgeElement.style.display = 'none';
-                        continue;
-                    }
+                for (const [partner, currentCount] of Object.entries(stats.private_messages_stats)) {
+                    const badgeElement = document.getElementById(`badge-${partner}`);
                     
-                    const lastSeenPrivate = localPrivateStorage[partner] || 0;
-                    const newMessages = currentCount - lastSeenPrivate;
-                    
-                    if (newMessages > 0) {
-                        badgeElement.textContent = newMessages;
-                        badgeElement.style.display = 'inline-block';
-                    } else {
-                        badgeElement.style.display = 'none';
+                    if (badgeElement) {
+                        if (currentRoom === partner) {
+                            localPrivateStorage[partner] = currentCount;
+                            localStorage.setItem('last_seen_messages_private', JSON.stringify(localPrivateStorage));
+                            badgeElement.style.display = 'none';
+                            continue;
+                        }
+                        
+                        const lastSeenPrivate = localPrivateStorage[partner] || 0;
+                        const newMessages = currentCount - lastSeenPrivate;
+                        
+                        if (newMessages > 0) {
+                            badgeElement.textContent = newMessages;
+                            badgeElement.style.display = 'inline-block';
+                        } else {
+                            badgeElement.style.display = 'none';
+                        }
                     }
                 }
             }
-        }
-    } catch (e) { console.error("Fehler beim Laden der DM-Badges:", e); }
-}
-
-// Alle 5 Sekunden die DMs der Mitschüler checken
-setInterval(checkPrivateBadges, 5000);
-checkPrivateBadges();
-
-        
+        } catch (e) { console.error("Fehler beim Laden der DM-Badges:", e); }
+    }
+    setInterval(checkPrivateBadges, 5000);
+    checkPrivateBadges();
 </script>
 </body>
 </html>
