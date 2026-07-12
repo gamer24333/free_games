@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>⏱️ Reflex-Test</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 50px; }
+        .layout { display: flex; justify-content: center; gap: 30px; max-width: 800px; margin: 0 auto; padding: 20px; flex-wrap: wrap; }
+        
+        .box-test { width: 350px; height: 300px; border-radius: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; user-select: none; transition: background 0.1s; font-size: 22px; font-weight: bold; }
+        .red { background: #ff2e63; }
+        .green { background: #2ecc71; }
+        .blue { background: #3498db; }
+        
+        .leaderboard { background: #333; border: 2px solid #444; border-radius: 12px; padding: 20px; width: 280px; text-align: left; }
+        .leaderboard th, .leaderboard td { padding: 8px; border-bottom: 1px solid #444; }
+        .leaderboard th { color: #9b59b6; }
+    </style>
+</head>
+<body>
+
+    <a href="/games" class="btn" style="background: #555; margin-bottom: 20px;">⬅️ Zurück zu den Spielen</a>
+    <h1>⏱️ Reflex-Test</h1>
+
+    <div class="layout">
+        <div id="testArea" class="box-test blue">
+            Klicke hier, um zu starten!
+        </div>
+
+        <div class="leaderboard">
+            <h3 style="margin-top:0; color:#9b59b6; text-align:center;">🏆 Klassen-Reflexe</h3>
+            <table style="width:100%; border-collapse:collapse;">
+                <thead>
+                    <tr><th>Platz</th><th>Name</th><th>Zeit</th></tr>
+                </thead>
+                <tbody>
+                    {% for player, score in leaderboard %}
+                    <tr>
+                        <td>{{ loop.index }}.</td>
+                        <td>{{ player }}</td>
+                        <td><b>{{ score }} ms</b></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const area = document.getElementById('testArea');
+        let state = 'idle'; // idle, waiting, green
+        let startTime, timerTimeout;
+
+        area.addEventListener('mousedown', handleClick);
+        area.addEventListener('touchstart', (e) => { e.preventDefault(); handleClick(); });
+
+        function handleClick() {
+            if (state === 'idle') {
+                // Warten auf Grün aktivieren
+                area.className = 'box-test red';
+                area.textContent = 'Warte auf GRÜN... 🔴';
+                state = 'waiting';
+
+                let randomTime = Math.floor(Math.random() * 4000) + 2000; // 2 bis 6 Sekunden
+                timerTimeout = setTimeout(() => {
+                    area.className = 'box-test green';
+                    area.textContent = 'JETZT KLICKEN! 🟢';
+                    state = 'green';
+                    startTime = window.performance.now();
+                }, randomTime);
+
+            } else if (state === 'waiting') {
+                // Zu früh geklickt!
+                clearTimeout(timerTimeout);
+                area.className = 'box-test blue';
+                area.textContent = 'Zu früh! ❌ Erneut versuchen.';
+                state = 'idle';
+
+            } else if (state === 'green') {
+                // Erfolgreich geklickt
+                let endTime = window.performance.now();
+                let reactionTime = Math.round(endTime - startTime);
+                
+                area.className = 'box-test blue';
+                area.textContent = `Ergebnis: ${reactionTime} ms! Klicke zum Neustarten.`;
+                state = 'idle';
+
+                // Zeit an Server senden
+                sendReactionTime(reactionTime);
+            }
+        }
+
+        async function sendReactionTime(ms) {
+            try {
+                await fetch('/api/submit-reaction', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ score: ms })
+                });
+                setTimeout(() => { window.location.reload(); }, 1200);
+            } catch(e) { console.error(e); }
+        }
+    </script>
+</body>
+</html>
