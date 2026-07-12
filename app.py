@@ -10,7 +10,7 @@ app.secret_key = os.environ.get("SECRET_KEY")
 KLASSEN_LISTE = [
     "Till", "Ben", "Matteo", "Louis", "Maxim", "Jonah P", "Jonah S", 
     "Mateo", "Hanna", "Emma", "Lia", "Mia", "Lena S", "Lena G", 
-    "Lena D", "Dasha", "Daniel", "Bennet", "Erik", "Roman", 
+    "Lena D", "Dasha", "Daniel", "Bennet", "Erik", "Roman", "Meike",
     "Janne", "Tom", "Levin", "Liam", "Tim", "Nathalie", "Richard"
 ]
 
