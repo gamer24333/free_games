@@ -47,5 +47,8 @@
             "turn": "Till",
             "status": "aktiv"
         }
+    },
+    "flappy_scores": {
+        "Till": 2
     }
 }
