@@ -181,17 +181,30 @@
                 chatBox.innerHTML = '';
                 nachrichten.forEach((msg, index) => {
                     let deleteButton = '';
+                    let statusHook = '';
+
+                    // Wenn ich der Absender bin, zeigen wir Häkchen an
                     if (msg.name === currentUsername) {
                         deleteButton = `
                         <form action="/chat/${currentRoom}/delete/${index}" method="POST" style="position: absolute; right: 8px; top: 8px; margin: 0;">
                             <button type="submit" style="background: none; border: none; color: #ff2e63; cursor: pointer; font-size: 14px; padding: 0;">🗑️</button>
                         </form>`;
+                        
+                        // Nur in privaten Chats machen Häkchen Sinn
+                        if (currentRoom !== "global") {
+                            if (msg.gelesen) {
+                                statusHook = `<span style="font-size: 12px; color: #3498db; margin-left: 5px; vertical-align: middle;">✔️✔️</span>`; // Gelesen (Blau)
+                            } else {
+                                statusHook = `<span style="font-size: 12px; color: #aaa; margin-left: 5px; vertical-align: middle;">✔️</span>`; // Zugestellt (Grau)
+                            }
+                        }
                     }
 
                     chatBox.innerHTML += `
                     <div class="message" style="position: relative; padding-right: 40px;">
                         <b>${msg.name}</b>
                         <span>${formatMessageText(msg.text)}</span>
+                        ${statusHook}
                         ${deleteButton}
                     </div>`;
                 });
