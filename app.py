@@ -14,6 +14,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///local_portal.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+# Sorgt dafür, dass die Tabellen auch auf Render (unter Gunicorn) automatisch erstellt werden
+with app.app_context():
+    db.create_all()
 
 # Feste Klassenliste
 KLASSEN_LISTE = [
