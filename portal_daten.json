@@ -11,7 +11,8 @@
         "Till": 50
     },
     "pins": {
-        "Till": "1928"
+        "Till": "1928",
+        "Maxim": "1207"
     },
     "clicker_scores": {
         "Till": 5809
