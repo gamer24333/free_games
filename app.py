@@ -62,14 +62,66 @@ def get_private_room_name(user1, user2):
 def index():
     return redirect(url_for('dashboard')) if 'username' in session else redirect(url_for('login'))
 
+def load_all_data():
+    if not GITHUB_TOKEN:
+        return {"chats": {"global": []}, "scores": {}, "pins": {}}, None
+    try:
+        response = requests.get(GITHUB_API_URL, headers=headers)
+        if response.status_code == 200:
+            file_data = response.json()
+            content = base64.b64decode(file_data['content']).decode('utf-8')
+            parsed_data = json.loads(content)
+            
+            # Sicherheitsnetz: Falls "pins" noch nicht in der JSON existiert, hinzufügen
+            if "pins" not in parsed_data:
+                parsed_data["pins"] = {}
+            return parsed_data, file_data['sha']
+        else:
+            default_data = {
+                "chats": {"global": [{"name": "System", "text": "Willkommen im Klassen-Chat! 🤫"}]},
+                "scores": {},
+                "pins": {} # Hier drin werden die PINs gespeichert (z.B. "Till": "1234")
+            }
+            return default_data, None
+    except Exception:
+        return {"chats": {"global": []}, "scores": {}, "pins": {}}, None
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if 'username' in session:
+        return redirect(url_for('dashboard'))
+        
     if request.method == 'POST':
         eingabe_name = request.form.get('nutzername', '').strip()
-        if eingabe_name in KLASSEN_LISTE:
+        eingabe_pin = request.form.get('pin', '').strip()
+        
+        # 1. Existiert der Schüler überhaupt?
+        if eingabe_name not in KLASSEN_LISTE:
+            return render_template('login.html', fehler="Du bist nicht auf der Liste!")
+            
+        data, sha = load_all_data()
+        pins_data = data.get("pins", {})
+        
+        # 2. Prüfen, ob der Schüler schon eine PIN registriert hat
+        if eingabe_name in pins_data:
+            # Er hat eine PIN -> Eingabe muss übereinstimmen
+            if pins_data[eingabe_name] == eingabe_pin:
+                session['username'] = eingabe_name
+                return redirect(url_for('dashboard'))
+            else:
+                return render_template('login.html', fehler="Falsche PIN! Jemand versucht wohl dich zu hacken... 🤔", name_vorbefuellt=eingabe_name)
+        else:
+            # ERSTMALIGER LOGIN: Er hat noch keine PIN!
+            if len(eingabe_pin) < 4:
+                return render_template('login.html', info="Da dies dein erster Login ist, erstelle bitte eine mindestens 4-stellige PIN!", name_vorbefuellt=eingabe_name)
+            
+            # Neue PIN für diesen Schüler auf GitHub speichern
+            data["pins"][eingabe_name] = eingabe_pin
+            save_all_data(data, sha)
+            
             session['username'] = eingabe_name
             return redirect(url_for('dashboard'))
-        return render_template('login.html', fehler="Du bist nicht auf der Liste!")
+            
     return render_template('login.html')
 
 @app.route('/welcome')
