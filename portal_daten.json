@@ -12,5 +12,9 @@
     },
     "pins": {
         "Till": "1928"
-    }
+    },
+    "clicker_scores": {
+        "Till": 70
+    },
+    "tictactoe": {}
 }
