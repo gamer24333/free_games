@@ -116,6 +116,7 @@ def dashboard():
     ttt_games = data.get("tictactoe", {})
     me = session['username']
     
+    # 1. Tic-Tac-Toe Einladungen filtern
     aktive_einladungen = []
     for g_id, g_data in ttt_games.items():
         if g_data["gegner"] == me and g_data["status"] == "eingeladen":
@@ -123,7 +124,53 @@ def dashboard():
         elif (g_data["ersteller"] == me or g_data["gegner"] == me) and g_data["status"] == "aktiv":
             aktive_einladungen.append({"id": g_id, "von": "Dein Match läuft!", "is_active": True})
 
-    return render_template('dashboard.html', name=me, einladungen=aktive_einladungen)
+    # 2. Prüfen, ob DU der Admin bist (Ersetze "Till" durch deinen exakten Namen aus der Liste)
+    is_admin = (me == "Till")
+
+    return render_template('dashboard.html', name=me, einladungen=aktive_einladungen, is_admin=is_admin)
+
+# API für den Dashboard-Zähler: Gibt die Anzahl der globalen Nachrichten zurück
+@app.route('/api/dashboard-stats')
+def dashboard_stats():
+    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
+    data, _ = load_all_data()
+    
+    global_chat_len = len(data["chats"].get("global", []))
+    
+    return {
+        "global_messages_count": global_chat_len
+    }
+
+# --- 🛠️ DAS ADMIN PANEL ROUTEN ---
+@app.route('/admin')
+def admin_panel():
+    # Ersetze "Till" durch deinen Namen
+    if 'username' not in session or session['username'] != "Till":
+        return "Zugriff verweigert! ❌", 403
+        
+    data, _ = load_all_data()
+    return render_template('admin.html', pins=data.get("pins", {}))
+
+@app.route('/admin/reset-pin/<schueler>', methods=['POST'])
+def admin_reset_pin(schueler):
+    if 'username' not in session or session['username'] != "Till": return "403", 403
+    
+    data, sha = load_all_data()
+    if schueler in data["pins"]:
+        del data["pins"][schueler] # Löscht die PIN des Schülers -> er kann beim nächsten Login eine neue setzen
+        save_all_data(data, sha)
+        
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/clear-chat', methods=['POST'])
+def admin_clear_chat():
+    if 'username' not in session or session['username'] != "Till": return "403", 403
+    
+    data, sha = load_all_data()
+    data["chats"]["global"] = [{"name": "System", "text": "Der Chat wurde vom Admin aufgeräumt!🧹"}]
+    save_all_data(data, sha)
+    
+    return redirect(url_for('admin_panel'))
 
 
 # --- CHAT ROUTEN ---
