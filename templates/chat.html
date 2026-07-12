@@ -30,7 +30,10 @@
             <a href="/chat" class="{% if room == 'global' %}active{% endif %}">🌍 Gruppen-Chat</a>
             <h3>Direktnachrichten</h3>
             {% for p in partner %}
-                <a href="/chat/{{ p }}" class="{% if room == p %}active{% endif %}">👤 {{ p }}</a>
+            <a href="/chat/{{ p }}" class="partner-btn" style="position: relative; display: block; margin: 5px 0;">
+                👤 {{ p }}
+                <span id="badge-{{ p }}" class="badge" style="background: #ff2e63; color: white; border-radius: 50%; padding: 2px 6px; font-size: 11px; margin-left: 8px; display: none;">0</span>
+            </a>
             {% endfor %}
         </div>
 
@@ -178,6 +181,47 @@
 
     // Jede 3 Sekunden im Hintergrund synchronisieren
     setInterval(loadMessages, 3000);
+
+    async function checkPrivateBadges() {
+    try {
+        const response = await fetch('/api/dashboard-stats');
+        if (response.ok) {
+            const stats = await response.json();
+            const localPrivateStorage = JSON.parse(localStorage.getItem('last_seen_messages_private') || '{}');
+            
+            // Gehe alle Mitschüler durch, die von der API geliefert werden
+            for (const [partner, currentCount] of Object.entries(stats.private_messages_stats)) {
+                const badgeElement = document.getElementById(`badge-${partner}`);
+                
+                if (badgeElement) {
+                    // Wenn wir uns gerade im Chat mit DIESEM Partner befinden, setzen wir den Zähler direkt zurück
+                    if (currentRoom === partner) {
+                        localPrivateStorage[partner] = currentCount;
+                        localStorage.setItem('last_seen_messages_private', JSON.stringify(localPrivateStorage));
+                        badgeElement.style.display = 'none';
+                        continue;
+                    }
+                    
+                    const lastSeenPrivate = localPrivateStorage[partner] || 0;
+                    const newMessages = currentCount - lastSeenPrivate;
+                    
+                    if (newMessages > 0) {
+                        badgeElement.textContent = newMessages;
+                        badgeElement.style.display = 'inline-block';
+                    } else {
+                        badgeElement.style.display = 'none';
+                    }
+                }
+            }
+        }
+    } catch (e) { console.error("Fehler beim Laden der DM-Badges:", e); }
+}
+
+// Alle 5 Sekunden die DMs der Mitschüler checken
+setInterval(checkPrivateBadges, 5000);
+checkPrivateBadges();
+
+        
 </script>
 </body>
 </html>
