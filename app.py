@@ -2,10 +2,9 @@ import base64
 import json
 import os
 import requests
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import Flask, redirect, render_template, request, session, url_for, jsonify
 
 app = Flask(__name__)
-# Standard-Passwort als Fallback, falls kein SECRET_KEY auf Render gesetzt ist
 app.secret_key = os.environ.get("SECRET_KEY", "super_geheimes_passwort_fuer_die_klasse")
 
 KLASSEN_LISTE = [
@@ -14,8 +13,6 @@ KLASSEN_LISTE = [
     "Lena D", "Dasha", "Daniel", "Bennet", "Erik", "Roman", "Meike",
     "Janne", "Tom", "Levin", "Liam", "Tim", "Nathalie", "Richard"
 ]
-
-
 
 # --- GITHUB CONFIGURATION ---
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
@@ -28,7 +25,7 @@ headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.
 
 def load_all_data():
     if not GITHUB_TOKEN:
-        return {"chats": {"global": []}, "scores": {}, "clicker_scores": {}, "pins": {}, "tictactoe": {}}, None
+        return {"chats": {"global": []}, "scores": {}, "clicker_scores": {}, "flappy_scores": {}, "reaction_scores": {}, "pins": {}, "tictactoe": {}}, None
     try:
         response = requests.get(GITHUB_API_URL, headers=headers)
         if response.status_code == 200:
@@ -36,24 +33,18 @@ def load_all_data():
             content = base64.b64decode(file_data['content']).decode('utf-8')
             parsed_data = json.loads(content)
             
-            # Sicherheitsnetz für alle alten/neuen Datenstrukturen
             if "chats" not in parsed_data: parsed_data["chats"] = {"global": []}
             if "scores" not in parsed_data: parsed_data["scores"] = {}
             if "clicker_scores" not in parsed_data: parsed_data["clicker_scores"] = {}
+            if "flappy_scores" not in parsed_data: parsed_data["flappy_scores"] = {}
+            if "reaction_scores" not in parsed_data: parsed_data["reaction_scores"] = {}
             if "pins" not in parsed_data: parsed_data["pins"] = {}
             if "tictactoe" not in parsed_data: parsed_data["tictactoe"] = {}
             return parsed_data, file_data['sha']
         else:
-            default_data = {
-                "chats": {"global": [{"name": "System", "text": "Willkommen im Klassen-Chat! 🤫"}]},
-                "scores": {},
-                "clicker_scores": {},
-                "pins": {},
-                "tictactoe": {}
-            }
-            return default_data, None
+            return {"chats": {"global": []}, "scores": {}, "clicker_scores": {}, "flappy_scores": {}, "reaction_scores": {}, "pins": {}, "tictactoe": {}}, None
     except Exception:
-        return {"chats": {"global": []}, "scores": {}, "clicker_scores": {}, "pins": {}, "tictactoe": {}}, None
+        return {"chats": {"global": []}, "scores": {}, "clicker_scores": {}, "flappy_scores": {}, "reaction_scores": {}, "pins": {}, "tictactoe": {}}, None
 
 def save_all_data(data, sha):
     json_string = json.dumps(data, ensure_ascii=False, indent=4)
@@ -76,9 +67,18 @@ def get_ttt_id(p1, p2):
 def games_menu():
     if 'username' not in session: 
         return redirect(url_for('login'))
-    return render_template('games.html')
-
-
+    
+    data, _ = load_all_data()
+    ttt_games = data.get("tictactoe", {})
+    me = session['username']
+    
+    # Hier filtern wir die Tic-Tac-Toe Einladungen direkt für das Spiele-Menü heraus
+    aktive_einladungen = []
+    for g_id, g_data in ttt_games.items():
+        if g_data["gegner"] == me and g_data["status"] == "eingeladen":
+            aktive_einladungen.append({"id": g_id, "von": g_data["ersteller"]})
+            
+    return render_template('games.html', einladungen=aktive_einladungen)
 
 @app.route('/')
 def index():
@@ -104,10 +104,10 @@ def login():
                 session['username'] = eingabe_name
                 return redirect(url_for('dashboard'))
             else:
-                return render_template('login.html', fehler="Falsche PIN! Jemand versucht wohl dich zu hacken... 🤔", name_vorbefuellt=eingabe_name)
+                return render_template('login.html', fehler="Falsche PIN! 🤔", name_vorbefuellt=eingabe_name)
         else:
             if len(eingabe_pin) < 4:
-                return render_template('login.html', info="Da dies dein erster Login ist, erstelle bitte eine mindestens 4-stellige PIN!", name_vorbefuellt=eingabe_name)
+                return render_template('login.html', info="Erstelle bitte eine mindestens 4-stellige PIN!", name_vorbefuellt=eingabe_name)
             
             data["pins"][eingabe_name] = eingabe_pin
             save_all_data(data, sha)
@@ -126,30 +126,22 @@ def dashboard():
     ttt_games = data.get("tictactoe", {})
     me = session['username']
     
-    # 1. Tic-Tac-Toe Einladungen filtern
-    aktive_einladungen = []
+    aktive_matches = []
     for g_id, g_data in ttt_games.items():
-        if g_data["gegner"] == me and g_data["status"] == "eingeladen":
-            aktive_einladungen.append({"id": g_id, "von": g_data["ersteller"], "is_active": False})
-        elif (g_data["ersteller"] == me or g_data["gegner"] == me) and g_data["status"] == "aktiv":
-            aktive_einladungen.append({"id": g_id, "von": "Dein Match läuft!", "is_active": True})
+        if (g_data["ersteller"] == me or g_data["gegner"] == me) and g_data["status"] == "aktiv":
+            aktive_matches.append({"id": g_id, "von": "Dein Match läuft!", "is_active": True})
 
-    # 2. Prüfen, ob DU der Admin bist (Ersetze "Till" durch deinen exakten Namen aus der Liste)
     is_admin = (me == "Till")
+    return render_template('dashboard.html', name=me, einladungen=aktive_matches, is_admin=is_admin)
 
-    return render_template('dashboard.html', name=me, einladungen=aktive_einladungen, is_admin=is_admin)
-
-# API für den Dashboard-Zähler: Gibt die Anzahl der globalen Nachrichten zurück
 @app.route('/api/dashboard-stats')
 def dashboard_stats():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
     data, _ = load_all_data()
     current_user = session['username']
     
-    # Anzahl der globalen Nachrichten
     global_chat_len = len(data["chats"].get("global", []))
     
-    # Hier zählen wir die Nachrichten für jeden privaten Chatraum
     private_chats_stats = {}
     for schueler in KLASSEN_LISTE:
         if schueler != current_user:
@@ -160,10 +152,9 @@ def dashboard_stats():
         "global_messages_count": global_chat_len,
         "private_messages_stats": private_chats_stats
     }
-# --- 🛠️ DAS ADMIN PANEL ROUTEN ---
+
 @app.route('/admin')
 def admin_panel():
-    # Ersetze "Till" durch deinen Namen
     if 'username' not in session or session['username'] != "Till":
         return "Zugriff verweigert! ❌", 403
         
@@ -176,7 +167,7 @@ def admin_reset_pin(schueler):
     
     data, sha = load_all_data()
     if schueler in data["pins"]:
-        del data["pins"][schueler] # Löscht die PIN des Schülers -> er kann beim nächsten Login eine neue setzen
+        del data["pins"][schueler]
         save_all_data(data, sha)
         
     return redirect(url_for('admin_panel'))
@@ -186,11 +177,10 @@ def admin_clear_chat():
     if 'username' not in session or session['username'] != "Till": return "403", 403
     
     data, sha = load_all_data()
-    data["chats"]["global"] = [{"name": "System", "text": "Der Chat wurde vom Admin aufgeräumt!🧹"}]
+    data["chats"]["global"] = [{"name": "System", "text": "Der Chat wurde vom Admin aufgeräumt! 🧹"}]
     save_all_data(data, sha)
     
     return redirect(url_for('admin_panel'))
-
 
 # --- CHAT ROUTEN ---
 
@@ -201,7 +191,7 @@ def chat(room="global"):
     
     data, _ = load_all_data()
     current_user = session['username']
-    chpartner = [schueler for schueler in KLASSEN_LISTE if schueler != current_user]
+    chpartner = sorted([schueler for schueler in KLASSEN_LISTE if schueler != current_user])
     
     actual_room = room
     if room != "global":
@@ -239,32 +229,22 @@ def api_chat_messages(room):
     
     nachrichten = data["chats"].get(room, [])
     
-    # "Gelesen"-Logik nur für private DMs (nicht für den globalen Chat)
     if room != "global":
-        # Wer ist der Partner? (Der Raumname ist der Name des Partners)
         partner = room
         room_id = get_private_room_name(current_user, partner)
         nachrichten = data["chats"].get(room_id, [])
         
-        # Wir merken uns, dass der aktuelle User alle bisherigen Nachrichten gesehen hat
-        if "read_status" not in data:
-            data["read_status"] = {}
-        if room_id not in data["read_status"]:
-            data["read_status"][room_id] = {}
+        if "read_status" not in data: data["read_status"] = {}
+        if room_id not in data["read_status"]: data["read_status"][room_id] = {}
             
-        # Speichern, wie viele Nachrichten der aktuelle User jetzt gesehen hat
         data["read_status"][room_id][current_user] = len(nachrichten)
-        save_all_data(data, sha) # Direkt auf GitHub sichern
+        save_all_data(data, sha)
         
-        # Jetzt fügen wir für das Frontend die Info hinzu, ob der Partner die Nachricht schon gesehen hat
         partner_seen_count = data["read_status"][room_id].get(partner, 0)
-        
         for index, msg in enumerate(nachrichten):
-            # Wenn der Index der Nachricht kleiner ist als das, was der Partner gesehen hat -> Gelesen!
             msg["gelesen"] = (index < partner_seen_count)
 
     return jsonify(nachrichten)
-
 
 @app.route('/chat/<room>/delete/<int:msg_index>', methods=['POST'])
 def delete_message(room, msg_index):
@@ -273,7 +253,6 @@ def delete_message(room, msg_index):
     data, sha = load_all_data()
     current_user = session['username']
     
-    # Raum-ID ermitteln (wie bei der Nachrichten-Route)
     if room == "global":
         room_id = "global"
     else:
@@ -281,16 +260,12 @@ def delete_message(room, msg_index):
         
     if room_id in data["chats"]:
         nachrichten = data["chats"][room_id]
-        
-        # Sicherstellen, dass der Index existiert und die Nachricht dem User gehört
         if 0 <= msg_index < len(nachrichten):
             if nachrichten[msg_index]["name"] == current_user:
-                nachrichten.pop(msg_index) # Nachricht entfernen
-                save_all_data(data, sha) # Auf GitHub speichern
+                nachrichten.pop(msg_index)
+                save_all_data(data, sha)
                 
-    # WICHTIG: Zurück auf den aktuellen Chat leiten, damit kein "Not Found" kommt
-    return redirect(url_for('chat_room', room=room))
-
+    return redirect(url_for('chat', room=room)) # KORRIGIERT: Führt nun zurück zu /chat/<room>
 
 # --- GAME 1: GEOMETRY DASH ---
 
@@ -301,6 +276,7 @@ def game():
     data, _ = load_all_data()
     scores_data = data.get("scores", {})
     
+    # KORRIGIERT: Zeigt jeden Schüler mit 0 an, wenn er noch nicht gespielt hat
     vollstaendige_liste = [(s, scores_data.get(s, 0)) for s in KLASSEN_LISTE]
     leaderboard = sorted(vollstaendige_liste, key=lambda x: x[1], reverse=True)
     return render_template('game.html', leaderboard=leaderboard)
@@ -318,7 +294,6 @@ def submit_score():
         save_all_data(data, sha)
     return {"status": "success"}
 
-
 # --- GAME 2: CLICKER GAME ---
 
 @app.route('/clicker')
@@ -328,17 +303,14 @@ def clicker_game():
     data, _ = load_all_data()
     scores = data.get("clicker_scores", {})
     
-    # Hier zwingen wir JEDEN Schüler aus der Liste in die Rangliste
     leaderboard_data = []
     for schueler in KLASSEN_LISTE:
-        # Holt den Score des Schülers. Wenn nicht vorhanden, nimm 0
         schueler_score = scores.get(schueler, 0)
         leaderboard_data.append((schueler, schueler_score))
         
-    # Sortieren: Höchste Klickzahl zuerst
     leaderboard_sorted = sorted(leaderboard_data, key=lambda x: x[1], reverse=True)
-    
     return render_template('clicker.html', leaderboard=leaderboard_sorted)
+
 @app.route('/api/submit-clicker', methods=['POST'])
 def submit_clicker():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
@@ -352,13 +324,12 @@ def submit_clicker():
         save_all_data(data, sha)
     return {"status": "success"}
 
-
 # --- GAME 3: TIC-TAC-TOE ---
 
 @app.route('/tictactoe')
 def tictactoe_menu():
     if 'username' not in session: return redirect(url_for('login'))
-    gegner_liste = [s for s in KLASSEN_LISTE if s != session['username']]
+    gegner_liste = sorted([s for s in KLASSEN_LISTE if s != session['username']])
     return render_template('tictactoe_menu.html', gegner_liste=gegner_liste)
 
 @app.route('/tictactoe/invite', methods=['POST'])
@@ -389,6 +360,16 @@ def tictactoe_accept(game_id):
         save_all_data(data, sha)
     return redirect(url_for('tictactoe_game', game_id=game_id))
 
+# NEUE ROUTE: Anfragen sauber wegklicken / löschen
+@app.route('/tictactoe/decline/<game_id>', methods=['POST'])
+def tictactoe_decline(game_id):
+    if 'username' not in session: return redirect(url_for('login'))
+    data, sha = load_all_data()
+    if "tictactoe" in data and game_id in data["tictactoe"]:
+        del data["tictactoe"][game_id]
+        save_all_data(data, sha)
+    return redirect(url_for('games_menu'))
+
 @app.route('/tictactoe/game/<game_id>')
 def tictactoe_game(game_id):
     if 'username' not in session: return redirect(url_for('login'))
@@ -397,7 +378,7 @@ def tictactoe_game(game_id):
 @app.route('/api/tictactoe/status/<game_id>')
 def ttt_status(game_id):
     data, _ = load_all_data()
-    return json.dumps(data["tictactoe"].get(game_id, {}))
+    return jsonify(data["tictactoe"].get(game_id, {}))
 
 @app.route('/api/tictactoe/move/<game_id>', methods=['POST'])
 def ttt_move(game_id):
@@ -427,8 +408,6 @@ def ttt_move(game_id):
             
     return {"status": "invalid_move"}, 400
 
-
-
 # --- 🦘 FLAPPY BIRD ROUTES ---
 @app.route('/flappy')
 def flappy_game():
@@ -436,8 +415,9 @@ def flappy_game():
     data, _ = load_all_data()
     scores = data.get("flappy_scores", {})
     
-    # Sortieren: Höchster Score oben
-    leaderboard = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    # KORRIGIERT: Zeigt jeden Schüler mit 0 an, wenn er noch nicht gespielt hat
+    leaderboard_data = [(s, scores.get(s, 0)) for s in KLASSEN_LISTE]
+    leaderboard = sorted(leaderboard_data, key=lambda x: x[1], reverse=True)
     return render_template('flappy.html', leaderboard=leaderboard)
 
 @app.route('/api/submit-flappy', methods=['POST'])
@@ -449,12 +429,10 @@ def submit_flappy():
     data, sha = load_all_data()
     if "flappy_scores" not in data: data["flappy_scores"] = {}
     
-    # Nur speichern, wenn es ein neuer persönlicher Highscore ist
     if val > data["flappy_scores"].get(user, -1):
         data["flappy_scores"][user] = val
         save_all_data(data, sha)
     return {"status": "ok"}
-
 
 # --- ⏱️ REFLEX-TEST ROUTES ---
 @app.route('/reaction')
@@ -463,8 +441,9 @@ def reaction_game():
     data, _ = load_all_data()
     scores = data.get("reaction_scores", {})
     
-    # Sortieren: KLEINSTE Millisekunden ganz oben!
-    leaderboard = sorted(scores.items(), key=lambda x: x[1], reverse=False)
+    # KORRIGIERT: Zeigt jeden Schüler an. Wenn noch kein Score da ist -> 9999 ms
+    leaderboard_data = [(s, scores.get(s, 9999)) for s in KLASSEN_LISTE]
+    leaderboard = sorted(leaderboard_data, key=lambda x: x[1], reverse=False)
     return render_template('reaction.html', leaderboard=leaderboard)
 
 @app.route('/api/submit-reaction', methods=['POST'])
@@ -476,15 +455,10 @@ def submit_reaction():
     data, sha = load_all_data()
     if "reaction_scores" not in data: data["reaction_scores"] = {}
     
-    # Nur speichern, wenn die neue Zeit SCHNELLER (kleiner) als die alte ist
     if val < data["reaction_scores"].get(user, 9999):
         data["reaction_scores"][user] = val
         save_all_data(data, sha)
     return {"status": "ok"}
-
-
-
-
 
 @app.route('/logout')
 def logout():
