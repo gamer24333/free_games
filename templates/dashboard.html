@@ -5,10 +5,12 @@
     <title>Dashboard</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 50px; }
-        .btn { display: inline-block; padding: 15px 30px; margin: 10px; background: #00adb5; color: white; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold; }
+        .btn { display: inline-block; padding: 15px 30px; margin: 10px; background: #00adb5; color: white; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold; position: relative; }
         .btn:hover { background: #007c82; }
+        .badge { background: #ff2e63; color: white; border-radius: 50%; padding: 3px 8px; font-size: 12px; position: absolute; top: -8px; right: -8px; display: none; box-shadow: 0 0 8px rgba(255,46,99,0.6); }
         .invite-box { background: #333; padding: 15px; border-radius: 8px; max-width: 500px; margin: 25px auto; border: 2px solid #ff2e63; text-align: left; }
         .invite-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .admin-box { margin-top: 40px; border-top: 2px dashed #555; padding-top: 20px; }
     </style>
 </head>
 <body>
@@ -17,7 +19,11 @@
     <p>Schön, dass du da bist. Was willst du machen?</p>
 
     <div style="margin: 30px 0;">
-        <a href="/chat" class="btn" style="background: #3498db;">💬 Klassen-Chat & DM</a>
+        <a href="/chat" class="btn" style="background: #3498db;">
+            💬 Klassen-Chat & DM
+            <span id="chatBadge" class="badge">0</span>
+        </a>
+        
         <a href="/geometry-dash" class="btn">🎮 Fake Geometry Dash</a>
         <a href="/clicker" class="btn" style="background: #f9d423; color: black;">⚡ Clicker Game</a>
         <a href="/tictactoe" class="btn" style="background: #ff2e63;">❌ Tic-Tac-Toe Duell ⭕</a>
@@ -41,9 +47,43 @@
         {% endfor %}
     </div>
     {% endif %}
+
+    {% if is_admin %}
+    <div class="admin-box">
+        <a href="/admin" class="btn" style="background: #9b59b6;">🛠️ Admin-Panel öffnen</a>
+    </div>
+    {% endif %}
     
     <br><br>
     <a href="/logout" style="color: #ff2e63; text-decoration: none; font-weight: bold;">Abmelden</a>
 
+    <script>
+        async function checkNewMessages() {
+            try {
+                const response = await fetch('/api/dashboard-stats');
+                if (response.ok) {
+                    const stats = await response.json();
+                    
+                    // Wie viele Nachrichten hat der User zuletzt im Chat gesehen?
+                    const lastSeenCount = localStorage.getItem('last_seen_messages') || 0;
+                    const totalMessages = stats.global_messages_count;
+                    
+                    const newMessages = totalMessages - lastSeenCount;
+                    const badge = document.getElementById('chatBadge');
+                    
+                    if (newMessages > 0) {
+                        badge.textContent = newMessages;
+                        badge.style.display = 'inline-block';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // Alle 5 Sekunden prüfen, ob jemand im Chat geschrieben hat
+        setInterval(checkNewMessages, 5000);
+        checkNewMessages();
+    </script>
 </body>
 </html>
