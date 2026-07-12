@@ -14,7 +14,7 @@
         .chat-main { flex-grow: 1; background: #1e1e1e; border: 2px solid #333; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; height: 500px; }
         .chat-box { flex-grow: 1; overflow-y: auto; text-align: left; padding: 10px; margin-bottom: 15px; }
         .message { margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; background: #2d2d2d; max-width: 80%; width: fit-content; }
-        .message b { color: #00adb5; display: block; font-size: 12px; }
+        .message b { display: block; font-size: 12px; }
         .chat-input-area { display: flex; gap: 10px; }
         .chat-input-area input[type="text"] { flex-grow: 1; padding: 10px; border-radius: 8px; border: 1px solid #333; background: #2d2d2d; color: white; font-size: 16px !important; }
         .chat-input-area button { padding: 10px 20px; background: #00adb5; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
@@ -43,7 +43,9 @@
             <div class="chat-box" id="chatBox">
                 {% for msg in nachrichten %}
                 <div class="message" style="position: relative; padding-right: 40px;">
-                    <b>{{ msg.name }}</b>
+                    <b style="color: {% if msg.name in admins %}#9b59b6{% else %}#00adb5{% endif %};">
+                        {% if msg.name in admins %}👑 {% endif %}{{ msg.name }}
+                    </b>
                     <span>
                         {% if msg.text.startswith('[IMAGE]') %}
                             <img src="{{ msg.text.replace('[IMAGE]', '') }}" style="max-width: 200px; border-radius: 8px; display: block; margin-top: 5px; cursor: pointer;" onclick="window.open(this.src)">
@@ -91,6 +93,9 @@
     const currentRoom = "{{ room }}";
     const totalLoadedMessages = {{ nachrichten|length }};
     const currentUsername = "{{ session['username'] }}";
+    // NEU: Reicht die Admin-Liste an JavaScript weiter
+    const adminList = {{ admins|tojson }};
+    
     const chatBox = document.getElementById('chatBox');
     const chatForm = document.getElementById('chatForm');
     const messageInput = document.getElementById('messageInput');
@@ -138,9 +143,13 @@
         if (!text) return;
 
         const tempIndex = chatBox.children.length;
+        const isMeAdmin = adminList.includes(currentUsername);
+        const nameColor = isMeAdmin ? "#9b59b6" : "#00adb5";
+        const crown = isMeAdmin ? "👑 " : "";
+
         chatBox.innerHTML += `
         <div class="message" style="position: relative; padding-right: 40px; opacity: 0.6;" id="msg-temp-${tempIndex}">
-            <b>${currentUsername}</b>
+            <b style="color: ${nameColor};">${crown}${currentUsername}</b>
             <span>${text}</span>
             <span style="position: absolute; right: 8px; top: 8px; font-size: 10px; color: #aaa;">⏳</span>
         </div>`;
@@ -183,26 +192,29 @@
                     let deleteButton = '';
                     let statusHook = '';
 
-                    // Wenn ich der Absender bin, zeigen wir Häkchen an
+                    // NEU: Berechne Admin-Status live für JavaScript
+                    const isSenderAdmin = adminList.includes(msg.name);
+                    const nameColor = isSenderAdmin ? "#9b59b6" : "#00adb5";
+                    const crown = isSenderAdmin ? "👑 " : "";
+
                     if (msg.name === currentUsername) {
                         deleteButton = `
                         <form action="/chat/${currentRoom}/delete/${index}" method="POST" style="position: absolute; right: 8px; top: 8px; margin: 0;">
                             <button type="submit" style="background: none; border: none; color: #ff2e63; cursor: pointer; font-size: 14px; padding: 0;">🗑️</button>
                         </form>`;
                         
-                        // Nur in privaten Chats machen Häkchen Sinn
                         if (currentRoom !== "global") {
                             if (msg.gelesen) {
-                                statusHook = `<span style="font-size: 12px; color: #3498db; margin-left: 5px; vertical-align: middle;">✔️✔️</span>`; // Gelesen (Blau)
+                                statusHook = `<span style="font-size: 12px; color: #3498db; margin-left: 5px; vertical-align: middle;">✔️✔️</span>`;
                             } else {
-                                statusHook = `<span style="font-size: 12px; color: #aaa; margin-left: 5px; vertical-align: middle;">✔️</span>`; // Zugestellt (Grau)
+                                statusHook = `<span style="font-size: 12px; color: #aaa; margin-left: 5px; vertical-align: middle;">✔️</span>`;
                             }
                         }
                     }
 
                     chatBox.innerHTML += `
                     <div class="message" style="position: relative; padding-right: 40px;">
-                        <b>${msg.name}</b>
+                        <b style="color: ${nameColor};">${crown}${msg.name}</b>
                         <span>${formatMessageText(msg.text)}</span>
                         ${statusHook}
                         ${deleteButton}
