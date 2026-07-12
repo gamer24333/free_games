@@ -79,7 +79,20 @@
         chatBox.scrollTop = chatBox.scrollHeight;
     }
     scrollToBottom();
+    
+    // Emojis per Klick ins Textfeld einfügen
+    const messageInput = document.getElementById('messageInput');
+    const emojiButtons = document.querySelectorAll('.emoji-btn');
 
+    emojiButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            // Emoji an der aktuellen Stelle im Textfeld einfügen
+            messageInput.value += button.textContent;
+            // Textfeld wieder fokussieren, damit man direkt weiterschreiben kann
+            messageInput.focus();
+        });
+    });
+        
     // BLITZSCHNELLES SENDEN (Optimistic UI)
     chatForm.addEventListener('submit', async (e) => {
         e.preventDefault(); // Verhindert das Neuladen der Seite!
