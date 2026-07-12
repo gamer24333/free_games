@@ -79,6 +79,8 @@
         const hintEl = document.getElementById('hint');
         const resetBtn = document.getElementById('resetBtn');
 
+        
+        
         clickBtn.addEventListener('click', () => {
             // Spiel startet beim allerersten Klick
             if (!hasStarted) {
@@ -101,7 +103,20 @@
                 scoreEl.textContent = clicks;
             }
         });
-
+        // Hier fügen wir den Leertasten-Support hinzu
+        window.addEventListener('keydown', function(e) {
+        // Prüfen, ob die Leertaste gedrückt wurde
+        if (e.code === 'Space' || e.keyCode === 32) {
+            e.preventDefault(); // Verhindert das nervige Scrollen der Seite!
+            
+            // Simuliert den Klick auf den normalen Klick-Button, falls das Spiel läuft
+            // Ersetze 'clickButton' durch die ID deines Klick-Buttons, falls sie anders heißt!
+            const btn = document.getElementById('clickButton'); 
+            if (btn && !btn.disabled) {
+                btn.click(); 
+                }
+            }
+        });
         async function endGame() {
             gameActive = false;
             clearInterval(timerInterval);
