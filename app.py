@@ -327,7 +327,7 @@ def game():
     
     vollstaendige_liste = [(s, scores_data.get(s, 0)) for s in KLASSEN_LISTE]
     leaderboard = sorted(vollstaendige_liste, key=lambda x: x[1], reverse=True)
-    return render_template('game.html', leaderboard=leaderboard)
+    return render_template('geometry_dash.html', leaderboard=leaderboard)
     
 @app.route('/api/submit-score', methods=['POST'])
 def submit_score():
