@@ -58,41 +58,89 @@
     </div>
 
     <script>
-        const chatBox = document.getElementById('chatBox');
+    const chatBox = document.getElementById('chatBox');
+    const chatForm = document.querySelector('.chat-input-area');
+    const inputField = chatForm.querySelector('input[name="message"]');
+    const currentUsername = "{{ session['username'] }}";
+
+    // Scrollt nach ganz unten
+    function scrollToBottom() {
         chatBox.scrollTop = chatBox.scrollHeight;
+    }
+    scrollToBottom();
 
-        const currentUsername = "{{ session['username'] }}";
+    // BLITZSCHNELLES SENDEN (Optimistic UI)
+    chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault(); // Verhindert das Neuladen der Seite!
+        
+        const text = inputField.value.strip ? inputField.value.strip() : inputField.value.trim();
+        if (!text) return;
 
-        setInterval(async () => {
-            try {
-                const response = await fetch('/api/chat-messages/{{ room }}');
-                if (response.ok) {
-                    const nachrichten = await response.json();
-                    const wasAtBottom = chatBox.scrollHeight - chatBox.clientHeight <= chatBox.scrollTop + 50;
-                    
-                    chatBox.innerHTML = '';
-                    nachrichten.forEach((msg, index) => {
-                        let deleteButton = '';
-                        // Wenn die Nachricht von dir ist, baue das Lösch-Formular ein
-                        if (msg.name === currentUsername) {
-                            deleteButton = `
-                            <form action="/chat/{{ room }}/delete/${index}" method="POST" style="position: absolute; right: 8px; top: 8px; margin: 0;">
-                                <button type="submit" style="background: none; border: none; color: #ff2e63; cursor: pointer; font-size: 14px; padding: 0;">🗑️</button>
-                            </form>`;
-                        }
-    
-                        chatBox.innerHTML += `
-                        <div class="message" style="position: relative; padding-right: 40px;">
-                            <b>${msg.name}</b>
-                            <span>${msg.text}</span>
-                            ${deleteButton}
-                        </div>`;
-                    });
-                    
-                    if (wasAtBottom) chatBox.scrollTop = chatBox.scrollHeight;
-                }
-            } catch (e) { console.error(e); }
-        }, 3000);
-    </script>
+        // 1. Nachricht SOFORT lokal in die Chatbox zeichnen
+        const tempIndex = chatBox.children.length;
+        chatBox.innerHTML += `
+        <div class="message" style="position: relative; padding-right: 40px; opacity: 0.6;" id="msg-temp-${tempIndex}">
+            <b>${currentUsername}</b>
+            <span>${text}</span>
+            <span style="position: absolute; right: 8px; top: 8px; font-size: 10px; color: #aaa;">⏳</span>
+        </div>`;
+        
+        // Input-Feld sofort leeren für die nächste Nachricht
+        inputField.value = '';
+        scrollToBottom();
+
+        // 2. Im Hintergrund an Flask senden
+        try {
+            const formData = new FormData();
+            formData.append('message', text);
+
+            const response = await fetch('/chat/{{ room }}/send', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                // Wenn gespeichert, lade Nachrichten sofort neu, um die Sanduhr zu entfernen
+                loadMessages();
+            }
+        } catch (err) {
+            console.error("Sende-Fehler:", err);
+        }
+    });
+
+    // Funktion zum Nachrichten laden
+    async function loadMessages() {
+        try {
+            const response = await fetch('/api/chat-messages/{{ room }}');
+            if (response.ok) {
+                const nachrichten = await response.json();
+                const wasAtBottom = chatBox.scrollHeight - chatBox.clientHeight <= chatBox.scrollTop + 50;
+                
+                chatBox.innerHTML = '';
+                nachrichten.forEach((msg, index) => {
+                    let deleteButton = '';
+                    if (msg.name === currentUsername) {
+                        deleteButton = `
+                        <form action="/chat/{{ room }}/delete/${index}" method="POST" style="position: absolute; right: 8px; top: 8px; margin: 0;">
+                            <button type="submit" style="background: none; border: none; color: #ff2e63; cursor: pointer; font-size: 14px; padding: 0;">🗑️</button>
+                        </form>`;
+                    }
+
+                    chatBox.innerHTML += `
+                    <div class="message" style="position: relative; padding-right: 40px;">
+                        <b>${msg.name}</b>
+                        <span>${msg.text}</span>
+                        ${deleteButton}
+                    </div>`;
+                });
+                
+                if (wasAtBottom) scrollToBottom();
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    // Jede 3 Sekunden im Hintergrund synchronisieren
+    setInterval(loadMessages, 3000);
+</script>
 </body>
 </html>
