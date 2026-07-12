@@ -266,6 +266,32 @@ def api_chat_messages(room):
     return jsonify(nachrichten)
 
 
+@app.route('/chat/<room>/delete/<int:msg_index>', methods=['POST'])
+def delete_message(room, msg_index):
+    if 'username' not in session: return redirect(url_for('login'))
+    
+    data, sha = load_all_data()
+    current_user = session['username']
+    
+    # Raum-ID ermitteln (wie bei der Nachrichten-Route)
+    if room == "global":
+        room_id = "global"
+    else:
+        room_id = get_private_room_name(current_user, room)
+        
+    if room_id in data["chats"]:
+        nachrichten = data["chats"][room_id]
+        
+        # Sicherstellen, dass der Index existiert und die Nachricht dem User gehört
+        if 0 <= msg_index < len(nachrichten):
+            if nachrichten[msg_index]["name"] == current_user:
+                nachrichten.pop(msg_index) # Nachricht entfernen
+                save_all_data(data, sha) # Auf GitHub speichern
+                
+    # WICHTIG: Zurück auf den aktuellen Chat leiten, damit kein "Not Found" kommt
+    return redirect(url_for('chat_room', room=room))
+
+
 # --- GAME 1: GEOMETRY DASH ---
 
 @app.route('/geometry-dash')
