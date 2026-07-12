@@ -69,9 +69,18 @@
     </div>
 
     <script>
-    // Speichert, wie viele Nachrichten beim Laden da waren, um den Dashboard-Zähler zurückzusetzen
+    const currentRoom = "{{ room }}";
     const totalLoadedMessages = {{ nachrichten|length }};
-    localStorage.setItem('last_seen_messages', totalLoadedMessages);
+
+    if (currentRoom === "global") {
+        // Zähler für den globalen Chat zurücksetzen
+        localStorage.setItem('last_seen_messages_global', totalLoadedMessages);
+    } else {
+        // Zähler für den privaten Chat mit dieser Person zurücksetzen
+        let localPrivateStorage = JSON.parse(localStorage.getItem('last_seen_messages_private') || '{}');
+        localPrivateStorage[currentRoom] = totalLoadedMessages;
+        localStorage.setItem('last_seen_messages_private', JSON.stringify(localPrivateStorage));
+    }
         
     const chatBox = document.getElementById('chatBox');
     const chatForm = document.querySelector('.chat-input-area');
