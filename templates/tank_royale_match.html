@@ -2,17 +2,34 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tank Royale Match</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1a1a; color: white; margin: 0; padding: 10px; touch-action: none; }
-        canvas { background: linear-gradient(to bottom, #111 60%, #1f1f2e 100%); border: 4px solid #ff9f43; border-radius: 8px; margin-top: 10px; max-width: 100%; height: auto; }
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1a1a; color: white; margin: 0; padding: 10px; }
+        
+        /* Macht das Canvas auf Mobilgeräten flexibel und bricht nicht aus dem Bildschirm aus */
+        canvas { 
+            background: linear-gradient(to bottom, #111 60%, #1f1f2e 100%); 
+            border: 4px solid #ff9f43; 
+            border-radius: 8px; 
+            margin-top: 10px; 
+            max-width: 100%; 
+            height: auto; 
+            touch-action: none; /* Verhindert iPad-Scrollen NUR auf dem Spielfeld */
+            cursor: pointer;
+        }
+        
         .controls-info { background: #222; max-width: 900px; margin: 10px auto; padding: 15px; border-radius: 8px; font-size: 14px; color: #aaa; }
         .controls-info strong { color: #ff9f43; }
+        
         .btn-shoot { background: #ff2e63; color: white; border: none; padding: 12px 30px; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 10px; width: 100%; max-width: 300px; }
         .btn-shoot:disabled { background: #555; cursor: not-allowed; }
+        
         .button-row { display: flex; justify-content: center; gap: 20px; margin-top: 10px; }
         .btn-move { background: #333; color: white; border: 1px solid #555; padding: 10px 20px; font-size: 18px; border-radius: 5px; -webkit-user-select: none; user-select: none; }
+        
+        #lockStatus { font-weight: bold; color: #76ff03; margin-top: 5px; display: block; }
     </style>
 </head>
 <body>
@@ -22,13 +39,15 @@
     <canvas id="tankCanvas" width="900" height="500"></canvas>
 
     <div class="controls-info">
+        <span id="lockStatus">Visier: Frei beweglich (Klicke ins Spielfeld zum Einrasten/Sperren)</span>
+        <br>
         🎮 <strong>Steuerung:</strong><br>
-        🖥️ <strong>PC:</strong> Bewege die Maus zum Zielen, klicke auf "FEUER" oder drücke <kbd>A</kbd>/<kbd>D</kbd> zum Fahren.<br>
-        📱 <strong>iPad/Touch:</strong> Ziehe mit dem Finger auf dem Spielfeld, um die Flugbahn zu steuern. Nutzen die Buttons unten zum Fahren!
+        🖥️ <strong>PC:</strong> Maus bewegen = Zielen | **Linksklick ins Feld** = Visier einfrieren/lösen | <kbd>A</kbd>/<kbd>D</kbd> = Fahren.<br>
+        📱 <strong>iPad:</strong> Ziehe den Finger zum Zielen | **Tippe einmal kurz**, um das Visier festzustellen | Buttons unten zum Fahren!
         
         <div class="button-row">
-            <button class="btn-move" id="moveLeftBtn">⬅️ Links fahren</button>
-            <button class="btn-move" id="moveRightBtn">Rechts fahren ➡️</button>
+            <button class="btn-move" id="moveLeftBtn">⬅️ Links</button>
+            <button class="btn-move" id="moveRightBtn">Rechts ➡️</button>
         </div>
         
         <button class="btn-shoot" id="shootBtn" disabled>FEUER! 🔥</button>
@@ -43,15 +62,17 @@
         const shootBtn = document.getElementById('shootBtn');
         const moveLeftBtn = document.getElementById('moveLeftBtn');
         const moveRightBtn = document.getElementById('moveRightBtn');
+        const lockStatusText = document.getElementById('lockStatus');
 
         let gameState = {};
         let bullet = null;
         const gravity = 0.15;
 
-        // Dynamische Ziel-Variablen
+        // Ziel-Variablen
         let myAngle = 45;
         let myPower = 12;
         let myXOffset = 0;
+        let isAimLocked = false; // Neuer Status für das Einrasten des Visiers
 
         // Mobile Buttons Halte-Status
         let moveLeftActive = false;
@@ -69,12 +90,12 @@
             terrainPoints.push(y);
         }
 
-        // --- MAUS- & TOUCH-STEUERUNG (BERECHNUNG) ---
+        // --- VISIER-BERECHNUNG ---
         function aimAtPoints(clientX, clientY) {
-            if (gameState.turn !== me || gameState.status !== "aktiv" || bullet !== null) return;
+            // Wenn das Visier gesperrt ist, berechnen wir nix neu!
+            if (isAimLocked || gameState.turn !== me || gameState.status !== "aktiv" || bullet !== null) return;
 
             const rect = canvas.getBoundingClientRect();
-            // Umrechnung von Display-Größe auf echte Canvas-Pixel (wichtig für iPads!)
             const mouseX = ((clientX - rect.left) / rect.width) * canvas.width;
             const mouseY = ((clientY - rect.top) / rect.height) * canvas.height;
 
@@ -82,19 +103,15 @@
             let currentX = amIErsteller ? gameState.p1_x + myXOffset : gameState.p2_x + myXOffset;
             let startY = terrainPoints[Math.floor(currentX)] - 15;
 
-            // Vektor vom Panzer zum Maus-/Touch-Punkt berechnen
             let dx = mouseX - currentX;
-            let dy = startY - mouseY; // Y im Canvas ist invertiert
+            let dy = startY - mouseY;
 
-            // Für den zweiten Spieler die Richtung spiegeln
             if (!amIErsteller) dx = -dx;
 
-            // Winkel berechnen (Bogenmaß in Grad)
             let angle = Math.atan2(dy, dx) * (180 / Math.PI);
             if (angle < 0) angle = 0;
             if (angle > 90) angle = 90;
 
-            // Kraft anhand der Entfernung schätzen (gedeckelt zwischen 5 und 20)
             let distance = Math.sqrt(dx*dx + dy*dy);
             let power = Math.min(20, Math.max(5, distance / 18));
 
@@ -102,18 +119,34 @@
             myPower = power;
         }
 
-        // Event-Listener für Maus
-        canvas.addEventListener('mousemove', (e) => aimAtPoints(e.clientX, e.clientY));
+        // Klick/Touch auf Canvas schaltet Lock um
+        canvas.addEventListener('click', (e) => {
+            if (gameState.turn !== me || gameState.status !== "aktiv" || bullet !== null) return;
+            
+            isAimLocked = !isAimLocked;
+            if (isAimLocked) {
+                lockStatusText.innerText = "🔒 Visier EINGERASTET! (Klicke erneut zum Ändern)";
+                lockStatusText.style.color = "#ff9f43";
+            } else {
+                lockStatusText.innerText = "Visier: Frei beweglich";
+                lockStatusText.style.color = "#76ff03";
+                // Direkt auf die aktuelle Klickposition ausrichten beim Entsperren
+                aimAtPoints(e.clientX, e.clientY);
+            }
+        });
 
-        // Event-Listener für Touch (iPad)
+        // Event-Listener für Maus und Touch
+        canvas.addEventListener('mousemove', (e) => aimAtPoints(e.clientX, e.clientY));
+        
         canvas.addEventListener('touchmove', (e) => {
             if(e.touches.length > 0) {
                 aimAtPoints(e.touches[0].clientX, e.touches[0].clientY);
             }
-            e.preventDefault(); // Verhindert das Scrollen der Website beim Ziehen
+            e.preventDefault(); 
         }, { passive: false });
 
-        // Touch-Buttons fürs Fahren auswerten
+
+        // Touch-Buttons fürs Fahren
         moveLeftBtn.addEventListener('mousedown', () => moveLeftActive = true);
         moveLeftBtn.addEventListener('mouseup', () => moveLeftActive = false);
         moveLeftBtn.addEventListener('touchstart', (e) => { moveLeftActive = true; e.preventDefault(); });
@@ -154,7 +187,6 @@
         function handleInput() {
             if (gameState.turn !== me || gameState.status !== "aktiv" || bullet !== null) return;
 
-            // Fahren via PC-Tastatur ODER iPad-Buttons
             if (keys['a'] || keys['A'] || moveLeftActive) myXOffset -= 1.5;
             if (keys['d'] || keys['D'] || moveRightActive) myXOffset += 1.5;
         }
@@ -190,7 +222,6 @@
             let p1_x = Math.round(gameState.p1_x + (amIErsteller ? myXOffset : 0));
             let p2_x = Math.round(gameState.p2_x + (!amIErsteller ? myXOffset : 0));
 
-            // Begrenzung, damit man nicht aus dem Bildschirm fährt
             p1_x = Math.max(20, Math.min(canvas.width - 20, p1_x));
             p2_x = Math.max(20, Math.min(canvas.width - 20, p2_x));
 
@@ -204,7 +235,7 @@
             ctx.fillStyle = p2.color; ctx.fillRect(p2.x - 20, p2.y, 40, 15);
             ctx.fillStyle = '#fff'; ctx.fillText(`${p2.name} (${p2.hp} HP)`, p2.x - 30, p2.y - 25);
 
-            // Flugbahn-Vorschau (Trajektorie)
+            // Flugbahn-Vorschau
             if (gameState.turn === me && gameState.status === "aktiv" && !bullet) {
                 let activeTank = amIErsteller ? p1 : p2;
                 let rad = (myAngle * Math.PI) / 180;
@@ -214,13 +245,12 @@
                 let previewVx = Math.cos(rad) * myPower * (amIErsteller ? 1 : -1);
                 let previewVy = -Math.sin(rad) * myPower;
 
-                ctx.strokeStyle = 'rgba(249, 212, 35, 0.6)';
+                ctx.strokeStyle = isAimLocked ? 'rgba(118, 255, 3, 0.8)' : 'rgba(249, 212, 35, 0.6)';
                 ctx.lineWidth = 3;
                 ctx.setLineDash([6, 6]);
                 ctx.beginPath();
                 ctx.moveTo(previewX, previewY);
 
-                // Vorschau-Linie
                 for (let i = 0; i < 20; i++) {
                     previewVy += gravity;
                     previewX += previewVx;
@@ -229,9 +259,13 @@
                 }
                 ctx.stroke();
                 ctx.setLineDash([]);
+                
+                // Text für Winkel & Kraft anzeigen
+                ctx.fillStyle = '#ff9f43';
+                ctx.fillText(`Winkel: ${Math.round(myAngle)}° | Kraft: ${Math.round(myPower)}`, activeTank.x - 40, activeTank.y - 10);
             }
 
-            // Kugel
+            // Kugel-Animation
             if (bullet) {
                 bullet.vy += gravity;
                 bullet.x += bullet.vx;
@@ -274,6 +308,9 @@
                 vy: -Math.sin(rad) * myPower
             };
             shootBtn.disabled = true;
+            isAimLocked = false; // Nach dem Schuss Lock aufheben
+            lockStatusText.innerText = "Visier: Frei beweglich";
+            lockStatusText.style.color = "#76ff03";
         }
 
         async function sendShotResult(angle, power, hit, finalP1X, finalP2X) {
