@@ -46,6 +46,10 @@
                             </form>
                         {% else %}
                             <a href="/tankroyale/match/{{ einl.id }}" class="btn" style="padding: 6px 12px; font-size: 14px; margin: 0; background: #ff9f43; color: black;">In den Panzer! 💥</a>
+                            <a href="/tankroyale/match/{{ einl.id }}" class="btn" style="padding: 6px 12px; font-size: 14px; margin: 0; background: #ff9f43; color: black;">In den Panzer! 💥</a>
+                            <form action="/tankroyale/delete-match/{{ einl.id }}" method="POST" style="margin: 0;">
+                                <button type="submit" class="btn" style="background: #ff2e63; padding: 6px 12px; font-size: 14px; margin: 0; border: none; cursor: pointer;">❌ Löschen</button>
+                            </form>
                         {% endif %}
                     </div>
                 {% else %}
