@@ -59,7 +59,7 @@
         }
 
         async function updateStatus() {
-            if (!gameId || gameId.startsWith("{{")) return;
+            if (!gameId || gameId.startsWith("{" + "{")) return;
             try {
                 let res = await fetch(`/api/tankroyale/status/${gameId}`);
                 if (!res.ok) return;
