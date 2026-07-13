@@ -12,17 +12,19 @@
         .leaderboard { background: #333; border: 2px solid #444; border-radius: 12px; padding: 20px; width: 280px; text-align: left; }
         .leaderboard th, .leaderboard td { padding: 8px; text-align: left; border-bottom: 1px solid #444; }
         .leaderboard th { color: #e67e22; }
+        .btn-pause { background: #e67e22; margin-top: 10px; padding: 10px 20px; color: white; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <a href="/games" class="btn" style="background: #555; margin-bottom: 20px;">⬅️ Zurück zu den Spielen</a>
     <h1>🦘 Flappy Bird</h1>
-    <p style="color: #aaa; margin-top: 0;">Tippe auf den Canvas oder drücke die <b>Leertaste</b>, um zu springen!</p>
+    <p style="color: #aaa; margin-top: 0;">Leertaste zum Springen | <b>ESC</b> oder Button zum Pausieren!</p>
 
     <div class="game-container">
         <div>
             <canvas id="flappyCanvas" width="320" height="480"></canvas>
+            <button id="pauseBtn" class="btn-pause" style="display: none;">⏸️ Pause</button>
         </div>
 
         <div class="leaderboard">
@@ -47,24 +49,42 @@
     <script>
         const canvas = document.getElementById('flappyCanvas');
         const ctx = canvas.getContext('2d');
+        const pauseBtn = document.getElementById('pauseBtn'); // NEU
 
-        // Spielvariablen
         let birdY = 200, velocity = 0, gravity = 0.25, jump = -4.6;
         let score = 0, gameOver = false, gameStarted = false;
+        let isPaused = false; // NEU: Pause-Status
         let pipes = [];
 
-        // Steuerung
         function doJump() {
+            if (isPaused) return; // Wenn pausiert, kein Sprung!
             if (gameOver) { resetGame(); return; }
-            if (!gameStarted) gameStarted = true;
+            if (!gameStarted) {
+                gameStarted = true;
+                pauseBtn.style.display = "inline-block"; // Pause-Button einblenden
+            }
             velocity = jump;
         }
-        window.addEventListener('keydown', (e) => { if(e.code === 'Space') { e.preventDefault(); doJump(); } });
+
+        // NEU: Pause umschalten
+        function togglePause() {
+            if (!gameStarted || gameOver) return;
+            isPaused = !isPaused;
+            pauseBtn.textContent = isPaused ? "▶️ Weiter" : "⏸️ Pause";
+        }
+
+        window.addEventListener('keydown', (e) => { 
+            if(e.code === 'Space') { e.preventDefault(); doJump(); } 
+            if(e.code === 'Escape') { e.preventDefault(); togglePause(); } // NEU: ESC fängt Pause ab
+        });
         canvas.addEventListener('touchstart', (e) => { e.preventDefault(); doJump(); });
         canvas.addEventListener('mousedown', doJump);
+        pauseBtn.addEventListener('click', togglePause); // NEU: Klick-Event für Button
 
         function resetGame() {
-            birdY = 200; velocity = 0; score = 0; gameOver = false; gameStarted = false; pipes = [];
+            birdY = 200; velocity = 0; score = 0; gameOver = false; gameStarted = false; isPaused = false; pipes = [];
+            pauseBtn.style.display = "none";
+            pauseBtn.textContent = "⏸️ Pause";
         }
 
         async function sendScore(finalScore) {
@@ -79,37 +99,28 @@
         }
 
         function gameLoop() {
-            // Hintergrund
             ctx.fillStyle = '#70c5ce';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            if (gameStarted && !gameOver) {
+            // NEU: Nur berechnen und bewegen, wenn NICHT pausiert ist
+            if (gameStarted && !gameOver && !isPaused) {
                 velocity += gravity;
                 birdY += velocity;
 
-                // Rohre generieren
                 if (pipes.length === 0 || pipes[pipes.length - 1].x < canvas.width - 160) {
                     let gap = 110;
                     let topHeight = Math.floor(Math.random() * (canvas.height - gap - 100)) + 30;
                     pipes.push({ x: canvas.width, top: topHeight, bottom: canvas.height - topHeight - gap, passed: false });
                 }
 
-                // Rohre bewegen und prüfen
                 pipes.forEach(pipe => {
                     pipe.x -= 2;
 
-                    // Zeichne Rohre
-                    ctx.fillStyle = '#73bf2e';
-                    ctx.fillRect(pipe.x, 0, 52, pipe.top);
-                    ctx.fillRect(pipe.x, canvas.height - pipe.bottom, 52, pipe.bottom);
-
-                    // Score erhöhen
                     if (!pipe.passed && pipe.x < 50) {
                         score++;
                         pipe.passed = true;
                     }
 
-                    // Kollision
                     if (50 + 20 > pipe.x && 50 < pipe.x + 52) {
                         if (birdY < pipe.top || birdY + 20 > canvas.height - pipe.bottom) {
                             gameOver = true;
@@ -117,20 +128,23 @@
                         }
                     }
                 });
-
                 pipes = pipes.filter(p => p.x > -60);
             }
 
-            // Boden-Kollision
+            // Rohre statisch zeichnen (auch bei Pause)
+            pipes.forEach(pipe => {
+                ctx.fillStyle = '#73bf2e';
+                ctx.fillRect(pipe.x, 0, 52, pipe.top);
+                ctx.fillRect(pipe.x, canvas.height - pipe.bottom, 52, pipe.bottom);
+            });
+
             if (birdY + 20 > canvas.height || birdY < 0) {
-                if (!gameOver && gameStarted) { gameOver = true; sendScore(score); }
+                if (!gameOver && gameStarted && !isPaused) { gameOver = true; sendScore(score); }
             }
 
-            // Vogel zeichnen (Gelbes Quadrat als Platzhalter - kannst du später durch ein Bild ersetzen!)
             ctx.fillStyle = '#f1c40f';
             ctx.fillRect(50, birdY, 20, 20);
 
-            // Score-Anzeige
             ctx.fillStyle = 'white';
             ctx.font = 'bold 24px Arial';
             ctx.fillText(score, canvas.width / 2 - 10, 40);
@@ -142,6 +156,19 @@
                 ctx.font = '18px Arial';
                 ctx.fillText('Klicken zum Starten', canvas.width/2 - 75, canvas.height/2);
             }
+            
+            // NEU: Optisches Pause-Overlay auf dem Spielfeld zeichnen
+            if (isPaused) {
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#e67e22';
+                ctx.font = 'bold 28px Arial';
+                ctx.fillText('PAUSIERT', canvas.width / 2 - 70, canvas.height / 2);
+                ctx.fillStyle = 'white';
+                ctx.font = '14px Arial';
+                ctx.fillText('ESC oder Button zum Weiterspielen', canvas.width / 2 - 110, canvas.height / 2 + 30);
+            }
+
             if (gameOver) {
                 ctx.fillStyle = 'rgba(255,0,0,0.3)';
                 ctx.fillRect(0,0,canvas.width,canvas.height);
