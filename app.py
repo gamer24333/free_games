@@ -811,4 +811,14 @@ with app.app_context():
     db.create_all()
 
 if __name__ == '__main__':
+    @app.route('/api/tankroyale/clear-broken-games')
+    def clear_broken_games():
+    try:
+        # Löscht die beiden Spiele mit dem alten 4-Wert-State
+        TankGame.query.filter_by(game_id="Test Account_tank_Till").delete()
+        TankGame.query.filter_by(game_id="Ben_tank_Matteo").delete()
+        db.session.commit()
+        return {"status": "Erfolgreich gelöscht! Erstelle jetzt ein neues Spiel."}, 200
+    except Exception as e:
+        return {"error": str(e)}, 500
     app.run(debug=True)
