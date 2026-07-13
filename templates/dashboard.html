@@ -34,18 +34,31 @@
         {% for einl in einladungen %}
             <div class="invite-item">
                 {% if einl.is_active %}
-                    <span style="color: #00adb5;">Ein Live-Spiel läuft gerade!</span>
+                    <div>
+                        <span style="color: #00adb5; display: block; font-weight: bold;">{{ einl.von }}</span>
+                        <span style="font-size: 12px; color: #aaa;">Ein Live-Spiel läuft gerade!</span>
+                    </div>
                     <div style="display: flex; gap: 8px;">
-                        <a href="/tictactoe/game/{{ einl.id }}" class="btn" style="padding: 6px 12px; font-size: 14px; margin: 0; background: #00adb5;">Weiterspielen</a>
-                        <form action="/tictactoe/delete-match/{{ einl.id }}" method="POST" style="margin: 0;">
-                            <button type="submit" class="btn" style="background: #ff2e63; padding: 6px 12px; font-size: 14px; margin: 0; border: none; cursor: pointer;">❌ Löschen</button>
-                        </form>
+                        {% if einl.typ == 'tictactoe' %}
+                            <a href="/tictactoe/game/{{ einl.id }}" class="btn" style="padding: 6px 12px; font-size: 14px; margin: 0; background: #00adb5;">Weiterspielen</a>
+                            <form action="/tictactoe/delete-match/{{ einl.id }}" method="POST" style="margin: 0;">
+                                <button type="submit" class="btn" style="background: #ff2e63; padding: 6px 12px; font-size: 14px; margin: 0; border: none; cursor: pointer;">❌ Löschen</button>
+                            </form>
+                        {% else %}
+                            <a href="/tankroyale/match/{{ einl.id }}" class="btn" style="padding: 6px 12px; font-size: 14px; margin: 0; background: #ff9f43; color: black;">In den Panzer! 💥</a>
+                        {% endif %}
                     </div>
                 {% else %}
-                    <span><b>{{ einl.von }}</b> fordert dich heraus!</span>
-                    <form action="/tictactoe/accept/{{ einl.id }}" method="POST" style="margin: 0;">
-                        <button type="submit" class="btn" style="background: #2ecc71; padding: 6px 12px; font-size: 14px; margin: 0; border: none; cursor: pointer;">Annehmen</button>
-                    </form>
+                    <span><b>{{ einl.von }}</b> fordert dich zu {% if einl.typ == 'tictactoe' %}Tic-Tac-Toe{% else %}Tank Royale{% endif %} heraus!</span>
+                    {% if einl.typ == 'tictactoe' %}
+                        <form action="/tictactoe/accept/{{ einl.id }}" method="POST" style="margin: 0;">
+                            <button type="submit" class="btn" style="background: #2ecc71; padding: 6px 12px; font-size: 14px; margin: 0; border: none; cursor: pointer;">Annehmen</button>
+                        </form>
+                    {% else %}
+                        <form action="/tankroyale/accept/{{ einl.id }}" method="POST" style="margin: 0;">
+                            <button type="submit" class="btn" style="background: #ff9f43; padding: 6px 12px; font-size: 14px; margin: 0; border: none; cursor: pointer; color: black;">Annehmen</button>
+                        </form>
+                    {% endif %}
                 {% endif %}
             </div>
         {% endfor %}
