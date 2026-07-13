@@ -23,7 +23,7 @@ KLASSEN_LISTE = [
     "Till", "Ben", "Matteo", "Louis", "Maxim", "Jonah P", "Jonah S", 
     "Mateo", "Hanna", "Emma", "Lia", "Mia", "Lena S", "Lena G", "Johann", 
     "Lena D", "Dasha", "Daniel", "Bennet", "Erik", "Roman", "Meike",
-    "Janne", "Tom", "Levin", "Liam", "Tim", "Nathalie", "Richard",
+    "Janne", "Tom", "Levin", "Liam", "Tim", "Nathalie", "Richard", "Julius",
     "TestAccount"
 ]
 
@@ -680,28 +680,25 @@ def tank_status(game_id):
     
     # 2. Wenn der String weniger als 13 Werte hat, füllen wir ihn auf!
     if len(raw_parts) < 13:
-        # Sicheres Auslesen der ersten 4 Werte (falls vorhanden)
         p1_hp = raw_parts[0] if len(raw_parts) > 0 else "100"
         p2_hp = raw_parts[1] if len(raw_parts) > 1 else "100"
-        p1_x  = raw_parts[2] if len(raw_parts) > 2 else "200"
-        p2_x  = raw_parts[3] if len(raw_parts) > 3 else "700"
+        p1_x  = raw_parts[2] if len(raw_parts) > 2 else "80"
+        p2_x  = raw_parts[3] if len(raw_parts) > 3 else "620"
         
-        # Neuen, langen State-String mit 13 Werten zusammenbauen
-        # hp1, hp2, x1, x2, fuel1, fuel2, w1_1, w1_2, w2_1, w2_2, crateX, crateY, crateActive
-        st = [p1_hp, p2_hp, p1_x, p2_x, "100", "100", "3", "2", "3", "2", "-1", "-1", "0"]
-        g.state = ",".join(st)
+        raw_parts = [p1_hp, p2_hp, p1_x, p2_x, "100", "100", "3", "2", "3", "2", "-1", "-1", "0"]
+        g.state = ",".join(raw_parts)
         db.session.commit()
     
-    # 3. Daten an das JavaScript senden (Fehlerfrei, da g.state jetzt garantiert 13 Werte hat)
+    # 3. Werte direkt aus dem Array parsen, statt nicht existierende Tabellenspalten abzufragen
     return {
         "status": g.status or "aktiv",
         "turn": g.turn,
         "ersteller": g.ersteller,
         "gegner": g.gegner,
-        "p1_hp": g.p1_hp if g.p1_hp is not None else 100,
-        "p2_hp": g.p2_hp if g.p2_hp is not None else 100,
-        "p1_x": g.p1_x if g.p1_x is not None else 200,
-        "p2_x": g.p2_x if g.p2_x is not None else 700,
+        "p1_hp": int(float(raw_parts[0])),
+        "p2_hp": int(float(raw_parts[1])),
+        "p1_x": int(float(raw_parts[2])),
+        "p2_x": int(float(raw_parts[3])),
         "raw_state": g.state
     }
     
