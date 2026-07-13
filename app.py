@@ -665,7 +665,7 @@ def tankroyale_decline(game_id):
 @app.route('/tankroyale/match/<game_id>')
 def tankroyale_match(game_id):
     if 'username' not in session: return redirect(url_for('login'))
-    return render_template('tank_royale_match.html', game_id=game_id, me=session['username'])
+    return render_template('tank_royale_match.html', gameId=game_id, me=session['username'])
 
 @app.route('/api/tankroyale/status/<game_id>')
 def tank_status(game_id):
