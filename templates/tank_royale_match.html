@@ -40,34 +40,41 @@
         const gravity = 0.15;
 
         async function updateStatus() {
-            let res = await fetch(`/api/tankroyale/status/${gameId}`);
-            gameState = await res.json();
-            
-            if (!gameState.status) return;
+            try {
+                let res = await fetch(`/api/tankroyale/status/${gameId}`);
+                if (!res.ok) return;
+                gameState = await res.json();
+                
+                if (!gameState || !gameState.status) return;
 
-            const isMyTurn = (gameState.turn === me && gameState.status === "aktiv");
-            shootBtn.disabled = !isMyTurn || bullet !== null;
+                const isMyTurn = (gameState.turn === me && gameState.status === "aktiv");
+                shootBtn.disabled = !isMyTurn || bullet !== null;
 
-            if (gameState.status === "eingeladen") {
-                document.getElementById('matchInfo').innerText = "Warte darauf, dass der Gegner annimmt... ⏳";
-            } else if (gameState.status.startsWith("gewonnen")) {
-                let winner = gameState.status.split('_')[1];
-                document.getElementById('matchInfo').innerText = winner === me ? "🎉 DU HAST GEWONNEN! 🎉" : `❌ ${winner} hat dich zerstört!`;
-                shootBtn.disabled = true;
-            } else {
-                document.getElementById('matchInfo').innerText = isMyTurn ? "🔴 DU BIST DRAN! Schieß!" : `⏳ ${gameState.turn} berechnet den Schuss...`;
+                if (gameState.status === "eingeladen") {
+                    document.getElementById('matchInfo').innerText = "Warte darauf, dass der Gegner annimmt... ⏳";
+                } else if (gameState.status.startsWith("gewonnen")) {
+                    let winner = gameState.status.split('_')[1];
+                    document.getElementById('matchInfo').innerText = winner === me ? "🎉 DU HAST GEWONNEN! 🎉" : `❌ ${winner} hat dich zerstört!`;
+                    shootBtn.disabled = true;
+                } else {
+                    document.getElementById('matchInfo').innerText = isMyTurn ? "🔴 DU BIST DRAN! Schieß!" : `⏳ ${gameState.turn} berechnet den Schuss...`;
+                }
+            } catch (e) {
+                console.error("Fehler beim Status-Update:", e);
             }
-
-            draw();
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#222831'; ctx.fillRect(0, 370, canvas.width, 30); // Boden
+            
+            // Boden zeichnen (wird immer gezeichnet)
+            ctx.fillStyle = '#222831'; 
+            ctx.fillRect(0, 370, canvas.width, 30); 
 
-            if (!gameState.status) return;
+            // WICHTIG: Abbrechen, wenn Serverdaten noch leer sind
+            if (!gameState || !gameState.status) return;
 
-            // Rollenverteilung ermitteln für Farben & Lebensbalken
+            // Rollenverteilung ermitteln
             let amIErsteller = (me === gameState.ersteller);
             let p1 = { x: gameState.p1_x, y: 350, hp: gameState.p1_hp, color: '#00adb5', name: gameState.ersteller };
             let p2 = { x: gameState.p2_x, y: 350, hp: gameState.p2_hp, color: '#ff2e63', name: gameState.gegner };
@@ -90,7 +97,6 @@
                 ctx.beginPath(); ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI * 2); ctx.fill();
 
                 let target = amIErsteller ? p2 : p1;
-                let activeShooter = amIErsteller ? p1 : p2;
 
                 // Kollisionsprüfung lokal auf dem Canvas
                 if (bullet.x > target.x && bullet.x < target.x + 40 && bullet.y > target.y && bullet.y < target.y + 20) {
@@ -105,15 +111,21 @@
         }
 
         async function sendShotResult(angle, power, hit) {
-            await fetch(`/api/tankroyale/shoot/${gameId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ angle: angle, power: power, hit: hit })
-            });
-            updateStatus();
+            try {
+                await fetch(`/api/tankroyale/shoot/${gameId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ angle: angle, power: power, hit: hit })
+                });
+                updateStatus();
+            } catch (e) {
+                console.error("Fehler beim Senden des Schusses:", e);
+            }
         }
 
         shootBtn.addEventListener('click', () => {
+            if (!gameState.status || bullet !== null) return;
+            
             let angle = parseFloat(angleInput.value);
             let power = parseFloat(powerInput.value);
             let rad = (angle * Math.PI) / 180;
@@ -124,7 +136,7 @@
             bullet = {
                 x: startX,
                 y: 340,
-                vx: Math.cos(rad) * power * (amIErsteller ? 1 : -1), // Richtung anpassen
+                vx: Math.cos(rad) * power * (amIErsteller ? 1 : -1),
                 vy: -Math.sin(rad) * power,
                 angle: angle,
                 power: power
@@ -132,9 +144,9 @@
             shootBtn.disabled = true;
         });
 
-        // Animation Loop für weiche Schüsse
+        // Die GameLoop rendert das Spielfeld nun durchgehend
         function gameLoop() {
-            if (bullet) draw();
+            draw();
             requestAnimationFrame(gameLoop);
         }
 
