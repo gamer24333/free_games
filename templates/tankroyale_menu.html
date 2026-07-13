@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Gegner wählen - Tank Royale</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 50px; }
+        select, button { padding: 10px; font-size: 16px; border-radius: 6px; margin: 10px; }
+        button { background: #ff9f43; border: none; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <a href="/games" class="btn btn-back">⬅️ Zurück</a>
+    <h1>🚀 Wen möchtest du in Tank Royale duellieren?</h1>
+    
+    <form action="/tankroyale/invite" method="POST">
+        <select name="gegner">
+            {% for g in gegner_liste %}
+                <option value="{{ g }}">{{ g }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Einladung senden! 💥</button>
+    </form>
+</body>
+</html>
