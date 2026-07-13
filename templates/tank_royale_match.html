@@ -8,14 +8,11 @@
     <style>
         body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1a1a; color: white; margin: 0; padding: 10px; }
         canvas { background: linear-gradient(to bottom, #111 60%, #1f1f2e 100%); border: 4px solid #ff9f43; border-radius: 8px; margin-top: 10px; max-width: 100%; height: auto; touch-action: none; }
-        
         .controls-info { background: #222; max-width: 900px; margin: 10px auto; padding: 15px; border-radius: 8px; font-size: 14px; color: #aaa; }
         .weapon-selector { display: flex; justify-content: center; gap: 10px; margin: 15px 0; }
-        
         .btn-weapon { background: #444; color: white; border: 2px solid #666; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .btn-weapon.active { background: #ff9f43; color: black; border-color: #fff; }
         .btn-weapon:disabled { background: #222; color: #555; border-color: #333; cursor: not-allowed; }
-        
         .button-row { display: flex; justify-content: center; gap: 20px; margin-top: 10px; }
         .btn-move { background: #333; color: white; border: 1px solid #555; padding: 10px 20px; font-size: 18px; border-radius: 5px; user-select: none; }
         .btn-shoot { background: #ff2e63; color: white; border: none; padding: 12px 30px; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 10px; width: 100%; max-width: 300px; }
@@ -52,40 +49,32 @@
         const canvas = document.getElementById('tankCanvas');
         const ctx = canvas.getContext('2d');
         const shootBtn = document.getElementById('shootBtn');
-        const moveLeftBtn = document.getElementById('moveLeftBtn');
-        const moveRightBtn = document.getElementById('moveRightBtn');
         const lockStatusText = document.getElementById('lockStatus');
 
         let gameState = {};
         let bullet = null;
         const gravity = 0.15;
 
-        // Spielmechanik-Variablen
         let myAngle = 45;
         let myPower = 12;
         let myXOffset = 0;
         let isAimLocked = false;
         let selectedWeapon = 'standard';
 
-        // Lokale Inventarwerte (werden vom Server überschrieben)
         let myFuel = 100;
         let ammoBerta = 3;
         let ammoTriple = 2;
-
-        // Kisten-Position (Synchronisiert)
         let crate = { x: -100, y: -100, active: false };
 
-        let moveLeftActive = false;
-        let moveRightActive = false;
+        let moveLeftActive = false; let moveRightActive = false;
         const keys = {};
         window.addEventListener('keydown', e => { keys[e.key] = true; });
         window.addEventListener('keyup', e => { keys[e.key] = false; });
 
-        // Hügel-Gelände
+        // Hügel-Gelände generieren
         const terrainPoints = [];
         for (let x = 0; x <= canvas.width; x++) {
-            let y = 400 + Math.sin(x * 0.008) * 40 + Math.cos(x * 0.02) * 10;
-            terrainPoints.push(y);
+            terrainPoints.push(400 + Math.sin(x * 0.008) * 40 + Math.cos(x * 0.02) * 10);
         }
 
         function selectWeapon(type) {
@@ -94,7 +83,6 @@
             document.getElementById(`wpn-${type}`).classList.add('active');
         }
 
-        // --- ZIELEN & KLICKEN ---
         function aimAtPoints(clientX, clientY) {
             if (isAimLocked || gameState.turn !== me || gameState.status !== "aktiv" || bullet !== null) return;
             const rect = canvas.getBoundingClientRect();
@@ -108,11 +96,9 @@
             let dx = mouseX - currentX; let dy = startY - mouseY;
             if (!amIErsteller) dx = -dx;
 
-            let angle = Math.atan2(dy, dx) * (180 / Math.PI);
-            if (angle < 0) angle = 0; if (angle > 90) angle = 90;
-            let power = Math.min(20, Math.max(5, Math.sqrt(dx*dx + dy*dy) / 18));
-
-            myAngle = angle; myPower = power;
+            myAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+            if (myAngle < 0) myAngle = 0; if (myAngle > 90) myAngle = 90;
+            myPower = Math.min(20, Math.max(5, Math.sqrt(dx*dx + dy*dy) / 18));
         }
 
         canvas.addEventListener('click', (e) => {
@@ -120,21 +106,11 @@
             isAimLocked = !isAimLocked;
             lockStatusText.innerText = isAimLocked ? "🔒 Visier EINGERASTET!" : "Visier: Frei beweglich";
             lockStatusText.style.color = isAimLocked ? "#ff9f43" : "#76ff03";
-            if (!isAimLocked) aimAtPoints(e.clientX, e.clientY);
         });
 
         canvas.addEventListener('mousemove', (e) => aimAtPoints(e.clientX, e.clientY));
-        canvas.addEventListener('touchmove', (e) => {
-            if(e.touches.length > 0) aimAtPoints(e.touches[0].clientX, e.touches[0].clientY);
-            e.preventDefault();
-        }, { passive: false });
 
-        // Touch-Fahren
-        moveLeftBtn.addEventListener('touchstart', (e) => { moveLeftActive = true; e.preventDefault(); });
-        moveLeftBtn.addEventListener('touchend', () => moveLeftActive = false);
-        moveRightBtn.addEventListener('touchstart', (e) => { moveRightActive = true; e.preventDefault(); });
-        moveRightBtn.addEventListener('touchend', () => moveRightActive = false);
-
+        // ZUGRIFF & SEITENSYNC FIXEN
         async function updateStatus() {
             if (!gameId || gameId.startsWith("{" + "{")) return;
             try {
@@ -142,33 +118,27 @@
                 if (!res.ok) return;
                 gameState = await res.json();
                 
-                if (!gameState || !gameState.status) return;
-
-                // State entpacken: "p1_hp,p2_hp,p1_x,p2_x,p1_fuel,p2_fuel,p1_w1,p1_w2,p2_w1,p2_w2,crate_x,crate_y,crate_active"
                 let st = gameState.raw_state ? gameState.raw_state.split(',').map(Number) : [100,100,200,700,100,100,3,2,3,2,-1,-1,0];
-                
                 let amIErsteller = (me === gameState.ersteller);
-                myFuel = amIErsteller ? st[4] : st[5];
+
+                // NUR WENN ICH NICHT AM ZUG BIN, überschreiben wir die Live-Werte komplett!
+                if (gameState.turn !== me) {
+                    myXOffset = 0; 
+                    myFuel = amIErsteller ? st[4] : st[5];
+                }
+                
                 ammoBerta = amIErsteller ? st[6] : st[8];
                 ammoTriple = amIErsteller ? st[7] : st[9];
 
-                // Inventar-Anzeige updaten
                 document.getElementById('ammo-berta').innerText = ammoBerta;
                 document.getElementById('ammo-triple').innerText = ammoTriple;
                 document.getElementById('wpn-berta').disabled = ammoBerta <= 0;
                 document.getElementById('wpn-triple').disabled = ammoTriple <= 0;
-                if (selectedWeapon !== 'standard' && ((selectedWeapon==='berta'&&ammoBerta<=0)||(selectedWeapon==='triple'&&ammoTriple<=0))) {
-                    selectWeapon('standard');
-                }
 
-                // Kisten-Daten spiegeln
-                crate.x = st[10];
-                crate.y = st[11];
-                crate.active = st[12] === 1;
+                crate.x = st[10]; crate.y = st[11]; crate.active = st[12] === 1;
 
                 const isMyTurn = (gameState.turn === me && gameState.status === "aktiv");
                 shootBtn.disabled = !isMyTurn || bullet !== null;
-
                 if (gameState.status === "aktiv") {
                     document.getElementById('matchInfo').innerText = isMyTurn ? "🔴 DU BIST DRAN!" : `⏳ ${gameState.turn} zielt...`;
                 }
@@ -177,99 +147,91 @@
 
         function handleInput() {
             if (gameState.turn !== me || gameState.status !== "aktiv" || bullet !== null) return;
-
-            // Nur fahren, wenn noch Sprit (Fuel) da ist!
             if (myFuel > 0) {
-                if (keys['a'] || keys['A'] || moveLeftActive) { myXOffset -= 1.5; myFuel -= 0.4; }
-                if (keys['d'] || keys['D'] || moveRightActive) { myXOffset += 1.5; myFuel -= 0.4; }
+                if (keys['a'] || keys['A'] || moveLeftActive) { myXOffset -= 1.5; myFuel -= 0.5; }
+                if (keys['d'] || keys['D'] || moveRightActive) { myXOffset += 1.5; myFuel -= 0.5; }
                 myFuel = Math.max(0, myFuel);
+            }
+        }
+
+        // BODEN-ZERSTÖRUNG: Senkt die Hügelpunkte im Explosionsradius ab
+        function destroyTerrain(impactX, radius) {
+            let startX = Math.max(0, Math.floor(impactX - radius));
+            let endX = Math.min(canvas.width, Math.floor(impactX + radius));
+            for (let x = startX; x < endX; x++) {
+                let portion = Math.cos(((x - impactX) / radius) * (Math.PI / 2));
+                if (portion > 0) {
+                    terrainPoints[x] += radius * portion * 0.8; // Drückt den Boden nach unten
+                    if (terrainPoints[x] > canvas.height) terrainPoints[x] = canvas.height;
+                }
             }
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Boden & Gras zeichnen
+            // Boden malen
             ctx.fillStyle = '#393e46'; ctx.beginPath(); ctx.moveTo(0, canvas.height);
             for (let x = 0; x <= canvas.width; x++) ctx.lineTo(x, terrainPoints[x]);
             ctx.lineTo(canvas.width, canvas.height); ctx.closePath(); ctx.fill();
-            ctx.strokeStyle = '#76ff03'; ctx.lineWidth = 3; ctx.beginPath();
-            for (let x = 0; x <= canvas.width; x++) { if (x === 0) ctx.moveTo(x, terrainPoints[x]); else ctx.lineTo(x, terrainPoints[x]); }
-            ctx.stroke();
 
             if (!gameState || !gameState.status) return;
             let amIErsteller = (me === gameState.ersteller);
-            
-            // Aktuelle Spritwerte auslesen
             let st = gameState.raw_state ? gameState.raw_state.split(',').map(Number) : [100,100,200,700,100,100,3,2,3,2,-1,-1,0];
+            
             let p1_f = amIErsteller ? myFuel : st[4];
             let p2_f = !amIErsteller ? myFuel : st[5];
-
             let p1_x = Math.max(20, Math.min(canvas.width - 20, Math.round(gameState.p1_x + (amIErsteller ? myXOffset : 0))));
             let p2_x = Math.max(20, Math.min(canvas.width - 20, Math.round(gameState.p2_x + (!amIErsteller ? myXOffset : 0))));
 
             let p1 = { x: p1_x, y: terrainPoints[p1_x] - 15, hp: gameState.p1_hp, fuel: p1_f, color: '#00adb5', name: gameState.ersteller };
             let p2 = { x: p2_x, y: terrainPoints[p2_x] - 15, hp: gameState.p2_hp, fuel: p2_f, color: '#ff2e63', name: gameState.gegner };
 
-            // Kistenphysik (Fällt herab bis zum Hügelboden)
             if (crate.active) {
                 let groundY = terrainPoints[Math.floor(crate.x)] - 10;
-                if (crate.y < groundY) crate.y += 1.0; // Fallgeschwindigkeit
+                if (crate.y < groundY) crate.y += 1.0;
+                ctx.fillStyle = '#ff9f43'; ctx.fillRect(crate.x - 10, crate.y, 20, 20);
                 
-                // Fallschirm & Kiste zeichnen
-                if (crate.y < groundY - 5) {
-                    ctx.fillStyle = '#ff2e63'; ctx.beginPath(); ctx.arc(crate.x, crate.y - 12, 12, Math.PI, 0); ctx.fill(); // Fallschirm
-                }
-                ctx.fillStyle = '#ff9f43'; ctx.fillRect(crate.x - 10, crate.y, 20, 20); // Box
-                ctx.fillStyle = '#fff'; ctx.font = 'bold 10px Arial'; ctx.fillText("LOOT", crate.x - 13, crate.y + 13);
-
-                // Kollision mit Kiste prüfen (wer drüber fährt, kriegt den Inhalt!)
                 let activeTank = amIErsteller ? p1 : p2;
                 if (Math.abs(activeTank.x - crate.x) < 25 && Math.abs(activeTank.y - crate.y) < 25) {
-                    crate.active = false;
-                    myFuel = 100; // Tank voll!
-                    // Dem Server bescheid geben, dass Kiste weg ist und Werte aufgefüllt werden
-                    sendShotResult(myAngle, myPower, "crate_collected", p1.x, p2.x); 
+                    crate.active = false; myFuel = 100;
+                    sendShotResult(myAngle, myPower, "crate_collected", p1.x, p2.x);
                 }
             }
 
-            // Panzer & Tankanzeige zeichnen
             [p1, p2].forEach(p => {
                 ctx.fillStyle = p.color; ctx.fillRect(p.x - 20, p.y, 40, 15);
-                ctx.fillStyle = '#fff'; ctx.font = '12px Arial'; ctx.fillText(`${p.name} (${p.hp} HP)`, p.x - 30, p.y - 30);
-                // Tankbalken (Sprit)
+                ctx.fillStyle = '#fff'; ctx.fillText(`${p.name} (${p.hp} HP)`, p.x - 30, p.y - 30);
                 ctx.fillStyle = '#555'; ctx.fillRect(p.x - 20, p.y - 12, 40, 5);
                 ctx.fillStyle = '#76ff03'; ctx.fillRect(p.x - 20, p.y - 12, (p.fuel / 100) * 40, 5);
             });
 
-            // Visier-Linie
-            if (gameState.turn === me && gameState.status === "aktiv" && !bullet) {
+            if (gameState.turn === me && !bullet) {
                 let activeTank = amIErsteller ? p1 : p2;
                 let rad = (myAngle * Math.PI) / 180;
-                let previewX = activeTank.x; let previewY = activeTank.y;
-                let previewVx = Math.cos(rad) * myPower * (amIErsteller ? 1 : -1);
-                let previewVy = -Math.sin(rad) * myPower;
-
-                ctx.strokeStyle = isAimLocked ? '#76ff03' : '#f9d423'; ctx.lineWidth = 3; ctx.setLineDash([6, 6]);
-                ctx.beginPath(); ctx.moveTo(previewX, previewY);
-                for (let i = 0; i < 20; i++) { previewVy += gravity; previewX += previewVx; previewY += previewVy; ctx.lineTo(previewX, previewY); }
-                ctx.stroke(); ctx.setLineDash([]);
+                let pX = activeTank.x; let pY = activeTank.y;
+                let pVx = Math.cos(rad) * myPower * (amIErsteller ? 1 : -1);
+                let pVy = -Math.sin(rad) * myPower;
+                ctx.strokeStyle = '#f9d423'; ctx.beginPath(); ctx.moveTo(pX, pY);
+                for (let i = 0; i < 20; i++) { pVy += gravity; pX += pVx; pY += pVy; ctx.lineTo(pX, pY); }
+                ctx.stroke();
             }
 
-            // Kugel bewegen
             if (bullet) {
                 bullet.vy += gravity; bullet.x += bullet.vx; bullet.y += bullet.vy;
-                ctx.fillStyle = selectedWeapon === 'berta' ? '#ff2e63' : '#f9d423';
-                ctx.beginPath(); ctx.arc(bullet.x, bullet.y, selectedWeapon === 'berta' ? 10 : 5, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI*2); ctx.fill();
 
                 let target = amIErsteller ? p2 : p1;
+                // Spieler getroffen?
                 if (bullet.x > target.x - 20 && bullet.x < target.x + 20 && bullet.y > target.y && bullet.y < target.y + 15) {
                     sendShotResult(myAngle, myPower, amIErsteller ? "p2" : "p1", p1.x, p2.x);
                     bullet = null;
-                } else if (bullet.x >= 0 && bullet.x <= canvas.width && bullet.y > terrainPoints[Math.floor(bullet.x)]) {
-                    sendShotResult(myAngle, myPower, "none", p1.x, p2.x); bullet = null;
-                } else if (bullet.y > canvas.height || bullet.x < 0 || bullet.x > canvas.width) {
-                    sendShotResult(myAngle, myPower, "none", p1.x, p2.x); bullet = null;
+                } 
+                // Boden getroffen?
+                else if (bullet.x >= 0 && bullet.x <= canvas.width && bullet.y > terrainPoints[Math.floor(bullet.x)]) {
+                    destroyTerrain(bullet.x, selectedWeapon === 'berta' ? 45 : 25); // Krater reißen!
+                    sendShotResult(myAngle, myPower, "none", p1.x, p2.x);
+                    bullet = null;
                 }
             }
         }
@@ -279,13 +241,12 @@
             let rad = (myAngle * Math.PI) / 180;
             let amIErsteller = (me === gameState.ersteller);
             let currentX = Math.max(20, Math.min(canvas.width - 20, (amIErsteller ? gameState.p1_x + myXOffset : gameState.p2_x + myXOffset)));
-            
             bullet = {
                 x: currentX, y: terrainPoints[Math.floor(currentX)] - 15,
                 vx: Math.cos(rad) * myPower * (amIErsteller ? 1 : -1),
                 vy: -Math.sin(rad) * myPower
             };
-            shootBtn.disabled = true; isAimLocked = false;
+            shootBtn.disabled = true;
         }
 
         async function sendShotResult(angle, power, hit, finalP1X, finalP2X) {
@@ -298,16 +259,22 @@
                         angle: angle, power: power, hit: hit, 
                         waffenTyp: selectedWeapon,
                         new_p1_x: finalP1X, new_p2_x: finalP2X,
-                        new_p1_fuel: amIErsteller ? myFuel : null,
-                        new_p2_fuel: !amIErsteller ? myFuel : null
+                        new_p1_fuel: amIErsteller ? Math.round(myFuel) : null,
+                        new_p2_fuel: !amIErsteller ? Math.round(myFuel) : null
                     })
                 });
-                myXOffset = 0;
+                myXOffset = 0; // Reset nach Übertragung!
+                isAimLocked = false;
                 updateStatus();
             } catch (e) { console.error(e); }
         }
 
         shootBtn.addEventListener('click', fireTank);
+        document.getElementById('moveLeftBtn').addEventListener('mousedown', () => moveLeftActive = true);
+        document.getElementById('moveLeftBtn').addEventListener('mouseup', () => moveLeftActive = false);
+        document.getElementById('moveRightBtn').addEventListener('mousedown', () => moveRightActive = true);
+        document.getElementById('moveRightBtn').addEventListener('mouseup', () => moveRightActive = false);
+
         function gameLoop() { handleInput(); draw(); requestAnimationFrame(gameLoop); }
         setInterval(updateStatus, 2000);
         updateStatus(); gameLoop();
