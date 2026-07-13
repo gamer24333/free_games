@@ -134,7 +134,8 @@
         }
         if (text.startsWith('[AUDIO]')) {
             const base64Data = text.replace('[AUDIO]', '');
-            return `<audio controls src="${base64Data}" style="display: block; margin-top: 5px; max-width: 100%;"></audio>`;
+            // playsinline hilft iOS-Geräten, Audio direkt im Chat abzuspielen
+            return `<audio controls playsinline src="${base64Data}" style="display: block; margin-top: 5px; max-width: 100%;"></audio>`;
         }
         return text;
     }
@@ -184,9 +185,21 @@
         }
     }
 
-    // --- LIVE UPDATER (Alle 3 Sekunden) ---
+    // --- LIVE UPDATER WITH AUDIO PROTECTION ---
     async function loadMessages() {
         try {
+            // FIX: Prüfen, ob aktuell eine Sprachnachricht abgespielt wird
+            const audios = chatBox.querySelectorAll('audio');
+            let isAudioPlaying = false;
+            audios.forEach(audio => {
+                if (!audio.paused && !audio.ended && audio.currentTime > 0) {
+                    isAudioPlaying = true;
+                }
+            });
+
+            // Wenn gerade jemand ein Audio hört, überspringen wir das Update, damit es nicht abbricht!
+            if (isAudioPlaying) return;
+
             const response = await fetch(`/api/chat-messages/${currentRoom}`);
             if (response.ok) {
                 const nachrichten = await response.json();
@@ -198,11 +211,10 @@
                     let statusHook = '';
 
                     const isSenderAdmin = adminList.includes(msg.name);
-                    const isMeAdmin = adminList.includes(currentUsername); // NEU: Bist du selbst Admin?
+                    const isMeAdmin = adminList.includes(currentUsername);
                     const nameColor = isSenderAdmin ? "#9b59b6" : "#00adb5";
                     const crown = isSenderAdmin ? "👑 " : "";
                     
-                    // Geändert: Button wird angezeigt, wenn es meine eigene Nachricht ist ODER wenn ich Admin bin
                     if (msg.name === currentUsername || isMeAdmin) {
                         deleteButton = `
                         <form action="/chat/${currentRoom}/delete/${index}" method="POST" style="position: absolute; right: 8px; top: 8px; margin: 0;">
@@ -233,8 +245,11 @@
     }
     setInterval(loadMessages, 3000);
 
-    // --- 🖼️ BILD-UPLOAD OHNE REFRESH ---
+    // --- 🖼️ BILD-UPLOAD (iPad optimiert) ---
     const imageInput = document.getElementById('imageInput');
+    // Für iOS erzwingen wir gängige Formate im Event-Listener
+    imageInput.setAttribute('accept', 'image/jpeg, image/png, image/gif');
+    
     imageInput.addEventListener('change', function() {
         const file = this.files[0];
         if (!file) return;
@@ -243,7 +258,6 @@
         reader.onloadend = async function() {
             const base64String = '[IMAGE]' + reader.result;
             
-            // Zeigt das Bild sofort lokal an (Optimistic)
             const previewHtml = `<img src="${reader.result}" style="max-width: 200px; border-radius: 8px; display: block; margin-top: 5px;">`;
             appendTemporaryMessage(previewHtml);
             
@@ -253,7 +267,7 @@
         imageInput.value = ""; 
     });
 
-    // --- 🎙️ SPRACHNACHRICHTEN OHNE REFRESH ---
+    // --- 🎙️ SPRACHNACHRICHTEN (iPad & Safari kompatibel) ---
     let mediaRecorder;
     let audioChunks = [];
     const voiceBtn = document.getElementById('voiceBtn');
@@ -262,19 +276,33 @@
     voiceBtn.addEventListener('click', async () => {
         if (!mediaRecorder || mediaRecorder.state === "inactive") {
             try {
+                // iOS verlangt korrekte Berechtigungs-Anfragen
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
+                
+                // iOS/Safari unterstützt oft kein audio/mp3 beim Aufnehmen. 
+                // Wir testen, was das Gerät kann (audio/webm oder Standard-Container)
+                let options = { mimeType: 'audio/webm' };
+                if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                    options = { mimeType: 'audio/mp4' }; // Fallback für iPads
+                }
+                if (!MediaRecorder.isTypeSupported('audio/mp4')) {
+                    options = {}; // Fallback falls beides zickt
+                }
+
+                mediaRecorder = new MediaRecorder(stream, options);
                 audioChunks = [];
 
-                mediaRecorder.ondataavailable = event => { audioChunks.push(event.data); };
+                mediaRecorder.ondataavailable = event => { 
+                    if (event.data.size > 0) audioChunks.push(event.data); 
+                };
+                
                 mediaRecorder.onstop = async () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                    const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/mp4' });
                     const reader = new FileReader();
                     reader.onloadend = async function() {
                         const base64Audio = '[AUDIO]' + reader.result;
                         
-                        // Lokale Sofort-Anzeige
-                        const previewHtml = `<audio controls src="${reader.result}" style="display: block; margin-top: 5px; max-width: 100%;"></audio>`;
+                        const previewHtml = `<audio controls playsinline src="${reader.result}" style="display: block; margin-top: 5px; max-width: 100%;"></audio>`;
                         appendTemporaryMessage(previewHtml);
 
                         await sendMediaMessage(base64Audio);
@@ -282,13 +310,17 @@
                     reader.readAsDataURL(audioBlob);
                     voiceStatus.textContent = "";
                     voiceBtn.style.background = "#e74c3c";
+                    
+                    // Schaltet das Mikrofon-Lämpchen auf dem iPad nach der Aufnahme wieder aus
+                    stream.getTracks().forEach(track => track.stop());
                 };
 
-                mediaRecorder.start();
+                mediaRecorder.start(10); // Schreibt Daten alle 10ms (hilft iOS-Stabilität)
                 voiceStatus.textContent = "🔴 Aufnahme läuft... (Nochmal drücken zum Stoppen)";
                 voiceBtn.style.background = "#2c3e50";
             } catch (err) {
-                alert("Mikrofon-Zugriff verweigert oder nicht unterstützt!");
+                alert("Mikrofon-Zugriff verweigert oder auf diesem Gerät nicht unterstützt!");
+                console.error(err);
             }
         } else {
             mediaRecorder.stop();
@@ -303,7 +335,6 @@
                 const stats = await response.json();
                 const localPrivateStorage = JSON.parse(localStorage.getItem('last_seen_messages_private') || '{}');
                 
-                // 1. Nachrichten-Zähler (Badges)
                 for (const [partner, currentCount] of Object.entries(stats.private_messages_stats)) {
                     const badgeElement = document.getElementById(`badge-${partner}`);
                     if (badgeElement) {
@@ -325,7 +356,6 @@
                     }
                 }
 
-                // 2. Online-Status aktualisieren (Erwartet eine Liste 'online_users' vom Backend)
                 if (stats.online_users) {
                     document.querySelectorAll('.partner-btn').forEach(btn => {
                         const partnerName = btn.getAttribute('data-partner');
