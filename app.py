@@ -674,31 +674,33 @@ def tank_status(game_id):
     if not g: 
         return {"status": "not_found"}, 404
     
-    # --- ABSICHERUNG GEGEN ALTEN DATENBANK-STATE ---
+    # 1. Altes oder kaputtes State-Format abfangen und reparieren
     raw_parts = g.state.split(',') if g.state else []
-    # Wenn der State unvollständig oder alt ist, reparieren wir ihn hier live vor dem Senden!
     if len(raw_parts) < 13:
+        # Falls Werte in der DB None sind, Standardwerte nutzen
         p1_x = int(g.p1_x) if g.p1_x is not None else 200
         p2_x = int(g.p2_x) if g.p2_x is not None else 700
         p1_hp = int(g.p1_hp) if g.p1_hp is not None else 100
         p2_hp = int(g.p2_hp) if g.p2_hp is not None else 100
-        # Erstelle sauberen Standard-State: hp1, hp2, x1, x2, fuel1, fuel2, w1_1, w1_2, w2_1, w2_2, crateX, crateY, crateActive
+        
+        # Generiert das korrekte 13-teilige Array:
+        # hp1, hp2, x1, x2, fuel1, fuel2, w1_1, w1_2, w2_1, w2_2, crateX, crateY, crateActive
         st = [p1_hp, p2_hp, p1_x, p2_x, 100, 100, 3, 2, 3, 2, -1, -1, 0]
         g.state = ",".join(str(x) for x in st)
         db.session.commit()
     
     return {
-        "status": g.status,
+        "status": g.status or "aktiv",
         "turn": g.turn,
         "ersteller": g.ersteller,
         "gegner": g.gegner,
-        "p1_hp": g.p1_hp,
-        "p2_hp": g.p2_hp,
-        "p1_x": g.p1_x,
-        "p2_x": g.p2_x,
+        "p1_hp": g.p1_hp if g.p1_hp is not None else 100,
+        "p2_hp": g.p2_hp if g.p2_hp is not None else 100,
+        "p1_x": g.p1_x if g.p1_x is not None else 200,
+        "p2_x": g.p2_x if g.p2_x is not None else 700,
         "raw_state": g.state
     }
-
+    
 @app.route('/api/tankroyale/shoot/<game_id>', methods=['POST'])
 def tank_shoot(game_id):
     if 'username' not in session: 
@@ -713,31 +715,34 @@ def tank_shoot(game_id):
     
     g = TankGame.query.filter_by(game_id=game_id).first()
     if g and g.status == "aktiv" and g.turn == me:
+        # State einlesen und absichern
         raw_parts = g.state.split(',') if g.state else []
         if len(raw_parts) < 13:
             st = [100, 100, int(g.p1_x or 200), int(g.p2_x or 700), 100, 100, 3, 2, 3, 2, -1, -1, 0]
         else:
-            st = [int(x) for x in raw_parts]
+            st = [int(float(x)) for x in raw_parts] # float-Sicherheit beim Parsen
         
-        # X-Positionen updaten
-        if data.get('new_p1_x') is not None: st[2] = int(data.get('new_p1_x'))
-        if data.get('new_p2_x') is not None: st[3] = int(data.get('new_p2_x'))
+        # 2. X-Positionen updaten (die das Frontend ermittelt hat)
+        if data.get('new_p1_x') is not None: st[2] = int(float(data.get('new_p1_x')))
+        if data.get('new_p2_x') is not None: st[3] = int(float(data.get('new_p2_x')))
         
-        # Treibstoff updaten
-        if data.get('new_p1_fuel') is not None: st[4] = int(data.get('new_p1_fuel'))
-        if data.get('new_p2_fuel') is not None: st[5] = int(data.get('new_p2_fuel'))
+        # 3. Tank/Fuel updaten
+        if data.get('new_p1_fuel') is not None: st[4] = int(float(data.get('new_p1_fuel')))
+        if data.get('new_p2_fuel') is not None: st[5] = int(float(data.get('new_p2_fuel')))
 
+        # Lootbox eingesammelt?
         if hit == "crate_collected":
             if me == g.ersteller:
-                st[4] = 100
-                st[6] += 2
+                st[4] = 100  # P1 Tank voll
+                st[6] += 2   # Munition aufstocken
                 st[7] += 2
             else:
-                st[5] = 100
+                st[5] = 100  # P2 Tank voll
                 st[8] += 2
                 st[9] += 2
-            st[12] = 0
+            st[12] = 0       # Kiste deaktivieren
         else:
+            # Munition abziehen
             if me == g.ersteller:
                 if waffentyp == "berta": st[6] = max(0, st[6] - 1)
                 elif waffentyp == "triple": st[7] = max(0, st[7] - 1)
@@ -745,6 +750,7 @@ def tank_shoot(game_id):
                 if waffentyp == "berta": st[8] = max(0, st[8] - 1)
                 elif waffentyp == "triple": st[9] = max(0, st[9] - 1)
 
+            # Schaden berechnen
             schaden = 25
             if waffentyp == "berta": schaden = 45
             elif waffentyp == "triple": schaden = 18
@@ -752,17 +758,19 @@ def tank_shoot(game_id):
             if hit == "p1": st[0] = max(0, st[0] - schaden)
             elif hit == "p2": st[1] = max(0, st[1] - schaden)
 
-        # Lootboxen Logik
+        # Neue Kiste spawnen (35% Chance), wenn keine da ist
         if st[12] == 0 and random.random() < 0.35:
             st[10] = random.randint(150, 750)
             st[11] = 0
             st[12] = 1
 
+        # Tabellenspalten synchronisieren
         g.p1_hp, g.p2_hp = st[0], st[1]
         g.p1_x, g.p2_x = st[2], st[3]
         g.state = ",".join(str(x) for x in st)
         g.last_shot = f"{angle},{power}"
         
+        # Siegbedingung prüfen & Zugwechsel
         if st[0] <= 0:
             g.status = f"gewonnen_{g.gegner}"
         elif st[1] <= 0:
