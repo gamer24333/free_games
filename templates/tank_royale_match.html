@@ -6,10 +6,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1a1a; color: white; }
-        canvas { background: #111; border: 4px solid #ff9f43; border-radius: 8px; margin-top: 20px; }
-        .controls { background: #222; max-width: 750px; margin: 10px auto; padding: 15px; border-radius: 8px; display: flex; justify-content: center; gap: 20px; align-items: center; }
-        input { background: #333; color: white; border: 1px solid #555; padding: 5px; width: 60px; text-align: center; border-radius: 4px; }
-        .btn-shoot { background: #ff2e63; color: white; border: none; padding: 8px 20px; font-weight: bold; border-radius: 4px; cursor: pointer; }
+        canvas { background: linear-gradient(to bottom, #111 60%, #1f1f2e 100%); border: 4px solid #ff9f43; border-radius: 8px; margin-top: 20px; }
+        .controls-info { background: #222; max-width: 750px; margin: 10px auto; padding: 15px; border-radius: 8px; font-size: 14px; color: #aaa; }
+        .controls-info strong { color: #ff9f43; }
+        .btn-shoot { background: #ff2e63; color: white; border: none; padding: 12px 30px; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 10px; }
         .btn-shoot:disabled { background: #555; cursor: not-allowed; }
     </style>
 </head>
@@ -17,12 +17,15 @@
     <a href="/games" class="btn btn-back" style="margin-top:20px; display:inline-block;">⬅️ Zur Spieleliste</a>
     <h2 id="matchInfo">Verbinde zum Spiel...</h2>
 
-    <canvas id="tankCanvas" width="750" height="400"></canvas>
+    <canvas id="tankCanvas" width="900" height="500"></canvas>
 
-    <div class="controls">
-        <label>📐 Winkel: <input type="number" id="angleInput" value="45" min="0" max="90"></label>
-        <label>💥 Kraft: <input type="number" id="powerInput" value="12" min="1" max="20"></label>
-        <button class="btn-shoot" id="shootBtn" disabled>FEUER! 🔥</button>
+    <div class="controls-info">
+        🎮 <strong>Steuerung:</strong> 
+        Fahren: <kbd>A</kbd> / <kbd>D</kbd> | 
+        Zielfernrohr (Winkel): <kbd>W</kbd> / <kbd>S</kbd> | 
+        Kraft ändern: <kbd>Pfeil-Hoch</kbd> / <kbd>Pfeil-Runter</kbd>
+        <br>
+        <button class="btn-shoot" id="shootBtn" disabled>FEUER! [Leertaste] 🔥</button>
     </div>
 
     <script>
@@ -32,14 +35,31 @@
         const canvas = document.getElementById('tankCanvas');
         const ctx = canvas.getContext('2d');
         const shootBtn = document.getElementById('shootBtn');
-        const angleInput = document.getElementById('angleInput');
-        const powerInput = document.getElementById('powerInput');
 
         let gameState = {};
         let bullet = null;
         const gravity = 0.15;
 
+        // Ziel-Variablen (lokal gesteuert)
+        let myAngle = 45;
+        let myPower = 12;
+        let myXOffset = 0; // Lokale Bewegung vor dem Absenden
+
+        // Tasten-Status abfangen
+        const keys = {};
+        window.addEventListener('keydown', e => { keys[e.key] = true; if(e.key === " ") fireTank(); });
+        window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+        // Hügel-Generierung (Unebenes Gelände)
+        const terrainPoints = [];
+        for (let x = 0; x <= canvas.width; x++) {
+            // Kombiniert zwei Sinuswellen für coolere, unebene Hügel
+            let y = 400 + Math.sin(x * 0.008) * 40 + Math.cos(x * 0.02) * 10;
+            terrainPoints.push(y);
+        }
+
         async function updateStatus() {
+            if (!gameId || gameId.startsWith("{{")) return;
             try {
                 let res = await fetch(`/api/tankroyale/status/${gameId}`);
                 if (!res.ok) return;
@@ -57,100 +77,177 @@
                     document.getElementById('matchInfo').innerText = winner === me ? "🎉 DU HAST GEWONNEN! 🎉" : `❌ ${winner} hat dich zerstört!`;
                     shootBtn.disabled = true;
                 } else {
-                    document.getElementById('matchInfo').innerText = isMyTurn ? "🔴 DU BIST DRAN! Schieß!" : `⏳ ${gameState.turn} berechnet den Schuss...`;
+                    document.getElementById('matchInfo').innerText = isMyTurn ? "🔴 DU BIST DRAN!" : `⏳ ${gameState.turn} zielt...`;
                 }
             } catch (e) {
-                console.error("Fehler beim Status-Update:", e);
+                console.error(e);
             }
+        }
+
+        // Steuerung verarbeiten im Game Loop
+        function handleInput() {
+            if (gameState.turn !== me || gameState.status !== "aktiv" || bullet !== null) return;
+
+            // Winkel ändern (W / S)
+            if (keys['w'] || keys['W']) myAngle = Math.min(90, myAngle + 0.5);
+            if (keys['s'] || keys['S']) myAngle = Math.max(0, myAngle - 0.5);
+
+            // Kraft ändern (Pfeiltasten)
+            if (keys['ArrowUp']) myPower = Math.min(20, myPower + 0.1);
+            if (keys['ArrowDown']) myPower = Math.max(1, myPower - 0.1);
+
+            // Bewegung (A / D)
+            let amIErsteller = (me === gameState.ersteller);
+            if (keys['a'] || keys['A']) myXOffset -= 1.5;
+            if (keys['d'] || keys['D']) myXOffset += 1.5;
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Boden zeichnen (wird immer gezeichnet)
-            ctx.fillStyle = '#222831'; 
-            ctx.fillRect(0, 370, canvas.width, 30); 
+            // 1. Unebenen Boden (Terrain) zeichnen
+            ctx.fillStyle = '#393e46';
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height);
+            for (let x = 0; x <= canvas.width; x++) {
+                ctx.lineTo(x, terrainPoints[x]);
+            }
+            ctx.lineTo(canvas.width, canvas.height);
+            ctx.closePath();
+            ctx.fill();
 
-            // WICHTIG: Abbrechen, wenn Serverdaten noch leer sind
+            // Gras-Kante hinzufügen für mehr Details
+            ctx.strokeStyle = '#76ff03';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            for (let x = 0; x <= canvas.width; x++) {
+                if (x === 0) ctx.moveTo(x, terrainPoints[x]);
+                else ctx.lineTo(x, terrainPoints[x]);
+            }
+            ctx.stroke();
+
             if (!gameState || !gameState.status) return;
 
-            // Rollenverteilung ermitteln
             let amIErsteller = (me === gameState.ersteller);
-            let p1 = { x: gameState.p1_x, y: 350, hp: gameState.p1_hp, color: '#00adb5', name: gameState.ersteller };
-            let p2 = { x: gameState.p2_x, y: 350, hp: gameState.p2_hp, color: '#ff2e63', name: gameState.gegner };
+            
+            // Positionen anhand des Geländes bestimmen
+            let p1_x = Math.round(gameState.p1_x + (amIErsteller ? myXOffset : 0));
+            let p2_x = Math.round(gameState.p2_x + (!amIErsteller ? myXOffset : 0));
+
+            let p1 = { x: p1_x, y: terrainPoints[p1_x] - 15, hp: gameState.p1_hp, color: '#00adb5', name: gameState.ersteller };
+            let p2 = { x: p2_x, y: terrainPoints[p2_x] - 15, hp: gameState.p2_hp, color: '#ff2e63', name: gameState.gegner };
 
             // Panzer 1 zeichnen
-            ctx.fillStyle = p1.color; ctx.fillRect(p1.x, p1.y, 40, 20);
-            ctx.fillStyle = '#fff'; ctx.font = '12px Arial'; ctx.fillText(`${p1.name} (HP: ${p1.hp})`, p1.x - 10, p1.y - 10);
+            ctx.fillStyle = p1.color; ctx.fillRect(p1.x - 20, p1.y, 40, 15);
+            ctx.fillStyle = '#fff'; ctx.font = '12px Arial'; ctx.fillText(`${p1.name} (${p1.hp} HP)`, p1.x - 30, p1.y - 25);
 
             // Panzer 2 zeichnen
-            ctx.fillStyle = p2.color; ctx.fillRect(p2.x, p2.y, 40, 20);
-            ctx.fillStyle = '#fff'; ctx.fillText(`${p2.name} (HP: ${p2.hp})`, p2.x - 10, p2.y - 10);
+            ctx.fillStyle = p2.color; ctx.fillRect(p2.x - 20, p2.y, 40, 15);
+            ctx.fillStyle = '#fff'; ctx.fillText(`${p2.name} (${p2.hp} HP)`, p2.x - 30, p2.y - 25);
 
-            // Lokale Projektil-Animation
+            // 2. Ziel-Linie (Flugbahn-Vorschau) zeichnen, wenn man dran ist
+            if (gameState.turn === me && gameState.status === "aktiv" && !bullet) {
+                let activeTank = amIErsteller ? p1 : p2;
+                let rad = (myAngle * Math.PI) / 180;
+                
+                let previewX = activeTank.x;
+                let previewY = activeTank.y;
+                let previewVx = Math.cos(rad) * myPower * (amIErsteller ? 1 : -1);
+                let previewVy = -Math.sin(rad) * myPower;
+
+                ctx.strokeStyle = 'rgba(249, 212, 35, 0.4)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]); // Gestrichelte Linie
+                ctx.beginPath();
+                ctx.moveTo(previewX, previewY);
+
+                // Zeichne die Kurve verkürzt (nur die ersten 18 Schritte), damit es nicht ZU einfach ist
+                for (let i = 0; i < 18; i++) {
+                    previewVy += gravity;
+                    previewX += previewVx;
+                    previewY += previewVy;
+                    ctx.lineTo(previewX, previewY);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]); // Reset Line Dash
+                
+                // Text für Winkel & Kraft anzeigen
+                ctx.fillStyle = '#ff9f43';
+                ctx.fillText(`Winkel: ${Math.round(myAngle)}° | Kraft: ${Math.round(myPower)}`, activeTank.x - 40, activeTank.y - 10);
+            }
+
+            // Kugel-Animation
             if (bullet) {
                 bullet.vy += gravity;
                 bullet.x += bullet.vx;
                 bullet.y += bullet.vy;
 
                 ctx.fillStyle = '#f9d423';
-                ctx.beginPath(); ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(bullet.x, bullet.y, 6, 0, Math.PI * 2); ctx.fill();
 
                 let target = amIErsteller ? p2 : p1;
 
-                // Kollisionsprüfung lokal auf dem Canvas
-                if (bullet.x > target.x && bullet.x < target.x + 40 && bullet.y > target.y && bullet.y < target.y + 20) {
-                    let hitTarget = amIErsteller ? "p2" : "p1";
-                    sendShotResult(bullet.angle, bullet.power, hitTarget);
+                // Kollision mit Ziel-Panzer
+                if (bullet.x > target.x - 20 && bullet.x < target.x + 20 && bullet.y > target.y && bullet.y < target.y + 15) {
+                    sendShotResult(myAngle, myPower, amIErsteller ? "p2" : "p1", p1.x, p2.x);
                     bullet = null;
-                } else if (bullet.y > 370 || bullet.x < 0 || bullet.x > canvas.width) {
-                    sendShotResult(bullet.angle, bullet.power, "none");
+                } 
+                // Kollision mit dem unebenen Boden
+                else if (bullet.x >= 0 && bullet.x <= canvas.width && bullet.y > terrainPoints[Math.floor(bullet.x)]) {
+                    sendShotResult(myAngle, myPower, "none", p1.x, p2.x);
+                    bullet = null;
+                }
+                // Aus dem Bildschirm geflogen
+                else if (bullet.y > canvas.height || bullet.x < 0 || bullet.x > canvas.width) {
+                    sendShotResult(myAngle, myPower, "none", p1.x, p2.x);
                     bullet = null;
                 }
             }
         }
 
-        async function sendShotResult(angle, power, hit) {
+        function fireTank() {
+            if (gameState.turn !== me || gameState.status !== "aktiv" || bullet !== null) return;
+
+            let rad = (myAngle * Math.PI) / 180;
+            let amIErsteller = (me === gameState.ersteller);
+            
+            let currentX = amIErsteller ? gameState.p1_x + myXOffset : gameState.p2_x + myXOffset;
+            let startY = terrainPoints[Math.floor(currentX)] - 15;
+
+            bullet = {
+                x: currentX,
+                y: startY,
+                vx: Math.cos(rad) * myPower * (amIErsteller ? 1 : -1),
+                vy: -Math.sin(rad) * myPower
+            };
+            shootBtn.disabled = true;
+        }
+
+        async function sendShotResult(angle, power, hit, finalP1X, finalP2X) {
+            // Reset den lokalen Bewegungs-Offset nach dem Schuss
+            myXOffset = 0;
             try {
                 await fetch(`/api/tankroyale/shoot/${gameId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ angle: angle, power: power, hit: hit })
+                    // Wir schicken die neuen X-Koordinaten direkt mit, falls gefahren wurde!
+                    body: JSON.stringify({ angle: angle, power: power, hit: hit, new_p1_x: finalP1X, new_p2_x: finalP2X })
                 });
                 updateStatus();
             } catch (e) {
-                console.error("Fehler beim Senden des Schusses:", e);
+                console.error(e);
             }
         }
 
-        shootBtn.addEventListener('click', () => {
-            if (!gameState.status || bullet !== null) return;
-            
-            let angle = parseFloat(angleInput.value);
-            let power = parseFloat(powerInput.value);
-            let rad = (angle * Math.PI) / 180;
-            
-            let amIErsteller = (me === gameState.ersteller);
-            let startX = amIErsteller ? gameState.p1_x + 20 : gameState.p2_x + 20;
+        shootBtn.addEventListener('click', fireTank);
 
-            bullet = {
-                x: startX,
-                y: 340,
-                vx: Math.cos(rad) * power * (amIErsteller ? 1 : -1),
-                vy: -Math.sin(rad) * power,
-                angle: angle,
-                power: power
-            };
-            shootBtn.disabled = true;
-        });
-
-        // Die GameLoop rendert das Spielfeld nun durchgehend
         function gameLoop() {
+            handleInput();
             draw();
             requestAnimationFrame(gameLoop);
         }
 
-        setInterval(updateStatus, 2000); // Server-Polling alle 2 Sekunden
+        setInterval(updateStatus, 2000);
         updateStatus();
         gameLoop();
     </script>
