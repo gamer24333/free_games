@@ -93,23 +93,44 @@ iframe {
     transform: scale(0.9);
 }
 
-/* Ergänzungen für das Chat-Layout */
+/* --- PERFEKTES SIDE-BY-SIDE CHAT LAYOUT --- */
+
+.chat-wrapper {
+    display: flex;
+    width: 98vw;          /* Nutzt fast die gesamte Bildschirmbreite */
+    max-width: 1600px;    /* Verhindert extremes Strecken auf Riesen-Monitoren */
+    height: 75vh;         /* Feste, einheitliche Höhe für das gesamte Chatsystem */
+    min-height: 500px;
+    margin: 20px auto;
+    gap: 15px;
+    align-items: stretch; /* Bringt Sidebar und Hauptfenster auf exakt dieselbe Höhe */
+}
+
+/* Die Sidebar links (Kontakte) */
 .chat-sidebar {
-    width: 250px;
+    width: 280px;         /* Angenehme, feste Breite für Namen */
+    flex-shrink: 0;       /* Verhindert, dass die Sidebar schrumpft */
     background: #1e1e1e;
     border: 2px solid #333;
     border-radius: 12px;
     padding: 15px;
-    height: 600px; /* Leicht erhöht für mehr Übersicht */
-    overflow-y: auto;
-    text-align: left;
+    display: flex;
+    flex-direction: column;
     box-sizing: border-box;
+}
+
+/* Scrollbereich NUR für die Kontakte im Inneren der Sidebar */
+.chat-sidebar .contacts-container {
+    flex-grow: 1;
+    overflow-y: auto;     /* Macht die Kontaktliste scrollbar, wenn es viele sind */
+    padding-right: 5px;
 }
 
 .chat-sidebar h3 {
     margin-top: 15px;
     border-bottom: 1px solid #333;
     padding-bottom: 5px;
+    font-size: 16px;
 }
 .chat-sidebar h3:first-child { margin-top: 0; }
 
@@ -117,46 +138,55 @@ iframe {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 10px 12px;
     color: #ccc;
     text-decoration: none;
-    border-radius: 6px;
+    border-radius: 8px;
     margin-bottom: 5px;
     font-size: 14px;
+    transition: background 0.2s;
 }
 .chat-sidebar a:hover, .chat-sidebar a.active {
     background: #00adb5;
     color: white;
 }
 
+/* Das Haupt-Chatfenster rechts */
 .chat-main {
+    flex-grow: 1;         /* Nutzt dynamisch den gesamten restlichen Platz! */
     background: #1e1e1e;
     border: 2px solid #333;
     border-radius: 12px;
     padding: 20px;
-    height: 600px;
+    display: flex;
+    flex-direction: column;
     box-sizing: border-box;
+    height: 100%;         /* Nutzt die volle Höhe des chat-wrappers */
 }
 
+/* Die Chat-Nachrichten-Box */
 .chat-box {
     flex-grow: 1;
-    overflow-y: auto;
+    overflow-y: auto;     /* Scrollbalken nur hier, wenn Nachrichten überreizen */
     text-align: left;
-    padding: 10px;
+    padding: 15px;
     margin-bottom: 15px;
     background: #161616;
     border-radius: 8px;
+    border: 1px solid #252525;
 }
 
 .message {
-    margin-bottom: 10px;
-    padding: 8px 12px;
+    margin-bottom: 12px;
+    padding: 10px 14px;
     border-radius: 8px;
     background: #2d2d2d;
-    max-width: 80%;
+    max-width: 75%;
     width: fit-content;
+    word-wrap: break-word; /* Verhindert, dass extrem lange Texte oder Links die Box sprengen */
 }
 
+/* Eingabebereich am Boden */
 .chat-input-area input[type="text"] {
     flex-grow: 1;
     padding: 12px;
@@ -167,21 +197,22 @@ iframe {
     font-size: 16px;
 }
 
+/* Status-Punkte */
 .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-left: 8px; background: #95a5a6; }
 .status-dot.online { background: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
 
-/* Responsive Media Query: Wenn der Bildschirm zu klein wird (z.B. Smartphone) */
+/* --- RESPONSIVE FIX FÜR HANDYS --- */
 @media (max-width: 768px) {
     .chat-wrapper {
-        flex-direction: column;
+        flex-direction: column; /* Auf Smartphones untereinander statt nebeneinander */
+        height: auto;
         width: 95vw;
     }
     .chat-sidebar {
         width: 100%;
-        height: auto;
-        max-height: 200px;
+        max-height: 220px;      /* Begrenzt die Kontaktliste auf dem Handy, damit man den Chat noch sieht */
     }
     .chat-main {
-        height: 500px;
+        height: 550px;          /* Festgelegte Chat-Höhe auf Mobilgeräten */
     }
 }
