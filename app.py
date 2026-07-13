@@ -715,7 +715,19 @@ def tank_shoot(game_id):
         
     return {"status": "invalid_move"}, 400
 
-
+@app.route('/tankroyale/delete-match/<game_id>', methods=['POST'])
+def tankroyale_delete_match(game_id):
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    
+    # Match aus der Datenbank suchen
+    match = TankGame.query.filter_by(game_id=game_id).first()
+    
+    if match:
+        db.session.delete(match)
+        db.session.commit()
+        
+    return redirect(url_for('dashboard'))
 
 @app.route('/logout')
 def logout():
