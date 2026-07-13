@@ -3,6 +3,8 @@ import random
 from flask import Flask, redirect, render_template, request, session, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
+import math
+import json
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY")
@@ -63,7 +65,7 @@ class TicTacToeGame(db.Model):
     game_id = db.Column(db.String(100), primary_key=True)
     ersteller = db.Column(db.String(50), nullable=False)
     gegner = db.Column(db.String(50), nullable=False)
-    board = db.Column(db.String(50), default=",,,,,,,,") # Als Komma-String für einfaches Splitten
+    board = db.Column(db.String(50), default=",,,,,,,,") 
     turn = db.Column(db.String(50), nullable=False)
     status = db.Column(db.String(50), default="eingeladen")
 
@@ -72,11 +74,11 @@ class TankGame(db.Model):
     game_id = db.Column(db.String(100), primary_key=True)
     ersteller = db.Column(db.String(50), nullable=False)
     gegner = db.Column(db.String(50), nullable=False)
-    # Speichert: player_hp, bot_hp (wird zum gegner_hp), player_x, gegner_x
     state = db.Column(db.String(100), default="100,100,80,620") 
     turn = db.Column(db.String(50), nullable=False)
     status = db.Column(db.String(50), default="eingeladen")
-    last_shot = db.Column(db.String(100), default="") # Speichert den letzten Schuss: "winkel,kraft" für die Animation beim Gegner
+    last_shot = db.Column(db.String(100), default="") 
+    terrain = db.Column(db.Text, nullable=True) # NEU: Spalte für das zerstörbare Gelände
 
 
 # --- HILFSFUNKTIONEN ---
@@ -156,12 +158,10 @@ def dashboard():
     me = session['username']
     aktive_matches = []
     
-    # 1. Aktive Tic-Tac-Toe Matches holen
     ttt_games = TicTacToeGame.query.filter(((TicTacToeGame.ersteller == me) | (TicTacToeGame.gegner == me)) & (TicTacToeGame.status == "aktiv")).all()
     for g in ttt_games:
         aktive_matches.append({"id": g.game_id, "von": f"Tic-Tac-Toe vs. {g.gegner if g.ersteller == me else g.ersteller}", "is_active": True, "typ": "tictactoe"})
 
-    # 2. Aktive Tank Royale Matches holen
     tank_games = TankGame.query.filter(((TankGame.ersteller == me) | (TankGame.gegner == me)) & (TankGame.status == "aktiv")).all()
     for g in tank_games:
         aktive_matches.append({"id": g.game_id, "von": f"Tank Royale vs. {g.gegner if g.ersteller == me else g.ersteller}", "is_active": True, "typ": "tankroyale"})
@@ -275,12 +275,10 @@ def admin_clear_chat():
 def chat(room="global"):
     if 'username' not in session: return redirect(url_for('login'))
 
-    # In der chat()-Route einfügen:
     zwei_minuten_ago = datetime.utcnow() - timedelta(minutes=2)
     online_users = UserSetting.query.filter(UserSetting.last_seen >= zwei_minuten_ago).all()
     online_names = [u.username for u in online_users]
 
-    
     current_user = session['username']
     chpartner = sorted([schueler for schueler in KLASSEN_LISTE if schueler != current_user])
     
@@ -353,11 +351,7 @@ def delete_message(room, msg_index):
         return redirect(url_for('login'))
         
     current_user = session['username']
-    
-    # 1. ADMIN-LISTE HOEN:
-    # Falls du 'admins' global definiert hast, brauchst du diese Zeile nicht.
-    # Wenn sie aus der DB kommt oder oben in der app.py steht, passe sie kurz an.
-    # Beispiel: admins = ["DeinName", "AdminZwei"] 
+    admins = get_admins_list()
     
     actual_room = room
     if room != "global":
@@ -368,7 +362,6 @@ def delete_message(room, msg_index):
     if 0 <= msg_index < len(db_messages):
         target_msg = db_messages[msg_index]
         
-        # 2. BERECHTIGUNG PRÜFEN: Eigener Absender ODER der User ist Admin
         if target_msg.sender == current_user or current_user in admins:
             db.session.delete(target_msg)
             db.session.commit()
@@ -382,16 +375,15 @@ def games_menu():
     if 'username' not in session: return redirect(url_for('login'))
     me = session['username']
     
-    # 1. Tic-Tac-Toe Einladungen holen
     ttt_invites = TicTacToeGame.query.filter_by(gegner=me, status='eingeladen').all()
     aktive_einladungen = [{"id": i.game_id, "von": i.ersteller, "typ": "tictactoe"} for i in ttt_invites]
     
-    # 2. HIER WAR DER FEHLER: Tank Royale Einladungen wurden ignoriert!
     tank_invites = TankGame.query.filter_by(gegner=me, status='eingeladen').all()
     for i in tank_invites:
         aktive_einladungen.append({"id": i.game_id, "von": i.ersteller, "typ": "tankroyale"})
             
     return render_template('games.html', einladungen=aktive_einladungen)
+
 @app.route('/geometry-dash')
 def game():
     if 'username' not in session: return redirect(url_for('login'))
@@ -550,8 +542,6 @@ def delete_match(game_id):
         db.session.commit()
     return redirect(url_for('dashboard'))
 
-# --- PAUSIEREN & RESUMEN (NEU) ---
-
 @app.route('/api/tictactoe/pause/<game_id>', methods=['POST'])
 def tictactoe_pause(game_id):
     if 'username' not in session: return {"error": "Nicht eingeloggt"}, 401
@@ -637,11 +627,19 @@ def tankroyale_invite():
     if existing:
         db.session.delete(existing)
     
-    # START-MUNITION GEKÜRZT: "1" statt "3" für Berta, "1" statt "2" für Triple
-    # Format: hp1,hp2,x1,x2,fuel1,fuel2,berta1,triple1,berta2,triple2,crateX,crateY,crateActive
+    # Gelände einmalig generieren (900 Punkte für die Canvas-Breite)
+    terrain_points = []
+    for x in range(901):
+        y = 400 + math.sin(x * 0.008) * 40 + math.cos(x * 0.02) * 10
+        terrain_points.append(round(y, 2))
+    
+    terrain_json = json.dumps(terrain_points)
+
     new_game = TankGame(
         game_id=game_id, ersteller=me, gegner=gegner,
-        state="100,100,80,620,100,100,1,1,1,1,-1,-1,0", turn=me, status="eingeladen"
+        state="100,100,80,620,100,100,1,1,1,1,-1,-1,0", 
+        turn=me, status="eingeladen",
+        terrain=terrain_json
     )
     db.session.add(new_game)
     db.session.commit()
@@ -676,11 +674,9 @@ def tank_status(game_id):
     if not g: 
         return {"status": "not_found"}, 404
     
-    # 1. State sicher auslesen
     state_str = g.state or ""
     raw_parts = state_str.split(',') if state_str else []
     
-    # 2. Wenn der String weniger als 13 Werte hat, füllen wir ihn auf!
     if len(raw_parts) < 13:
         p1_hp = raw_parts[0] if len(raw_parts) > 0 else "100"
         p2_hp = raw_parts[1] if len(raw_parts) > 1 else "100"
@@ -691,7 +687,9 @@ def tank_status(game_id):
         g.state = ",".join(raw_parts)
         db.session.commit()
     
-    # 3. Werte direkt aus dem Array parsen, statt nicht existierende Tabellenspalten abzufragen
+    # Gelände aus der DB laden (falls keins existiert, leeres Array mitsenden)
+    terrain_data = json.loads(g.terrain) if g.terrain else []
+    
     return {
         "status": g.status or "aktiv",
         "turn": g.turn,
@@ -701,7 +699,8 @@ def tank_status(game_id):
         "p2_hp": int(float(raw_parts[1])),
         "p1_x": int(float(raw_parts[2])),
         "p2_x": int(float(raw_parts[3])),
-        "raw_state": g.state
+        "raw_state": g.state,
+        "terrain": terrain_data # HIER MITSENDEN
     }
     
 @app.route('/api/tankroyale/shoot/<game_id>', methods=['POST'])
@@ -718,34 +717,33 @@ def tank_shoot(game_id):
     
     g = TankGame.query.filter_by(game_id=game_id).first()
     if g and g.status == "aktiv" and g.turn == me:
-        # State einlesen und absichern
+        # Geländedaten aktualisieren, falls im Request-Body übergeben
+        if "updated_terrain" in data and data["updated_terrain"]:
+            g.terrain = json.dumps(data["updated_terrain"])
+
         raw_parts = g.state.split(',') if g.state else []
         if len(raw_parts) < 13:
             st = [100, 100, int(g.p1_x or 200), int(g.p2_x or 700), 100, 100, 3, 2, 3, 2, -1, -1, 0]
         else:
-            st = [int(float(x)) for x in raw_parts] # float-Sicherheit beim Parsen
+            st = [int(float(x)) for x in raw_parts]
         
-        # 2. X-Positionen updaten (die das Frontend ermittelt hat)
         if data.get('new_p1_x') is not None: st[2] = int(float(data.get('new_p1_x')))
         if data.get('new_p2_x') is not None: st[3] = int(float(data.get('new_p2_x')))
         
-        # 3. Tank/Fuel updaten
         if data.get('new_p1_fuel') is not None: st[4] = int(float(data.get('new_p1_fuel')))
         if data.get('new_p2_fuel') is not None: st[5] = int(float(data.get('new_p2_fuel')))
 
-        # In der tank_shoot Route bei crate_collected:
         if hit == "crate_collected":
             if me == g.ersteller:
-                st[4] = 100  # P1 Tank voll
-                st[6] += 1   # Nur +1 Dicke Berta
-                st[7] += 1   # Nur +1 Streuschuss
+                st[4] = 100  
+                st[6] += 1   
+                st[7] += 1   
             else:
-                st[5] = 100  # P2 Tank voll
+                st[5] = 100  
                 st[8] += 1
                 st[9] += 1
-            st[12] = 0       # Kiste deaktivieren
+            st[12] = 0       
         else:
-            # Munition abziehen
             if me == g.ersteller:
                 if waffentyp == "berta": st[6] = max(0, st[6] - 1)
                 elif waffentyp == "triple": st[7] = max(0, st[7] - 1)
@@ -753,7 +751,6 @@ def tank_shoot(game_id):
                 if waffentyp == "berta": st[8] = max(0, st[8] - 1)
                 elif waffentyp == "triple": st[9] = max(0, st[9] - 1)
 
-            # Schaden berechnen
             schaden = 25
             if waffentyp == "berta": schaden = 45
             elif waffentyp == "triple": schaden = 18
@@ -761,19 +758,16 @@ def tank_shoot(game_id):
             if hit == "p1": st[0] = max(0, st[0] - schaden)
             elif hit == "p2": st[1] = max(0, st[1] - schaden)
 
-        # Neue Kiste spawnen (35% Chance), wenn keine da ist
         if st[12] == 0 and random.random() < 0.35:
             st[10] = random.randint(150, 750)
             st[11] = 0
             st[12] = 1
 
-        # Tabellenspalten synchronisieren
         g.p1_hp, g.p2_hp = st[0], st[1]
         g.p1_x, g.p2_x = st[2], st[3]
         g.state = ",".join(str(x) for x in st)
         g.last_shot = f"{angle},{power}"
         
-        # Siegbedingung prüfen & Zugwechsel
         if st[0] <= 0:
             g.status = f"gewonnen_{g.gegner}"
         elif st[1] <= 0:
@@ -791,9 +785,7 @@ def tankroyale_delete_match(game_id):
     if 'username' not in session:
         return redirect(url_for('login'))
     
-    # Match aus der Datenbank suchen
     match = TankGame.query.filter_by(game_id=game_id).first()
-    
     if match:
         db.session.delete(match)
         db.session.commit()
@@ -810,14 +802,4 @@ with app.app_context():
     db.create_all()
 
 if __name__ == '__main__':
-    @app.route('/api/tankroyale/clear-broken-games')
-    def clear_broken_games():
-        try:
-            # Löscht die beiden Spiele mit dem alten 4-Wert-State
-            TankGame.query.filter_by(game_id="Test Account_tank_Till").delete()
-            TankGame.query.filter_by(game_id="Ben_tank_Matteo").delete()
-            db.session.commit()
-            return {"status": "Erfolgreich gelöscht! Erstelle jetzt ein neues Spiel."}, 200
-        except Exception as e:
-            return {"error": str(e)}, 500
     app.run(debug=True)
