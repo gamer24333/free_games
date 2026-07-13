@@ -36,19 +36,27 @@
     <div class="challenge-container">
         {% for challenge in einladungen %}
         <div class="challenge-box">
-            <span>⚔️ Einladung von {{ challenge.von }}</span>
+            <span>⚔️ Einladung zu {% if challenge.typ == 'tictactoe' %}Tic-Tac-Toe{% else %}Tank-Wars{% endif %} von {{ challenge.von }}</span>
             <div class="challenge-actions">
+                {% if challenge.typ == 'tictactoe' %}
                 <form action="/tictactoe/accept/{{ challenge.id }}" method="POST" style="margin:0;">
                     <button type="submit" class="challenge-btn" style="background: #27ae60;">Ja</button>
                 </form>
                 <form action="/tictactoe/decline/{{ challenge.id }}" method="POST" style="margin:0;">
                     <button type="submit" class="challenge-btn" style="background: #c0392b;">Nein ❌</button>
                 </form>
+                {% else %}
+                <form action="/tankroyale/accept/{{ challenge.id }}" method="POST" style="margin:0;">
+                    <button type="submit" class="challenge-btn" style="background: #27ae60;">Ja</button>
+                </form>
+                <form action="/tankroyale/decline/{{ challenge.id }}" method="POST" style="margin:0;">
+                    <button type="submit" class="challenge-btn" style="background: #c0392b;">Nein ❌</button>
+                </form>
+                {% endif %}
             </div>
         </div>
         {% endfor %}
     </div>
-
     <div class="games-grid">
         <div class="game-card">
             <div>
@@ -88,6 +96,14 @@
                 <span class="game-mode mode-single">👤 1 Spieler</span>
             </div>
             <a href="/reaction" class="play-btn" style="background: #9b59b6;">Messen</a>
+        </div>
+
+        <div class="game-card">
+            <div>
+                <div class="game-title">Tank Royale</div>
+                <span class="game-mode mode-multi">👥 2 Spieler</span>
+            </div>
+            <a href="/tankroyale" class="play-btn" style="background: #ff9f43; color: black;">Herausfordern</a>
         </div>
     </div>
 
