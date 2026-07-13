@@ -677,17 +677,25 @@ def tank_status(game_id):
     state_str = g.state or ""
     raw_parts = state_str.split(',') if state_str else []
     
+    # Absolute Sicherheit: Wenn das Array beschädigt ist oder Werte fehlen,
+    # füllen wir es mit sicheren Standardwerten auf.
     if len(raw_parts) < 13:
-        p1_hp = raw_parts[0] if len(raw_parts) > 0 else "100"
-        p2_hp = raw_parts[1] if len(raw_parts) > 1 else "100"
-        p1_x  = raw_parts[2] if len(raw_parts) > 2 else "80"
-        p2_x  = raw_parts[3] if len(raw_parts) > 3 else "620"
-        
-        raw_parts = [p1_hp, p2_hp, p1_x, p2_x, "100", "100", "3", "2", "3", "2", "-1", "-1", "0"]
+        default_parts = ["100", "100", "80", "620", "100", "100", "3", "2", "3", "2", "-1", "-1", "0"]
+        # Bestehende Werte übernehmen, soweit vorhanden
+        for i in range(len(raw_parts)):
+            if raw_parts[i] and raw_parts[i] != "NaN":
+                default_parts[i] = raw_parts[i]
+        raw_parts = default_parts
         g.state = ",".join(raw_parts)
         db.session.commit()
     
-    # Gelände aus der DB laden (falls keins existiert, leeres Array mitsenden)
+    # Fehlerhafte "NaN" Strings filtern, bevor int(float()) gecasht wird
+    def safe_int(val, default=0):
+        try:
+            return int(float(val))
+        except (ValueError, TypeError):
+            return default
+
     terrain_data = json.loads(g.terrain) if g.terrain else []
     
     return {
@@ -695,12 +703,12 @@ def tank_status(game_id):
         "turn": g.turn,
         "ersteller": g.ersteller,
         "gegner": g.gegner,
-        "p1_hp": int(float(raw_parts[0])),
-        "p2_hp": int(float(raw_parts[1])),
-        "p1_x": int(float(raw_parts[2])),
-        "p2_x": int(float(raw_parts[3])),
+        "p1_hp": safe_int(raw_parts[0], 100),
+        "p2_hp": safe_int(raw_parts[1], 100),
+        "p1_x": safe_int(raw_parts[2], 80),
+        "p2_x": safe_int(raw_parts[3], 620),
         "raw_state": g.state,
-        "terrain": terrain_data # HIER MITSENDEN
+        "terrain": terrain_data
     }
     
 @app.route('/api/tankroyale/shoot/<game_id>', methods=['POST'])
