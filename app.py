@@ -637,9 +637,11 @@ def tankroyale_invite():
     if existing:
         db.session.delete(existing)
     
+    # START-MUNITION GEKÜRZT: "1" statt "3" für Berta, "1" statt "2" für Triple
+    # Format: hp1,hp2,x1,x2,fuel1,fuel2,berta1,triple1,berta2,triple2,crateX,crateY,crateActive
     new_game = TankGame(
         game_id=game_id, ersteller=me, gegner=gegner,
-        state="100,100,80,620", turn=me, status="eingeladen"
+        state="100,100,80,620,100,100,1,1,1,1,-1,-1,0", turn=me, status="eingeladen"
     )
     db.session.add(new_game)
     db.session.commit()
@@ -731,16 +733,16 @@ def tank_shoot(game_id):
         if data.get('new_p1_fuel') is not None: st[4] = int(float(data.get('new_p1_fuel')))
         if data.get('new_p2_fuel') is not None: st[5] = int(float(data.get('new_p2_fuel')))
 
-        # Lootbox eingesammelt?
+        # In der tank_shoot Route bei crate_collected:
         if hit == "crate_collected":
             if me == g.ersteller:
                 st[4] = 100  # P1 Tank voll
-                st[6] += 2   # Munition aufstocken
-                st[7] += 2
+                st[6] += 1   # Nur +1 Dicke Berta
+                st[7] += 1   # Nur +1 Streuschuss
             else:
                 st[5] = 100  # P2 Tank voll
-                st[8] += 2
-                st[9] += 2
+                st[8] += 1
+                st[9] += 1
             st[12] = 0       # Kiste deaktivieren
         else:
             # Munition abziehen
