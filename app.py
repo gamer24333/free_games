@@ -684,34 +684,64 @@ def tank_status(game_id):
 def tank_shoot(game_id):
     if 'username' not in session: return {"error": "Nicht eingeloggt"}, 401
     me = session['username']
+    
     angle = float(request.json.get('angle'))
     power = float(request.json.get('power'))
     hit = request.json.get('hit')
+    waffentyp = request.json.get('waffenTyp', 'standard') # Welche Waffe wurde genutzt?
     
-    # NEU: Hole die beim Fahren veränderten Positionen ab
     new_p1_x = request.json.get('new_p1_x')
     new_p2_x = request.json.get('new_p2_x')
+    new_p1_fuel = request.json.get('new_p1_fuel')
+    new_p2_fuel = request.json.get('new_p2_fuel')
     
     g = TankGame.query.filter_by(game_id=game_id).first()
     if g and g.status == "aktiv" and g.turn == me:
-        state_list = [int(x) for x in g.state.split(',')]
+        # Den langen State-String zerlegen
+        st = [int(x) for x in g.state.split(',')]
         
-        # Treffer verrechnen
+        # 0: p1_hp, 1: p2_hp, 2: p1_x, 3: p2_x, 4: p1_fuel, 5: p2_fuel
+        # 6: p1_w1 (Dicke Berta), 7: p1_w2 (Triple), 8: p2_w1, 9: p2_w2
+        # 10: crate_x, 11: crate_y, 12: crate_active
+        
+        # X-Positionen und Sprit updaten
+        if new_p1_x is not None: st[2] = new_p1_x
+        if new_p2_x is not None: st[3] = new_p2_x
+        if new_p1_fuel is not None: st[4] = new_p1_fuel
+        if new_p2_fuel is not None: st[5] = new_p2_fuel
+
+        # Munition abziehen, wenn es keine Standardwaffe war
+        if me == g.ersteller:
+            if waffentyp == "berta": st[6] = max(0, st[6] - 1)
+            elif waffentyp == "triple": st[7] = max(0, st[7] - 1)
+        else:
+            if waffentyp == "berta": st[8] = max(0, st[8] - 1)
+            elif waffentyp == "triple": st[9] = max(0, st[9] - 1)
+
+        # Schaden berechnen je nach Waffe
+        schaden = 25
+        if waffentyp == "berta": schaden = 45
+        elif waffentyp == "triple": schaden = 18 # Pro Kugel, falls getroffen
+
         if hit == "p1":
-            state_list[0] = max(0, state_list[0] - 35)
+            st[0] = max(0, st[0] - schaden)
         elif hit == "p2":
-            state_list[1] = max(0, state_list[1] - 35)
-            
-        # Nutze die neuen X-Koordinaten falls vorhanden, sonst die alten
-        p1_x = new_p1_x if new_p1_x is not None else state_list[2]
-        p2_x = new_p2_x if new_p2_x is not None else state_list[3]
-            
-        g.state = f"{state_list[0]},{state_list[1]},{p1_x},{p2_x}"
+            st[1] = max(0, st[1] - schaden)
+
+        # Lootboxen Logik: Wenn keine aktiv ist, mit 30% Wahrscheinlichkeit eine spawnen
+        import random
+        if st[12] == 0 and random.random() < 0.3:
+            st[10] = random.randint(100, 800) # Crate X
+            st[11] = 0 # Crate Y (fällt vom Himmel)
+            st[12] = 1 # Crate Aktiv
+
+        # State wieder zusammenbauen
+        g.state = ",".join(str(x) for x in st)
         g.last_shot = f"{angle},{power}"
         
-        if state_list[0] <= 0:
+        if st[0] <= 0:
             g.status = f"gewonnen_{g.gegner}"
-        elif state_list[1] <= 0:
+        elif st[1] <= 0:
             g.status = f"gewonnen_{g.ersteller}"
         else:
             g.turn = g.gegner if me == g.ersteller else g.ersteller
