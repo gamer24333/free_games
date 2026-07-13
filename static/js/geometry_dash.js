@@ -177,7 +177,7 @@ function update() {
 
     if (player.mode === 'ball') {
         ctx.fillStyle = '#161925'; ctx.fillRect(0, 0, canvas.width, ceilingY);
-        ctx.beginPath(); ctx.moveTo(0, ceilingY); ctx.lineTo(canvas.width, ceilingY); stroke();
+        ctx.beginPath(); ctx.moveTo(0, ceilingY); ctx.lineTo(canvas.width, ceilingY); ctx.stroke();
     }
 
     if (!isPaused && gameStarted && !isGameOver) {
