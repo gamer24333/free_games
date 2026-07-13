@@ -674,23 +674,25 @@ def tank_status(game_id):
     if not g: 
         return {"status": "not_found"}, 404
     
-    # State-String auslesen und zerlegen
+    # 1. State sicher auslesen
     state_str = g.state or ""
     raw_parts = state_str.split(',') if state_str else []
     
-    # FEHLERBEHEBUNG: Wenn der State weniger als 13 Werte hat, reparieren wir ihn hier!
+    # 2. Wenn der String weniger als 13 Werte hat, füllen wir ihn auf!
     if len(raw_parts) < 13:
-        # Bestehende Werte retten oder Defaults setzen
-        p1_hp = int(raw_parts[0]) if len(raw_parts) > 0 else 100
-        p2_hp = int(raw_parts[1]) if len(raw_parts) > 1 else 100
-        p1_x  = int(raw_parts[2]) if len(raw_parts) > 2 else 200
-        p2_x  = int(raw_parts[3]) if len(raw_parts) > 3 else 700
+        # Sicheres Auslesen der ersten 4 Werte (falls vorhanden)
+        p1_hp = raw_parts[0] if len(raw_parts) > 0 else "100"
+        p2_hp = raw_parts[1] if len(raw_parts) > 1 else "100"
+        p1_x  = raw_parts[2] if len(raw_parts) > 2 else "200"
+        p2_x  = raw_parts[3] if len(raw_parts) > 3 else "700"
         
-        # Auffüllen auf 13 Werte: hp1, hp2, x1, x2, fuel1, fuel2, w1_1, w1_2, w2_1, w2_2, crateX, crateY, crateActive
-        st = [p1_hp, p2_hp, p1_x, p2_x, 100, 100, 3, 2, 3, 2, -1, -1, 0]
-        g.state = ",".join(str(x) for x in st)
-        db.session.commit() # Speichert den reparierten Zustand direkt in die DB!
+        # Neuen, langen State-String mit 13 Werten zusammenbauen
+        # hp1, hp2, x1, x2, fuel1, fuel2, w1_1, w1_2, w2_1, w2_2, crateX, crateY, crateActive
+        st = [p1_hp, p2_hp, p1_x, p2_x, "100", "100", "3", "2", "3", "2", "-1", "-1", "0"]
+        g.state = ",".join(st)
+        db.session.commit()
     
+    # 3. Daten an das JavaScript senden (Fehlerfrei, da g.state jetzt garantiert 13 Werte hat)
     return {
         "status": g.status or "aktiv",
         "turn": g.turn,
