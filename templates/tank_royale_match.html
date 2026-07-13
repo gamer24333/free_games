@@ -181,7 +181,8 @@
 
             if (!gameState || !gameState.status) return;
             let amIErsteller = (me === gameState.ersteller);
-            let st = gameState.raw_state ? gameState.raw_state.split(',').map(Number) : [100,100,200,700,100,100,3,2,3,2,-1,-1,0];
+            let st = gameState.raw_state ? gameState.raw_state.split(',').map(Number) : [];
+            while(st.length < 13) { st.push(0); } // Macht das Array sicher 13 Felder lang
             
             let p1_f = amIErsteller ? myFuel : st[4];
             let p2_f = !amIErsteller ? myFuel : st[5];
