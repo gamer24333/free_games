@@ -12,19 +12,17 @@
         
         .game-layout { display: flex; justify-content: center; align-items: flex-start; gap: 40px; max-width: 900px; margin: 0 auto; padding: 20px; flex-wrap: wrap; }
         
-        /* Spielfeld */
         .game-box { background: #333; border: 3px solid #00adb5; border-radius: 12px; padding: 30px; width: 350px; text-align: center; box-sizing: border-box; }
         .click-btn { width: 160px; height: 160px; border-radius: 50%; background: #00adb5; color: white; font-size: 20px; font-weight: bold; border: none; cursor: pointer; box-shadow: 0 0 15px rgba(0,173,181,0.4); transition: transform 0.05s; margin: 20px 0; user-select: none; -webkit-user-select: none; }
         .click-btn:active { transform: scale(0.95); background: #008c9e; }
         .click-btn:disabled { background: #555; box-shadow: none; cursor: not-allowed; }
         .stats { font-size: 22px; margin: 10px 0; }
         
-        /* Rangliste */
         .leaderboard-box { background: #333; border: 2px solid #444; border-radius: 12px; width: 300px; padding: 20px; box-sizing: border-box; text-align: left; }
         .leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         .leaderboard-table th, .leaderboard-table td { padding: 8px; border-bottom: 1px solid #444; text-align: left; }
         .leaderboard-table th { color: #00adb5; }
-        .leaderboard-table tr:nth-child(1) td { color: #ffd700; font-weight: bold; } /* Platz 1 Gold */
+        .leaderboard-table tr:nth-child(1) td { color: #ffd700; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -79,10 +77,7 @@
         const hintEl = document.getElementById('hint');
         const resetBtn = document.getElementById('resetBtn');
 
-        
-        
         clickBtn.addEventListener('click', () => {
-            // Spiel startet beim allerersten Klick
             if (!hasStarted) {
                 hasStarted = true;
                 gameActive = true;
@@ -103,20 +98,17 @@
                 scoreEl.textContent = clicks;
             }
         });
-        // Hier fügen wir den Leertasten-Support hinzu
+
+        // BEHOBEN: Leertasten-Support korrigiert (ID war falsch)
         window.addEventListener('keydown', function(e) {
-        // Prüfen, ob die Leertaste gedrückt wurde
-        if (e.code === 'Space' || e.keyCode === 32) {
-            e.preventDefault(); // Verhindert das nervige Scrollen der Seite!
-            
-            // Simuliert den Klick auf den normalen Klick-Button, falls das Spiel läuft
-            // Ersetze 'clickButton' durch die ID deines Klick-Buttons, falls sie anders heißt!
-            const btn = document.getElementById('clickButton'); 
-            if (btn && !btn.disabled) {
-                btn.click(); 
+            if (e.code === 'Space' || e.keyCode === 32) {
+                e.preventDefault(); 
+                if (clickBtn && !clickBtn.disabled) {
+                    clickBtn.click(); 
                 }
             }
         });
+
         async function endGame() {
             gameActive = false;
             clearInterval(timerInterval);
@@ -124,7 +116,6 @@
             hintEl.textContent = `Fertig! Du hast ${clicks} Klicks geschafft.`;
             resetBtn.style.display = "inline-block";
 
-            // Highscore per POST an Flask senden
             try {
                 const response = await fetch('/api/submit-clicker', {
                     method: 'POST',
@@ -133,7 +124,6 @@
                 });
                 
                 if (response.ok) {
-                    // Nach 1.5 Sekunden die Seite neu laden, damit die Rangliste aktualisiert wird
                     setTimeout(() => {
                         window.location.reload();
                     }, 1500);
