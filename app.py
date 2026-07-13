@@ -153,16 +153,19 @@ def dashboard():
         return redirect(url_for('login'))
     
     me = session['username']
-    ttt_games = TicTacToeGame.query.filter((TicTacToeGame.ersteller == me) | (TicTacToeGame.gegner == me)).all()
-    
     aktive_matches = []
+    
+    # 1. Aktive Tic-Tac-Toe Matches holen
+    ttt_games = TicTacToeGame.query.filter(((TicTacToeGame.ersteller == me) | (TicTacToeGame.gegner == me)) & (TicTacToeGame.status == "aktiv")).all()
     for g in ttt_games:
-        if g.status == "aktiv":
-            aktive_matches.append({"id": g.game_id, "von": "Dein Match läuft!", "is_active": True})
+        aktive_matches.append({"id": g.game_id, "von": f"Tic-Tac-Toe vs. {g.gegner if g.ersteller == me else g.ersteller}", "is_active": True, "typ": "tictactoe"})
+
+    # 2. Aktive Tank Royale Matches holen
+    tank_games = TankGame.query.filter(((TankGame.ersteller == me) | (TankGame.gegner == me)) & (TankGame.status == "aktiv")).all()
+    for g in tank_games:
+        aktive_matches.append({"id": g.game_id, "von": f"Tank Royale vs. {g.gegner if g.ersteller == me else g.ersteller}", "is_active": True, "typ": "tankroyale"})
 
     user = UserSetting.query.filter_by(username=me).first()
-    
-    # Till ist standardmäßig immer Admin, ansonsten wird in der DB geschaut
     is_admin = True if (me == "Till" or (user and user.is_admin)) else False
     
     return render_template('dashboard.html', name=me, einladungen=aktive_matches, is_admin=is_admin)
