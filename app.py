@@ -731,27 +731,35 @@ def tank_shoot(game_id):
 
         raw_parts = g.state.split(',') if g.state else []
         if len(raw_parts) < 13:
-            st = [100, 100, int(g.p1_x or 200), int(g.p2_x or 700), 100, 100, 3, 2, 3, 2, -1, -1, 0]
+            st = [100, 100, int(g.p1_x or 80), int(g.p2_x or 620), 100, 100, 3, 2, 3, 2, -1, -1, 0]
         else:
             st = [int(float(x)) for x in raw_parts]
         
+        # X-Positionen updaten
         if data.get('new_p1_x') is not None: st[2] = int(float(data.get('new_p1_x')))
         if data.get('new_p2_x') is not None: st[3] = int(float(data.get('new_p2_x')))
         
-        if data.get('new_p1_fuel') is not None: st[4] = int(float(data.get('new_p1_fuel')))
-        if data.get('new_p2_fuel') is not None: st[5] = int(float(data.get('new_p2_fuel')))
+        # SCHUTZ: Nur der aktive Spieler darf seinen EIGENEN Tank leeren (Senden vom Frontend)
+        if me == g.ersteller:
+            if data.get('new_p1_fuel') is not None: 
+                st[4] = int(float(data.get('new_p1_fuel')))
+        else:
+            if data.get('new_p2_fuel') is not None: 
+                st[5] = int(float(data.get('new_p2_fuel')))
 
+        # --- EFFEKTE BERECHNEN ---
         if hit == "crate_collected":
             if me == g.ersteller:
-                st[4] = 100  
-                st[6] += 1   
+                st[4] = 100  # P1 Tank randvoll
+                st[6] += 1   # Waffennachschub
                 st[7] += 1   
             else:
-                st[5] = 100  
+                st[5] = 100  # P2 Tank randvoll
                 st[8] += 1
                 st[9] += 1
-            st[12] = 0       
+            st[12] = 0       # Kiste einsammeln und vom Feld nehmen
         else:
+            # Normaler Schuss: Munition abziehen
             if me == g.ersteller:
                 if waffentyp == "berta": st[6] = max(0, st[6] - 1)
                 elif waffentyp == "triple": st[7] = max(0, st[7] - 1)
@@ -759,6 +767,7 @@ def tank_shoot(game_id):
                 if waffentyp == "berta": st[8] = max(0, st[8] - 1)
                 elif waffentyp == "triple": st[9] = max(0, st[9] - 1)
 
+            # Schaden berechnen
             schaden = 25
             if waffentyp == "berta": schaden = 45
             elif waffentyp == "triple": schaden = 18
@@ -766,16 +775,19 @@ def tank_shoot(game_id):
             if hit == "p1": st[0] = max(0, st[0] - schaden)
             elif hit == "p2": st[1] = max(0, st[1] - schaden)
 
+        # Neue Kiste spawnen (35% Chance), wenn aktuell keine aktiv ist
         if st[12] == 0 and random.random() < 0.35:
             st[10] = random.randint(150, 750)
             st[11] = 0
             st[12] = 1
 
+        # Synchronisierung mit Datenbank-Feldern
         g.p1_hp, g.p2_hp = st[0], st[1]
         g.p1_x, g.p2_x = st[2], st[3]
         g.state = ",".join(str(x) for x in st)
         g.last_shot = f"{angle},{power}"
         
+        # Spielstatus / Turn-Wechsel prüfen
         if st[0] <= 0:
             g.status = f"gewonnen_{g.gegner}"
         elif st[1] <= 0:
