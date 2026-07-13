@@ -112,7 +112,7 @@
 
         // ZUGRIFF & SEITENSYNC FIXEN
         async function updateStatus() { // 💡 Großes "S" wie im restlichen Code!
-            if (!gameId || gameId.startsWith("{" + "{")) return;
+            if (!gameId || gameId.includes("{")) return;
             try {
                 // 💡 WICHTIG: Nutze echte Backticks (``) links neben der Backspace-Taste!
                 let res = await fetch(`/api/tankroyale/status/${gameId}`); 
