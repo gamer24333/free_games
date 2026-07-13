@@ -118,7 +118,11 @@
                 if (!res.ok) return;
                 gameState = await res.json();
                 
-                let st = gameState.raw_state ? gameState.raw_state.split(',').map(Number) : [100,100,200,700,100,100,3,2,3,2,-1,-1,0];
+                let st = gameState.raw_state ? gameState.raw_state.split(',').map(Number) : [];
+                // Falls das Array aus der DB zu kurz ist, fülle es lokal temporär auf, damit JS nicht abstürzt
+                while(st.length < 13) {
+                    st.push(st.length === 2 ? 200 : (st.length === 3 ? 700 : 0)); 
+                }
                 let amIErsteller = (me === gameState.ersteller);
 
                 // NUR WENN ICH NICHT AM ZUG BIN, überschreiben wir die Live-Werte komplett!
