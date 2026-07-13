@@ -686,28 +686,34 @@ def tank_shoot(game_id):
     me = session['username']
     angle = float(request.json.get('angle'))
     power = float(request.json.get('power'))
-    hit = request.json.get('hit') # 'p1', 'p2' oder 'none'
+    hit = request.json.get('hit')
+    
+    # NEU: Hole die beim Fahren veränderten Positionen ab
+    new_p1_x = request.json.get('new_p1_x')
+    new_p2_x = request.json.get('new_p2_x')
     
     g = TankGame.query.filter_by(game_id=game_id).first()
     if g and g.status == "aktiv" and g.turn == me:
         state_list = [int(x) for x in g.state.split(',')]
         
-        # Treffer verrechnen (Schaden = 35 HP)
+        # Treffer verrechnen
         if hit == "p1":
             state_list[0] = max(0, state_list[0] - 35)
         elif hit == "p2":
             state_list[1] = max(0, state_list[1] - 35)
             
-        g.state = f"{state_list[0]},{state_list[1]},{state_list[2]},{state_list[3]}"
+        # Nutze die neuen X-Koordinaten falls vorhanden, sonst die alten
+        p1_x = new_p1_x if new_p1_x is not None else state_list[2]
+        p2_x = new_p2_x if new_p2_x is not None else state_list[3]
+            
+        g.state = f"{state_list[0]},{state_list[1]},{p1_x},{p2_x}"
         g.last_shot = f"{angle},{power}"
         
-        # Prüfen ob jemand tot ist
         if state_list[0] <= 0:
             g.status = f"gewonnen_{g.gegner}"
         elif state_list[1] <= 0:
             g.status = f"gewonnen_{g.ersteller}"
         else:
-            # Rundenwechsel
             g.turn = g.gegner if me == g.ersteller else g.ersteller
             
         db.session.commit()
