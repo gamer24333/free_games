@@ -1,6 +1,7 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const pauseBtn = document.getElementById('pauseBtn');
+const bgMusic = document.getElementById('gdMusic'); // Musik-Element holen
 
 let gameSpeed = 5;
 let score = 0;
@@ -20,23 +21,31 @@ const player = {
 let obstacles = [];
 let spawnTimeout;
 
+// Lautstärke-Einstellung (0.2 = 20%, damit es angenehm im Hintergrund läuft)
+if (bgMusic) {
+    bgMusic.volume = 0.2;
+}
+
 function doJump() {
     if (isPaused) return; 
     
     if (!gameStarted && !isGameOver) {
         gameStarted = true;
         if (pauseBtn) pauseBtn.style.display = "inline-block"; 
+        
+        // MUSIK-START: Sobald das Spiel beim ersten Klick beginnt
+        if (bgMusic && bgMusic.paused) {
+            bgMusic.play().catch(e => console.log("Musik-Autoplay blockiert:", e));
+        }
     }
 
     if (!isGameOver) {
         if (player.mode === 'cube') {
-            // Normaler Modus: Nur springen, wenn auf dem Boden oder auf einer Plattform
             if (player.isGrounded) {
                 player.vy = player.jumpForce;
                 player.isGrounded = false;
             }
         } else if (player.mode === 'ball') {
-            // Ball-Modus: Gravitation umdrehen bei jedem Klick/Leertaste
             player.gravity = -player.gravity;
             player.isGrounded = false;
         }
@@ -48,6 +57,16 @@ function doJump() {
 function togglePause() {
     if (!gameStarted || isGameOver) return; 
     isPaused = !isPaused;
+    
+    // MUSIK PAUSIEREN / WEITERSPIELEN
+    if (bgMusic) {
+        if (isPaused) {
+            bgMusic.pause();
+        } else {
+            bgMusic.play().catch(e => console.log(e));
+        }
+    }
+
     if (pauseBtn) {
         pauseBtn.textContent = isPaused ? "▶️ Weiter" : "⏸️ Pause";
     }
@@ -70,11 +89,9 @@ function spawnObstacle() {
         return;
     }
 
-    // Zufall zwischen Spike, Block, schwebender Plattform oder einem Modus-Wechsel-Portal
     let rand = Math.random();
     
     if (rand < 0.35) {
-        // 1. Spike am Boden oder an der Decke (falls Ball)
         let onCeiling = player.mode === 'ball' && Math.random() > 0.5;
         obstacles.push({ 
             x: canvas.width, 
@@ -84,7 +101,6 @@ function spawnObstacle() {
             ceil: onCeiling
         });
     } else if (rand < 0.65) {
-        // 2. Schwebende Plattform / Platte zum draufspringen
         let heightLevel = floorY - 70 - Math.floor(Math.random() * 2) * 50;
         obstacles.push({
             x: canvas.width,
@@ -93,7 +109,6 @@ function spawnObstacle() {
             type: 'platform'
         });
     } else if (rand < 0.85) {
-        // 3. Normaler Block (Hindernis)
         let onFloor = Math.random() > 0.4;
         obstacles.push({
             x: canvas.width,
@@ -101,7 +116,6 @@ function spawnObstacle() {
             width: 35, height: 35, type: 'block'
         });
     } else {
-        // 4. Portal (Wechselt den Modus zwischen Cube und Ball)
         let nextMode = player.mode === 'cube' ? 'ball' : 'cube';
         obstacles.push({
             x: canvas.width,
@@ -112,7 +126,6 @@ function spawnObstacle() {
         });
     }
 
-    // Spawn-Rate zieht mit der Geschwindigkeit an, damit Abstände fair bleiben
     let nextSpawn = 1000 + Math.random() * 1400;
     spawnTimeout = setTimeout(spawnObstacle, nextSpawn / (gameSpeed / 5));
 }
@@ -136,16 +149,21 @@ function resetGame() {
     player.y = floorY - player.size; player.vy = 0; player.rotation = 0;
     isGameOver = false; isPaused = false; gameStarted = false;
     if (pauseBtn) { pauseBtn.style.display = "none"; pauseBtn.textContent = "⏸️ Pause"; }
+    
+    // MUSIK ZURÜCKSETZEN: Stoppt die alte Musik und setzt sie auf Sekunde 0 zurück
+    if (bgMusic) {
+        bgMusic.pause();
+        bgMusic.currentTime = 0;
+    }
+
     spawnObstacle();
 }
 
 function update() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1. Details & Hintergrund zeichnen
     ctx.fillStyle = '#0f111a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Raster-Linien im Hintergrund für mehr GD-Vibe
     ctx.strokeStyle = 'rgba(0, 173, 185, 0.05)'; ctx.lineWidth = 2;
     let gridSize = 40;
     let offset = gameStarted && !isPaused && !isGameOver ? (Date.now() / 20) % gridSize : 0;
@@ -153,82 +171,68 @@ function update() {
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
     }
 
-    // Boden & Decke zeichnen
     ctx.fillStyle = '#161925'; ctx.fillRect(0, floorY, canvas.width, canvas.height - floorY);
     ctx.strokeStyle = '#00adb5'; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.moveTo(0, floorY); ctx.lineTo(canvas.width, floorY); ctx.stroke();
 
     if (player.mode === 'ball') {
         ctx.fillStyle = '#161925'; ctx.fillRect(0, 0, canvas.width, ceilingY);
-        ctx.beginPath(); ctx.moveTo(0, ceilingY); ctx.lineTo(canvas.width, ceilingY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, ceilingY); ctx.lineTo(canvas.width, ceilingY); stroke();
     }
 
-    // 2. Physik & Bewegung (nur wenn nicht pausiert)
     if (!isPaused && gameStarted && !isGameOver) {
         player.vy += player.gravity;
         player.y += player.vy;
-
-        // Kontinuierlicher Speed-Up (Macht das Spiel am Ende extrem rasant!)
         gameSpeed += 0.0015; 
 
-        // Grenzen am Boden checken
         if (player.y >= floorY - player.size) {
             player.y = floorY - player.size; player.vy = 0; player.isGrounded = true;
             if (player.mode === 'cube') {
                 player.rotation = Math.round(player.rotation / (Math.PI / 2)) * (Math.PI / 2);
             }
         } 
-        // Grenzen an der Decke checken (wichtig für Ball-Modus)
         else if (player.mode === 'ball' && player.y <= ceilingY) {
             player.y = ceilingY; player.vy = 0; player.isGrounded = true;
         } else {
             player.isGrounded = false;
         }
 
-        // Rotation
         if (!player.isGrounded) {
             player.rotation += (player.gravity > 0 ? 0.09 : -0.09);
         } else if (player.mode === 'ball') {
-            player.rotation += 0.05 * (gameSpeed / 5); // Ball rollt optisch auf dem Boden
+            player.rotation += 0.05 * (gameSpeed / 5); 
         }
     }
 
-    // 3. Spieler zeichnen
     ctx.save();
     ctx.translate(player.x + player.size/2, player.y + player.size/2);
     ctx.rotate(player.rotation);
     
     if (player.mode === 'cube') {
-        // Würfel-Design
         ctx.fillStyle = '#00adb5'; ctx.fillRect(-player.size/2, -player.size/2, player.size, player.size);
         ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.strokeRect(-player.size/2, -player.size/2, player.size, player.size);
-        // Inneres Auge/Viereck für mehr Details
         ctx.fillStyle = '#222831'; ctx.fillRect(-player.size/4, -player.size/4, player.size/2, player.size/2);
     } else {
-        // Ball-Design
         ctx.fillStyle = '#ff9f43'; ctx.beginPath(); ctx.arc(0, 0, player.size/2, 0, Math.PI*2); ctx.fill();
         ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
-        // Muster im Ball
         ctx.beginPath(); ctx.moveTo(-player.size/2, 0); ctx.lineTo(player.size/2, 0); ctx.stroke();
     }
     ctx.restore();
 
-    // 4. Hindernisse updaten & kollidieren
     let onAnyPlatform = false;
 
     for (let i = obstacles.length - 1; i >= 0; i--) {
         let obs = obstacles[i];
         if (!isGameOver && !isPaused) obs.x -= gameSpeed;
 
-        // --- ZEICHNEN DER OBJEKTE ---
         if (obs.type === 'spike') {
             ctx.fillStyle = '#ff2e63';
             ctx.beginPath();
-            if (obs.ceil) { // Deckenspike zeigt nach unten
+            if (obs.ceil) { 
                 ctx.moveTo(obs.x, obs.y);
                 ctx.lineTo(obs.x + obs.width/2, obs.y + obs.height);
                 ctx.lineTo(obs.x + obs.width, obs.y);
-            } else { // Bodenspike zeigt nach oben
+            } else { 
                 ctx.moveTo(obs.x, obs.y);
                 ctx.lineTo(obs.x + obs.width/2, obs.y - obs.height);
                 ctx.lineTo(obs.x + obs.width, obs.y);
@@ -236,7 +240,6 @@ function update() {
             ctx.closePath(); ctx.fill();
         } 
         else if (obs.type === 'platform') {
-            // Plattform zeichnen
             ctx.fillStyle = '#4ee54e'; ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
         } 
@@ -246,7 +249,6 @@ function update() {
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(obs.x, obs.y - obs.height, obs.width, obs.height);
         } 
         else if (obs.type === 'portal') {
-            // Neon-Portal zeichnen
             let portalColor = obs.targetMode === 'ball' ? '#ff9f43' : '#00adb5';
             ctx.fillStyle = portalColor; ctx.globalAlpha = 0.3;
             ctx.fillRect(obs.x, obs.y, obs.width, obs.height); ctx.globalAlpha = 1.0;
@@ -255,18 +257,13 @@ function update() {
             ctx.fillStyle = '#fff'; ctx.font = '12px Arial';
             ctx.fillText(obs.targetMode.toUpperCase(), obs.x - 5, obs.y - 10);
         }
-
-        // --- KOLLISIONS- UND LOGIKPRÜFUNG ---
         
-        // Spezielle Plattform-Lande-Logik
         if (obs.type === 'platform') {
             if (player.x + player.size > obs.x && player.x < obs.x + obs.width) {
-                // Steht der Spieler kurz über der Plattform und fällt nach unten?
                 if (player.gravity > 0 && player.y + player.size >= obs.y && player.y + player.size - player.vy <= obs.y + 10) {
                     player.y = obs.y - player.size; player.vy = 0; player.isGrounded = true;
                     onAnyPlatform = true;
                 }
-                // Für den Ball an der Decke (umgedrehte Gravitation)
                 if (player.gravity < 0 && player.y <= obs.y + obs.height && player.y - player.vy >= obs.y + obs.height - 10) {
                     player.y = obs.y + obs.height; player.vy = 0; player.isGrounded = true;
                     onAnyPlatform = true;
@@ -274,7 +271,7 @@ function update() {
             }
         }
 
-        // Standard Kollision (Game Over) für tödliche Objekte
+        // KOLLISION / GAME OVER DETEKTION
         if (obs.type === 'spike' || obs.type === 'block') {
             let collisionY = obs.type === 'spike' && obs.ceil ? obs.y : obs.y - obs.height;
             if (
@@ -286,23 +283,26 @@ function update() {
                 if (!isGameOver) {
                     isGameOver = true;
                     if (pauseBtn) pauseBtn.style.display = "none";
+                    
+                    // MUSIK STOPPEN BEI GAME OVER
+                    if (bgMusic) {
+                        bgMusic.pause();
+                    }
+                    
                     sendScoreToServer(score);
                 }
             }
         }
 
-        // Portal-Berührung (Modus wechseln)
         if (obs.type === 'portal') {
             if (player.x < obs.x + obs.width && player.x + player.size > obs.x && player.y + player.size > obs.y && player.y < obs.y + obs.height) {
                 if (player.mode !== obs.targetMode) {
                     player.mode = obs.targetMode;
-                    // Reset der Gravitation in die richtige Richtung beim Wechsel
                     player.gravity = player.mode === 'ball' ? 0.5 : 0.6; 
                 }
             }
         }
 
-        // Score & Level-Berechnung
         if (!isPaused && obs.x + obs.width < player.x && !obs.passed) {
             obs.passed = true;
             score++;
@@ -316,7 +316,6 @@ function update() {
 
     if (onAnyPlatform) player.isGrounded = true;
 
-    // 5. UI Texte & Overlays
     ctx.fillStyle = '#fff'; ctx.font = 'bold 20px Arial';
     ctx.fillText(`Score: ${score}`, 20, 35);
     ctx.fillText(`Level: ${level}`, 150, 35);
