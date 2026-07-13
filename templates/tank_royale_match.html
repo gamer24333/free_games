@@ -115,7 +115,7 @@
             if (!gameId || gameId.includes("{")) return;
             try {
                 // 💡 WICHTIG: Nutze echte Backticks (``) links neben der Backspace-Taste!
-                let res = await fetch(`/api/tankroyale/status/${gameId}`); 
+                let res = await fetch(`/api/tankroyale/status/${encodeURIComponent(gameId)}`);
                 
                 if (!res.ok) return;
                 gameState = await res.json();
