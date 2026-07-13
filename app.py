@@ -1,6 +1,8 @@
 import os
 from flask import Flask, redirect, render_template, request, session, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime, timedelta
+
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY")
@@ -31,6 +33,7 @@ class UserSetting(db.Model):
     username = db.Column(db.String(50), primary_key=True)
     pin = db.Column(db.String(20), nullable=True)
     is_admin = db.Column(db.Boolean, default=False)
+    last_seen = db.Column(db.DateTime, nullable=True)
 
 class ChatMessage(db.Model):
     __tablename__ = 'chat_messages'
@@ -82,6 +85,16 @@ def get_admins_list():
 
 # --- ROUTEN ---
 
+@app.before_request
+def update_last_seen():
+    if 'username' in session:
+        user = UserSetting.query.filter_by(username=session['username']).first()
+        if user:
+            user.last_seen = datetime.utcnow()
+            db.session.commit()
+
+
+
 @app.route('/')
 def index():
     return redirect(url_for('dashboard')) if 'username' in session else redirect(url_for('login'))
@@ -122,6 +135,7 @@ def login():
             return redirect(url_for('dashboard'))
             
     return render_template('login.html')
+
 
 @app.route('/welcome')
 def dashboard():
@@ -246,6 +260,12 @@ def admin_clear_chat():
 @app.route('/chat/<room>')
 def chat(room="global"):
     if 'username' not in session: return redirect(url_for('login'))
+
+    # In der chat()-Route einfügen:
+    zwei_minuten_ago = datetime.utcnow() - timedelta(minutes=2)
+    online_users = UserSetting.query.filter(UserSetting.last_seen >= zwei_minuten_ago).all()
+    online_names = [u.username for u in online_users]
+
     
     current_user = session['username']
     chpartner = sorted([schueler for schueler in KLASSEN_LISTE if schueler != current_user])
@@ -258,7 +278,7 @@ def chat(room="global"):
     raum_nachrichten = [{"name": m.sender, "text": m.text} for m in db_messages]
     
     admins = get_admins_list()
-    return render_template('chat.html', room=room, nachrichten=raum_nachrichten, partner=chpartner, admins=admins)
+    return render_template('chat.html', room=room, nachrichten=raum_nachrichten, partner=chpartner, admins=admins, online_liste=online_names)
 
 @app.route('/chat/<room>/send', methods=['POST'])
 def send_message(room):
