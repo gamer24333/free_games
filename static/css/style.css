@@ -93,24 +93,95 @@ iframe {
     transform: scale(0.9);
 }
 
-/* Der Haupt-Rahmen, der alles umschließt */
-.chat-wrapper {
-    display: flex;
-    width: 95vw;          /* Nutzt 95% der Bildschirmbreite */
-    max-width: 1400px;    /* Verhindert, dass es auf Riesen-Monitoren zu langgezogen wird */
-    margin: 20px auto;
-    gap: 15px;
-}
-
-/* Die Sidebar links (Räume & Direktnachrichten) */
+/* Ergänzungen für das Chat-Layout */
 .chat-sidebar {
-    width: 250px;         /* Feste, angenehme Breite */
-    flex-shrink: 0;       /* Verhindert, dass die Sidebar schrumpft */
+    width: 250px;
+    background: #1e1e1e;
+    border: 2px solid #333;
+    border-radius: 12px;
+    padding: 15px;
+    height: 600px; /* Leicht erhöht für mehr Übersicht */
+    overflow-y: auto;
+    text-align: left;
+    box-sizing: border-box;
 }
 
-/* Das eigentliche Chat-Fenster rechts */
-.chat-main {
-    flex-grow: 1;         /* Nutzt den kompletten restlichen Platz aus! */
+.chat-sidebar h3 {
+    margin-top: 15px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 5px;
+}
+.chat-sidebar h3:first-child { margin-top: 0; }
+
+.chat-sidebar a {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    color: #ccc;
+    text-decoration: none;
+    border-radius: 6px;
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+.chat-sidebar a:hover, .chat-sidebar a.active {
+    background: #00adb5;
+    color: white;
+}
+
+.chat-main {
+    background: #1e1e1e;
+    border: 2px solid #333;
+    border-radius: 12px;
+    padding: 20px;
+    height: 600px;
+    box-sizing: border-box;
+}
+
+.chat-box {
+    flex-grow: 1;
+    overflow-y: auto;
+    text-align: left;
+    padding: 10px;
+    margin-bottom: 15px;
+    background: #161616;
+    border-radius: 8px;
+}
+
+.message {
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: #2d2d2d;
+    max-width: 80%;
+    width: fit-content;
+}
+
+.chat-input-area input[type="text"] {
+    flex-grow: 1;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #2d2d2d;
+    color: white;
+    font-size: 16px;
+}
+
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-left: 8px; background: #95a5a6; }
+.status-dot.online { background: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
+
+/* Responsive Media Query: Wenn der Bildschirm zu klein wird (z.B. Smartphone) */
+@media (max-width: 768px) {
+    .chat-wrapper {
+        flex-direction: column;
+        width: 95vw;
+    }
+    .chat-sidebar {
+        width: 100%;
+        height: auto;
+        max-height: 200px;
+    }
+    .chat-main {
+        height: 500px;
+    }
 }
