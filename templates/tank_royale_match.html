@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Tank Royale Match</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1a1a; color: white; }
+        canvas { background: #111; border: 4px solid #ff9f43; border-radius: 8px; margin-top: 20px; }
+        .controls { background: #222; max-width: 750px; margin: 10px auto; padding: 15px; border-radius: 8px; display: flex; justify-content: center; gap: 20px; align-items: center; }
+        input { background: #333; color: white; border: 1px solid #555; padding: 5px; width: 60px; text-align: center; border-radius: 4px; }
+        .btn-shoot { background: #ff2e63; color: white; border: none; padding: 8px 20px; font-weight: bold; border-radius: 4px; cursor: pointer; }
+        .btn-shoot:disabled { background: #555; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <a href="/games" class="btn btn-back" style="margin-top:20px; display:inline-block;">⬅️ Zur Spieleliste</a>
+    <h2 id="matchInfo">Verbinde zum Spiel...</h2>
+
+    <canvas id="tankCanvas" width="750" height="400"></canvas>
+
+    <div class="controls">
+        <label>📐 Winkel: <input type="number" id="angleInput" value="45" min="0" max="90"></label>
+        <label>💥 Kraft: <input type="number" id="powerInput" value="12" min="1" max="20"></label>
+        <button class="btn-shoot" id="shootBtn" disabled>FEUER! 🔥</button>
+    </div>
+
+    <script>
+        const gameId = "{{ gameId }}";
+        const me = "{{ me }}";
+        
+        const canvas = document.getElementById('tankCanvas');
+        const ctx = canvas.getContext('2d');
+        const shootBtn = document.getElementById('shootBtn');
+        const angleInput = document.getElementById('angleInput');
+        const powerInput = document.getElementById('powerInput');
+
+        let gameState = {};
+        let bullet = null;
+        const gravity = 0.15;
+
+        async function updateStatus() {
+            let res = await fetch(`/api/tankroyale/status/${gameId}`);
+            gameState = await res.json();
+            
+            if (!gameState.status) return;
+
+            const isMyTurn = (gameState.turn === me && gameState.status === "aktiv");
+            shootBtn.disabled = !isMyTurn || bullet !== null;
+
+            if (gameState.status === "eingeladen") {
+                document.getElementById('matchInfo').innerText = "Warte darauf, dass der Gegner annimmt... ⏳";
+            } else if (gameState.status.startsWith("gewonnen")) {
+                let winner = gameState.status.split('_')[1];
+                document.getElementById('matchInfo').innerText = winner === me ? "🎉 DU HAST GEWONNEN! 🎉" : `❌ ${winner} hat dich zerstört!`;
+                shootBtn.disabled = true;
+            } else {
+                document.getElementById('matchInfo').innerText = isMyTurn ? "🔴 DU BIST DRAN! Schieß!" : `⏳ ${gameState.turn} berechnet den Schuss...`;
+            }
+
+            draw();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#222831'; ctx.fillRect(0, 370, canvas.width, 30); // Boden
+
+            if (!gameState.status) return;
+
+            // Rollenverteilung ermitteln für Farben & Lebensbalken
+            let amIErsteller = (me === gameState.ersteller);
+            let p1 = { x: gameState.p1_x, y: 350, hp: gameState.p1_hp, color: '#00adb5', name: gameState.ersteller };
+            let p2 = { x: gameState.p2_x, y: 350, hp: gameState.p2_hp, color: '#ff2e63', name: gameState.gegner };
+
+            // Panzer 1 zeichnen
+            ctx.fillStyle = p1.color; ctx.fillRect(p1.x, p1.y, 40, 20);
+            ctx.fillStyle = '#fff'; ctx.font = '12px Arial'; ctx.fillText(`${p1.name} (HP: ${p1.hp})`, p1.x - 10, p1.y - 10);
+
+            // Panzer 2 zeichnen
+            ctx.fillStyle = p2.color; ctx.fillRect(p2.x, p2.y, 40, 20);
+            ctx.fillStyle = '#fff'; ctx.fillText(`${p2.name} (HP: ${p2.hp})`, p2.x - 10, p2.y - 10);
+
+            // Lokale Projektil-Animation
+            if (bullet) {
+                bullet.vy += gravity;
+                bullet.x += bullet.vx;
+                bullet.y += bullet.vy;
+
+                ctx.fillStyle = '#f9d423';
+                ctx.beginPath(); ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI * 2); ctx.fill();
+
+                let target = amIErsteller ? p2 : p1;
+                let activeShooter = amIErsteller ? p1 : p2;
+
+                // Kollisionsprüfung lokal auf dem Canvas
+                if (bullet.x > target.x && bullet.x < target.x + 40 && bullet.y > target.y && bullet.y < target.y + 20) {
+                    let hitTarget = amIErsteller ? "p2" : "p1";
+                    sendShotResult(bullet.angle, bullet.power, hitTarget);
+                    bullet = null;
+                } else if (bullet.y > 370 || bullet.x < 0 || bullet.x > canvas.width) {
+                    sendShotResult(bullet.angle, bullet.power, "none");
+                    bullet = null;
+                }
+            }
+        }
+
+        async function sendShotResult(angle, power, hit) {
+            await fetch(`/api/tankroyale/shoot/${gameId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ angle: angle, power: power, hit: hit })
+            });
+            updateStatus();
+        }
+
+        shootBtn.addEventListener('click', () => {
+            let angle = parseFloat(angleInput.value);
+            let power = parseFloat(powerInput.value);
+            let rad = (angle * Math.PI) / 180;
+            
+            let amIErsteller = (me === gameState.ersteller);
+            let startX = amIErsteller ? gameState.p1_x + 20 : gameState.p2_x + 20;
+
+            bullet = {
+                x: startX,
+                y: 340,
+                vx: Math.cos(rad) * power * (amIErsteller ? 1 : -1), // Richtung anpassen
+                vy: -Math.sin(rad) * power,
+                angle: angle,
+                power: power
+            };
+            shootBtn.disabled = true;
+        });
+
+        // Animation Loop für weiche Schüsse
+        function gameLoop() {
+            if (bullet) draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        setInterval(updateStatus, 2000); // Server-Polling alle 2 Sekunden
+        updateStatus();
+        gameLoop();
+    </script>
+</body>
+</html>
