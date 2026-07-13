@@ -24,7 +24,7 @@ KLASSEN_LISTE = [
     "Mateo", "Hanna", "Emma", "Lia", "Mia", "Lena S", "Lena G", "Johann", 
     "Lena D", "Dasha", "Daniel", "Bennet", "Erik", "Roman", "Meike",
     "Janne", "Tom", "Levin", "Liam", "Tim", "Nathalie", "Richard",
-    "Test Account"
+    "TestAccount"
 ]
 
 # --- DATENBANK MODELLE (TABELLEN) ---
