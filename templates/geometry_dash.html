@@ -43,6 +43,10 @@
         </div>
     </div>
 
+    <audio id="gdMusic" loop hidden>
+        <source src="{{ url_for('static', filename='geometry-dash.mp3') }}" type="audio/mpeg">
+    </audio>
+
     <script src="{{ url_for('static', filename='js/geometry_dash.js') }}"></script>
 </body>
 </html>
