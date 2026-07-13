@@ -49,45 +49,59 @@
     <script>
         const canvas = document.getElementById('flappyCanvas');
         const ctx = canvas.getContext('2d');
-        const pauseBtn = document.getElementById('pauseBtn'); // NEU
+        const pauseBtn = document.getElementById('pauseBtn');
+        const bgMusic = document.getElementById('gdMusic'); // Holt das Audio-Element
 
         let birdY = 200, velocity = 0, gravity = 0.25, jump = -4.6;
         let score = 0, gameOver = false, gameStarted = false;
-        let isPaused = false; // NEU: Pause-Status
+        let isPaused = false;
         let pipes = [];
 
         function doJump() {
-            if (isPaused) return; // Wenn pausiert, kein Sprung!
+            if (isPaused) return;
             if (gameOver) { resetGame(); return; }
             if (!gameStarted) {
                 gameStarted = true;
-                pauseBtn.style.display = "inline-block"; // Pause-Button einblenden
+                pauseBtn.style.display = "inline-block";
+                
+                // MUSIK STARTEN: Sobald das Spiel beginnt
+                bgMusic.currentTime = 0; // Song von vorne starten
+                bgMusic.play().catch(e => console.log("Autoplay blockiert:", e));
             }
             velocity = jump;
         }
 
-        // NEU: Pause umschalten
+        // Pause umschalten & Musik anpassen
         function togglePause() {
             if (!gameStarted || gameOver) return;
             isPaused = !isPaused;
             pauseBtn.textContent = isPaused ? "▶️ Weiter" : "⏸️ Pause";
+            
+            // MUSIK PAUSIEREN / WEITERSPIELEN
+            if (isPaused) {
+                bgMusic.pause();
+            } else {
+                bgMusic.play().catch(e => console.log(e));
+            }
         }
 
         window.addEventListener('keydown', (e) => { 
             if(e.code === 'Space') { e.preventDefault(); doJump(); } 
-            if(e.code === 'Escape') { e.preventDefault(); togglePause(); } // NEU: ESC fängt Pause ab
+            if(e.code === 'Escape') { e.preventDefault(); togglePause(); }
         });
         canvas.addEventListener('touchstart', (e) => { e.preventDefault(); doJump(); });
         canvas.addEventListener('mousedown', doJump);
-        pauseBtn.addEventListener('click', togglePause); // NEU: Klick-Event für Button
+        pauseBtn.addEventListener('click', togglePause);
 
         function resetGame() {
             birdY = 200; velocity = 0; score = 0; gameOver = false; gameStarted = false; isPaused = false; pipes = [];
             pauseBtn.style.display = "none";
             pauseBtn.textContent = "⏸️ Pause";
+            bgMusic.pause(); // Musik sicherheitshalber stoppen
         }
 
         async function sendScore(finalScore) {
+            bgMusic.pause(); // MUSIK STOPPEN bei Game Over
             try {
                 await fetch('/api/submit-flappy', {
                     method: 'POST',
@@ -102,7 +116,6 @@
             ctx.fillStyle = '#70c5ce';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // NEU: Nur berechnen und bewegen, wenn NICHT pausiert ist
             if (gameStarted && !gameOver && !isPaused) {
                 velocity += gravity;
                 birdY += velocity;
@@ -131,7 +144,6 @@
                 pipes = pipes.filter(p => p.x > -60);
             }
 
-            // Rohre statisch zeichnen (auch bei Pause)
             pipes.forEach(pipe => {
                 ctx.fillStyle = '#73bf2e';
                 ctx.fillRect(pipe.x, 0, 52, pipe.top);
@@ -157,7 +169,6 @@
                 ctx.fillText('Klicken zum Starten', canvas.width/2 - 75, canvas.height/2);
             }
             
-            // NEU: Optisches Pause-Overlay auf dem Spielfeld zeichnen
             if (isPaused) {
                 ctx.fillStyle = 'rgba(0,0,0,0.5)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
