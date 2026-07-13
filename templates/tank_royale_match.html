@@ -6,11 +6,10 @@
     <title>Tank Royale Match</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        yle>
         body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1a1a; color: white; margin: 0; padding: 10px; font-size: 16px; }
-        h2 { font-size: 28px; margin-bottom: 5px; } /* Größere Überschrift */
+        h2 { font-size: 28px; margin-bottom: 5px; } 
         canvas { background: linear-gradient(to bottom, #111 60%, #1f1f2e 100%); border: 4px solid #ff9f43; border-radius: 8px; margin-top: 10px; max-width: 100%; height: auto; touch-action: none; }
-        .controls-info { background: #222; max-width: 900px; margin: 10px auto; padding: 20px; border-radius: 8px; font-size: 18px; color: #ccc; } /* Größere Schrift */
+        .controls-info { background: #222; max-width: 900px; margin: 10px auto; padding: 20px; border-radius: 8px; font-size: 18px; color: #ccc; } 
         .weapon-selector { display: flex; justify-content: center; gap: 15px; margin: 20px 0; }
         .btn-weapon { background: #444; color: white; border: 2px solid #666; padding: 12px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .btn-weapon.active { background: #ff9f43; color: black; border-color: #fff; }
@@ -28,7 +27,7 @@
     <canvas id="tankCanvas" width="900" height="500"></canvas>
 
     <div class="controls-info">
-        <span id="lockStatus">Visier: Frei beweglich</span>
+        <span id="lockStatus">Visier: Ziehe auf dem Bildschirm zum Zielen</span>
         
         <div class="weapon-selector">
             <button class="btn-weapon active" id="wpn-standard" onclick="selectWeapon('standard')">Normal (∞)</button>
@@ -58,9 +57,9 @@
         const gravity = 0.15;
 
         let myAngle = 45;
-        let myPower = 12;
+        let myPower = 12; // Startpower angepasst
         let myXOffset = 0;
-        let isAimLocked = false;
+        let isAiming = false; // Für flüssiges Ziehen
         let selectedWeapon = 'standard';
 
         let myFuel = 100;
@@ -73,7 +72,6 @@
         window.addEventListener('keydown', e => { keys[e.key] = true; });
         window.addEventListener('keyup', e => { keys[e.key] = false; });
 
-        // Hügel-Gelände generieren
         const terrainPoints = [];
         for (let x = 0; x <= canvas.width; x++) {
             terrainPoints.push(400 + Math.sin(x * 0.008) * 40 + Math.cos(x * 0.02) * 10);
@@ -85,34 +83,51 @@
             document.getElementById(`wpn-${type}`).classList.add('active');
         }
 
-        function aimAtPoints(clientX, clientY) {
-            if (isAimLocked || gameState.turn !== me || gameState.status !== "aktiv" || bullet !== null) return;
+        // Zentrale Rechenfunktion für Maus und Touch (Verhindert Absturz & skaliert Power korrekt)
+        function calculateAim(clientX, clientY) {
+            if (gameState.turn !== me || gameState.status !== "aktiv" || bullet !== null) return;
             const rect = canvas.getBoundingClientRect();
             const mouseX = ((clientX - rect.left) / rect.width) * canvas.width;
             const mouseY = ((clientY - rect.top) / rect.height) * canvas.height;
 
             let amIErsteller = (me === gameState.ersteller);
             let currentX = amIErsteller ? gameState.p1_x + myXOffset : gameState.p2_x + myXOffset;
-            let startY = terrainPoints[Math.floor(currentX)] - 15;
+            let startY = terrainPoints[Math.floor(Math.max(0, Math.min(canvas.width - 1, currentX)))] - 15;
 
             let dx = mouseX - currentX; let dy = startY - mouseY;
             if (!amIErsteller) dx = -dx;
 
-            myAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+            let rad = Math.atan2(dy, dx);
+            myAngle = Math.round(rad * (180 / Math.PI));
             if (myAngle < 0) myAngle = 0; if (myAngle > 90) myAngle = 90;
-            myPower = Math.min(20, Math.max(5, Math.sqrt(dx*dx + dy*dy) / 18));
+            
+            // Fix: Höhere maximale Power (bis zu 16), damit die Linie weit genug fliegt und nicht einfriert
+            let distance = Math.sqrt(dx*dx + dy*dy);
+            myPower = Math.min(16, Math.max(4, Math.round(distance / 25)));
+            
+            lockStatusText.innerText = `Winkel: ${myAngle}° | Kraft: ${myPower}`;
         }
 
-        canvas.addEventListener('click', (e) => {
-            if (gameState.turn !== me || gameState.status !== "aktiv" || bullet !== null) return;
-            isAimLocked = !isAimLocked;
-            lockStatusText.innerText = isAimLocked ? "🔒 Visier EINGERASTET!" : "Visier: Frei beweglich";
-            lockStatusText.style.color = isAimLocked ? "#ff9f43" : "#76ff03";
-        });
+        // --- MAUS STEUERUNG ---
+        canvas.addEventListener('mousedown', (e) => { isAiming = true; calculateAim(e.clientX, e.clientY); });
+        canvas.addEventListener('mousemove', (e) => { if (isAiming) calculateAim(e.clientX, e.clientY); });
+        window.addEventListener('mouseup', () => { isAiming = false; });
 
-        canvas.addEventListener('mousemove', (e) => aimAtPoints(e.clientX, e.clientY));
+        // --- IPAD / TOUCH STEUERUNG ---
+        canvas.addEventListener('touchstart', (e) => {
+            isAiming = true;
+            if(e.touches.length > 0) calculateAim(e.touches[0].clientX, e.touches[0].clientY);
+            if (e.cancelable) e.preventDefault();
+        }, { passive: false });
 
-       // ZUGRIFF & SEITENSYNC FIXEN
+        canvas.addEventListener('touchmove', (e) => {
+            if (!isAiming) return;
+            if(e.touches.length > 0) calculateAim(e.touches[0].clientX, e.touches[0].clientY);
+            if (e.cancelable) e.preventDefault();
+        }, { passive: false });
+
+        window.addEventListener('touchend', () => { isAiming = false; });
+
         async function updateStatus() {
             if (!gameId || gameId.includes("{")) return;
             try {
@@ -138,8 +153,6 @@
                 document.getElementById('wpn-berta').disabled = ammoBerta <= 0;
                 document.getElementById('wpn-triple').disabled = ammoTriple <= 0;
 
-                // FIX: Kisten-Position NUR aktualisieren, wenn sich der Aktivitätsstatus serverseitig ändert,
-                // um das Zurücksetzen alle 2 Sekunden während des Flugs zu verhindern.
                 if (crate.active !== (st[12] === 1)) {
                     crate.x = st[10]; 
                     crate.y = st[11]; 
@@ -167,14 +180,23 @@
             }
         }
 
-        // BODEN-ZERSTÖRUNG: Senkt die Hügelpunkte im Explosionsradius ab
+        // Touch-Unterstützung für die Bewegungsknöpfe unten
+        ['touchstart', 'mousedown'].forEach(evt => {
+            document.getElementById('moveLeftBtn').addEventListener(evt, (e) => { moveLeftActive = true; e.preventDefault(); });
+            document.getElementById('moveRightBtn').addEventListener(evt, (e) => { moveRightActive = true; e.preventDefault(); });
+        });
+        ['touchend', 'mouseup'].forEach(evt => {
+            document.getElementById('moveLeftBtn').addEventListener(evt, () => moveLeftActive = false);
+            document.getElementById('moveRightBtn').addEventListener(evt, () => moveRightActive = false);
+        });
+
         function destroyTerrain(impactX, radius) {
             let startX = Math.max(0, Math.floor(impactX - radius));
             let endX = Math.min(canvas.width, Math.floor(impactX + radius));
             for (let x = startX; x < endX; x++) {
                 let portion = Math.cos(((x - impactX) / radius) * (Math.PI / 2));
                 if (portion > 0) {
-                    terrainPoints[x] += radius * portion * 0.8; // Drückt den Boden nach unten
+                    terrainPoints[x] += radius * portion * 0.8;
                     if (terrainPoints[x] > canvas.height) terrainPoints[x] = canvas.height;
                 }
             }
@@ -183,7 +205,7 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Boden malen
+            // Boden zeichnen
             ctx.fillStyle = '#393e46'; ctx.beginPath(); ctx.moveTo(0, canvas.height);
             for (let x = 0; x <= canvas.width; x++) ctx.lineTo(x, terrainPoints[x]);
             ctx.lineTo(canvas.width, canvas.height); ctx.closePath(); ctx.fill();
@@ -204,7 +226,6 @@
             if (crate.active) {
                 let groundY = terrainPoints[Math.floor(crate.x)] - 12;
                 if (crate.y < groundY) crate.y += 1.5;
-                // Schönere Kiste mit Kreuz drauf
                 ctx.fillStyle = '#ff9f43'; ctx.fillRect(crate.x - 12, crate.y, 24, 24);
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(crate.x - 12, crate.y, 24, 24);
                 ctx.beginPath(); ctx.moveTo(crate.x - 12, crate.y); ctx.lineTo(crate.x + 12, crate.y + 24);
@@ -219,54 +240,38 @@
 
             [p1, p2].forEach(p => {
                 ctx.save();
-                // 1. Detaillierterer Panzer (Ketten + Turm + Rohr)
-                // Ketten (Unterbau)
-                ctx.fillStyle = '#333';
-                ctx.fillRect(p.x - 22, p.y + 8, 44, 8);
-                
-                // Panzer-Chassis
-                ctx.fillStyle = p.color;
-                ctx.fillRect(p.x - 18, p.y, 36, 10);
-                
-                // Panzerturm (Kuppel)
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, 8, Math.PI, 0);
-                ctx.fill();
+                // Detaillierterer Panzer (Ketten + Gehäuse + Kuppel)
+                ctx.fillStyle = '#333'; ctx.fillRect(p.x - 22, p.y + 8, 44, 8);
+                ctx.fillStyle = p.color; ctx.fillRect(p.x - 18, p.y, 36, 10);
+                ctx.beginPath(); ctx.arc(p.x, p.y, 8, Math.PI, 0); ctx.fill();
 
-                // Kanonenrohr zeichnen
+                // Rohr ausrichten
                 let rad = (p.name === me ? myAngle : 45) * Math.PI / 180;
                 let direction = p.dX; 
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 4;
-                ctx.beginPath();
-                ctx.moveTo(p.x, p.y - 2);
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(p.x, p.y - 2);
                 ctx.lineTo(p.x + Math.cos(rad) * 18 * direction, p.y - 2 - Math.sin(rad) * 18);
-                ctx.stroke();
-                ctx.restore();
+                ctx.stroke(); ctx.restore();
 
-                // Größere Spielerschrift über den Panzern
-                ctx.fillStyle = '#fff';
-                ctx.font = "bold 15px Arial";
+                // Beschriftung & HUD über den Panzern
+                ctx.fillStyle = '#fff'; ctx.font = "bold 15px Arial";
                 ctx.fillText(`${p.name} (${p.hp} HP)`, p.x - 35, p.y - 35);
-                
-                // Treibstoff-Balken
                 ctx.fillStyle = '#555'; ctx.fillRect(p.x - 20, p.y - 15, 40, 5);
                 ctx.fillStyle = '#76ff03'; ctx.fillRect(p.x - 20, p.y - 15, (p.fuel / 100) * 40, 5);
             });
 
-            // Ziel-Hilfslinie
+            // Ziel-Hilfslinie (Berechnung synchronisiert mit `myPower`)
             if (gameState.turn === me && !bullet && gameState.status === "aktiv") {
                 let activeTank = amIErsteller ? p1 : p2;
                 let rad = (myAngle * Math.PI) / 180;
-                let pX = activeTank.x; let pY = activeTank.y;
-                let pVx = Math.cos(rad) * myPower * (amIErsteller ? 1 : -1);
-                let pVy = -Math.sin(rad) * myPower;
-                ctx.strokeStyle = '#f9d423'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(pX, pY);
-                for (let i = 0; i < 25; i++) { pVy += gravity; pX += pVx; pY += pVy; ctx.lineTo(pX, pY); }
-                ctx.stroke();
+                let pX = activeTank.x; let pY = activeTank.y - 2;
+                let pVx = Math.cos(rad) * (myPower * 1.2) * (amIErsteller ? 1 : -1); 
+                let pVy = -Math.sin(rad) * (myPower * 1.2);
+                ctx.strokeStyle = '#f9d423'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(pX, pY);
+                for (let i = 0; i < 40; i++) { pVy += gravity; pX += pVx; pY += pVy; ctx.lineTo(pX, pY); }
+                ctx.stroke(); ctx.setLineDash([]);
             }
 
-            // Projektil
+            // Projektilflug & Kollisionsabfrage
             if (bullet) {
                 bullet.vy += gravity; bullet.x += bullet.vx; bullet.y += bullet.vy;
                 ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(bullet.x, bullet.y, selectedWeapon === 'berta' ? 8 : 5, 0, Math.PI*2); ctx.fill();
@@ -281,6 +286,10 @@
                     sendShotResult(myAngle, myPower, "none", p1.x, p2.x);
                     bullet = null;
                 }
+                else if (bullet.x < 0 || bullet.x > canvas.width || bullet.y > canvas.height) { // Spielfeldrand absichern
+                    sendShotResult(myAngle, myPower, "none", p1.x, p2.x);
+                    bullet = null;
+                }
             }
         }
         
@@ -290,9 +299,9 @@
             let amIErsteller = (me === gameState.ersteller);
             let currentX = Math.max(20, Math.min(canvas.width - 20, (amIErsteller ? gameState.p1_x + myXOffset : gameState.p2_x + myXOffset)));
             bullet = {
-                x: currentX, y: terrainPoints[Math.floor(currentX)] - 15,
-                vx: Math.cos(rad) * myPower * (amIErsteller ? 1 : -1),
-                vy: -Math.sin(rad) * myPower
+                x: currentX, y: terrainPoints[Math.floor(currentX)] - 17,
+                vx: Math.cos(rad) * (myPower * 1.2) * (amIErsteller ? 1 : -1),
+                vy: -Math.sin(rad) * (myPower * 1.2)
             };
             shootBtn.disabled = true;
         }
@@ -311,17 +320,13 @@
                         new_p2_fuel: !amIErsteller ? Math.round(myFuel) : null
                     })
                 });
-                myXOffset = 0; // Reset nach Übertragung!
-                isAimLocked = false;
+                myXOffset = 0;
+                isAiming = false;
                 updateStatus();
             } catch (e) { console.error(e); }
         }
 
         shootBtn.addEventListener('click', fireTank);
-        document.getElementById('moveLeftBtn').addEventListener('mousedown', () => moveLeftActive = true);
-        document.getElementById('moveLeftBtn').addEventListener('mouseup', () => moveLeftActive = false);
-        document.getElementById('moveRightBtn').addEventListener('mousedown', () => moveRightActive = true);
-        document.getElementById('moveRightBtn').addEventListener('mouseup', () => moveRightActive = false);
 
         function gameLoop() { handleInput(); draw(); requestAnimationFrame(gameLoop); }
         setInterval(updateStatus, 2000);
