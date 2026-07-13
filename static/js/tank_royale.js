@@ -1,140 +1,145 @@
+const gameId = "{{ gameId }}";
+const me = "{{ me }}";
+
 const canvas = document.getElementById('tankCanvas');
 const ctx = canvas.getContext('2d');
-const fireBtn = document.getElementById('fireBtn');
+const shootBtn = document.getElementById('shootBtn'); // Korrekte ID aus dem HTML
 const angleInput = document.getElementById('angleInput');
 const powerInput = document.getElementById('powerInput');
 
-let score = 0;
-let isGameOver = false;
-let turn = "player"; // "player" oder "bot"
-
+let gameState = {};
+let bullet = null;
 const gravity = 0.15;
 
-const player = { x: 80, y: 350, width: 40, height: 20, hp: 100, color: '#00adb5' };
-const bot = { x: 620, y: 350, width: 40, height: 20, hp: 100, color: '#ff2e63' };
-let bullet = null;
-
-function fireProjectile(startX, startY, angle, power, isBot = false) {
-    if (bullet) return; // Nur ein Schuss gleichzeitig erlaubt
-
-    // Winkel in Bogenmaß umrechnen
-    let rad = (angle * Math.PI) / 180;
-    
-    bullet = {
-        x: startX,
-        y: startY - 10,
-        vx: Math.cos(rad) * power * (isBot ? -1 : 1), // Bot schießt nach links
-        vy: -Math.sin(rad) * power,
-        radius: 5,
-        isBot: isBot
-    };
-}
-
-fireBtn.addEventListener('click', () => {
-    if (turn !== "player" || isGameOver) return;
-    let angle = parseFloat(angleInput.value);
-    let power = parseFloat(powerInput.value);
-    fireProjectile(player.x + 20, player.y, angle, power, false);
-    turn = "bot";
-});
-
-function botTurn() {
-    if (isGameOver) return;
-    setTimeout(() => {
-        // Der Bot rät einen zufälligen, aber spielbaren Winkel und Kraft
-        let randomAngle = 30 + Math.random() * 35;
-        let randomPower = 10 + Math.random() * 6;
-        fireProjectile(bot.x + 20, bot.y, randomAngle, randomPower, true);
-        turn = "player";
-    }, 1500);
-}
-
-async function sendScoreToServer(finalScore) {
+// 1. Status vom Server abrufen
+async function updateStatus() {
     try {
-        await fetch('/api/submit-tank-score', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ score: finalScore })
-        });
-    } catch (e) { console.error(e); }
+        let res = await fetch(`/api/tankroyale/status/${gameId}`);
+        if (!res.ok) return;
+        
+        gameState = await res.json();
+        
+        if (!gameState || !gameState.status) return;
+
+        // Prüfen, ob man selbst an der Reihe ist
+        const isMyTurn = (gameState.turn === me && gameState.status === "aktiv");
+        
+        // Button nur aktivieren, wenn man dran ist und kein Projektil fliegt
+        shootBtn.disabled = !isMyTurn || bullet !== null;
+
+        // Text-Anzeige aktualisieren
+        const matchInfo = document.getElementById('matchInfo');
+        if (gameState.status === "eingeladen") {
+            matchInfo.innerText = "Warte darauf, dass der Gegner annimmt... ⏳";
+        } else if (gameState.status.startsWith("gewonnen")) {
+            let winner = gameState.status.split('_')[1];
+            matchInfo.innerText = winner === me ? "🎉 DU HAST GEWONNEN! 🎉" : `❌ ${winner} hat dich zerstört!`;
+            shootBtn.disabled = true;
+        } else {
+            matchInfo.innerText = isMyTurn ? "🔴 DU BIST DRAN! Schieß!" : `⏳ ${gameState.turn} berechnet den Schuss...`;
+        }
+    } catch (e) {
+        console.error("Fehler beim Abrufen des Status:", e);
+    }
 }
 
-function checkCollision(b, target) {
-    return (b.x > target.x && b.x < target.x + target.width &&
-            b.y > target.y && b.y < target.y + target.height);
-}
-
-function update() {
+// 2. Spielfeld zeichnen
+function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+    
     // Boden zeichnen
-    ctx.fillStyle = '#222831'; ctx.fillRect(0, 370, canvas.width, 30);
+    ctx.fillStyle = '#222831'; 
+    ctx.fillRect(0, 370, canvas.width, 30);
 
-    // Spieler-Panzer
-    ctx.fillStyle = player.color; ctx.fillRect(player.x, player.y, player.width, player.height);
-    ctx.fillStyle = '#fff'; ctx.font = '12px Arial'; ctx.fillText(`HP: ${player.hp}`, player.x, player.y - 10);
+    // Schutz: Wenn noch keine Serverdaten da sind, hier abbrechen
+    if (!gameState || !gameState.status) return;
 
-    // Bot-Panzer
-    ctx.fillStyle = bot.color; ctx.fillRect(bot.x, bot.y, bot.width, bot.height);
-    ctx.fillStyle = '#fff'; ctx.fillText(`HP: ${bot.hp}`, bot.x, bot.y - 10);
+    let amIErsteller = (me === gameState.ersteller);
+    let p1 = { x: gameState.p1_x, y: 350, hp: gameState.p1_hp, color: '#00adb5', name: gameState.ersteller };
+    let p2 = { x: gameState.p2_x, y: 350, hp: gameState.p2_hp, color: '#ff2e63', name: gameState.gegner };
 
-    // Projektil-Physik & Bewegung
+    // Panzer 1 (Ersteller) zeichnen
+    ctx.fillStyle = p1.color; 
+    ctx.fillRect(p1.x, p1.y, 40, 20);
+    ctx.fillStyle = '#fff'; 
+    ctx.font = '12px Arial'; 
+    ctx.fillText(`${p1.name} (HP: ${p1.hp})`, p1.x - 10, p1.y - 10);
+
+    // Panzer 2 (Gegner) zeichnen
+    ctx.fillStyle = p2.color; 
+    ctx.fillRect(p2.x, p2.y, 40, 20);
+    ctx.fillStyle = '#fff'; 
+    ctx.fillText(`${p2.name} (HP: ${p2.hp})`, p2.x - 10, p2.y - 10);
+
+    // Projektil bewegen und zeichnen
     if (bullet) {
-        bullet.vy += gravity; // Gravitation zieht die Kugel runter
+        bullet.vy += gravity;
         bullet.x += bullet.vx;
         bullet.y += bullet.vy;
 
-        // Kugel zeichnen
         ctx.fillStyle = '#f9d423';
-        ctx.beginPath(); ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); 
+        ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI * 2); 
+        ctx.fill();
 
-        // Kollision mit dem Boden oder Spielfeldrand
-        if (bullet.y > 370 || bullet.x < 0 || bullet.x > canvas.width) {
+        let target = amIErsteller ? p2 : p1;
+
+        // Kollisionsprüfung (Lokal)
+        if (bullet.x > target.x && bullet.x < target.x + 40 && bullet.y > target.y && bullet.y < target.y + 20) {
+            let hitTarget = amIErsteller ? "p2" : "p1";
+            sendShotResult(bullet.angle, bullet.power, hitTarget);
             bullet = null;
-            if (turn === "bot") botTurn();
-        } 
-        // Kollision mit Bot (Spieler trifft)
-        else if (!bullet.isBot && checkCollision(bullet, bot)) {
-            bot.hp -= 35;
-            score += 10;
+        } else if (bullet.y > 370 || bullet.x < 0 || bullet.x > canvas.width) {
+            sendShotResult(bullet.angle, bullet.power, "none");
             bullet = null;
-            if (bot.hp <= 0) {
-                // Bot zerstört -> Spawnt mit vollem Leben neu, Spiel geht weiter für mehr Punkte!
-                bot.hp = 100;
-                bot.x = 400 + Math.random() * 250; // Neue Zufallsposition für den Bot
-            }
-            botTurn();
-        }
-        // Kollision mit Spieler (Bot trifft)
-        else if (bullet.isBot && checkCollision(bullet, player)) {
-            player.hp -= 35;
-            bullet = null;
-            if (player.hp <= 0) {
-                isGameOver = true;
-                sendScoreToServer(score);
-            }
         }
     }
-
-    // UI Anzeigen
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 20px Arial';
-    ctx.fillText(`Score: ${score}`, 20, 35);
-    ctx.fillText(turn === "player" ? "Du bist dran!" : "Bot berechnet Schuss...", canvas.width / 2 - 80, 35);
-
-    if (isGameOver) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#ff2e63'; ctx.font = 'bold 40px Arial'; ctx.fillText('GAME OVER', canvas.width / 2 - 120, canvas.height / 2);
-        ctx.fillStyle = '#fff'; ctx.font = '16px Arial'; ctx.fillText('Klicke zum Neustarten', canvas.width / 2 - 80, canvas.height / 2 + 40);
-    }
-
-    requestAnimationFrame(update);
 }
 
-canvas.addEventListener('click', () => {
-    if (isGameOver) {
-        player.hp = 100; bot.hp = 100; score = 0; isGameOver = false; turn = "player";
-        bullet = null;
+// 3. Schuss-Ergebnis an das Backend melden
+async function sendShotResult(angle, power, hit) {
+    try {
+        await fetch(`/api/tankroyale/shoot/${gameId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ angle: angle, power: power, hit: hit })
+        });
+        updateStatus();
+    } catch (e) {
+        console.error("Fehler beim Senden des Schusses:", e);
     }
+}
+
+// 4. Klick auf den Feuer-Button
+shootBtn.addEventListener('click', () => {
+    if (!gameState.status || bullet !== null) return;
+
+    let angle = parseFloat(angleInput.value);
+    let power = parseFloat(powerInput.value);
+    let rad = (angle * Math.PI) / 180;
+    
+    let amIErsteller = (me === gameState.ersteller);
+    let startX = amIErsteller ? gameState.p1_x + 20 : gameState.p2_x + 20;
+
+    bullet = {
+        x: startX,
+        y: 340,
+        vx: Math.cos(rad) * power * (amIErsteller ? 1 : -1), // Richtung nach links/rechts spiegeln
+        vy: -Math.sin(rad) * power,
+        angle: angle,
+        power: power
+    };
+    
+    shootBtn.disabled = true;
 });
 
-update();
+// 5. Game Loop (Zeichnet permanent das Spielfeld)
+function gameLoop() {
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+// Intervalle und Start-Trigger
+setInterval(updateStatus, 2000); // Alle 2 Sekunden Match-Daten aktualisieren
+updateStatus(); // Sofort beim Laden einmalig ausführen
+gameLoop(); // Animations-Schleife starten
