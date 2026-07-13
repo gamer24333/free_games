@@ -623,7 +623,7 @@ def ttt_move(game_id):
 def tankroyale_menu():
     if 'username' not in session: return redirect(url_for('login'))
     gegner_liste = sorted([s for s in KLASSEN_LISTE if s != session['username']])
-    return render_template('tankroyale_menu.html', gegner_liste=gegner_liste)
+    return render_template('tank_royale_menu.html', gegner_liste=gegner_liste)
 
 @app.route('/tankroyale/invite', methods=['POST'])
 def tankroyale_invite():
