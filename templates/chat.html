@@ -9,8 +9,10 @@
         .layout { display: flex; max-width: 900px; margin: 20px auto; gap: 20px; }
         .sidebar { width: 250px; background: #1e1e1e; border: 2px solid #333; border-radius: 12px; padding: 15px; height: 500px; overflow-y: auto; text-align: left; }
         .sidebar h3 { margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 5px; }
-        .sidebar a { display: block; padding: 8px 12px; color: #ccc; text-decoration: none; border-radius: 6px; margin-bottom: 5px; font-size: 14px; }
+        .sidebar a { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; color: #ccc; text-decoration: none; border-radius: 6px; margin-bottom: 5px; font-size: 14px; }
         .sidebar a:hover, .sidebar a.active { background: #00adb5; color: white; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-left: 8px; background: #95a5a6; }
+        .status-dot.online { background: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
         .chat-main { flex-grow: 1; background: #1e1e1e; border: 2px solid #333; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; height: 500px; }
         .chat-box { flex-grow: 1; overflow-y: auto; text-align: left; padding: 10px; margin-bottom: 15px; }
         .message { margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; background: #2d2d2d; max-width: 80%; width: fit-content; }
@@ -27,12 +29,14 @@
     <div class="layout">
         <div class="sidebar">
             <h3>Räume</h3>
-            <a href="/chat" class="{% if room == 'global' %}active{% endif %}">🌍 Gruppen-Chat</a>
+            <a href="/chat" class="{% if room == 'global' %}active{% endif %}">
+                <span>🌍 Gruppen-Chat</span>
+            </a>
             <h3>Direktnachrichten</h3>
             {% for p in partner %}
-            <a href="/chat/{{ p }}" class="partner-btn" style="position: relative; display: block; margin: 5px 0;">
-                👤 {{ p }}
-                <span id="badge-{{ p }}" class="badge" style="background: #ff2e63; color: white; border-radius: 50%; padding: 2px 6px; font-size: 11px; margin-left: 8px; display: none;">0</span>
+            <a href="/chat/{{ p }}" class="partner-btn" data-partner="{{ p }}" style="position: relative; margin: 5px 0;">
+                <span>👤 {{ p }} <span id="status-{{ p }}" class="status-dot"></span></span>
+                <span id="badge-{{ p }}" class="badge" style="background: #ff2e63; color: white; border-radius: 50%; padding: 2px 6px; font-size: 11px; display: none;">0</span>
             </a>
             {% endfor %}
         </div>
@@ -93,7 +97,6 @@
     const currentRoom = "{{ room }}";
     const totalLoadedMessages = {{ nachrichten|length }};
     const currentUsername = "{{ session['username'] }}";
-    // NEU: Reicht die Admin-Liste an JavaScript weiter
     const adminList = {{ admins|tojson }};
     
     const chatBox = document.getElementById('chatBox');
@@ -101,7 +104,6 @@
     const messageInput = document.getElementById('messageInput');
     const emojiButtons = document.querySelectorAll('.emoji-btn');
 
-    // Sync localStorage counters
     if (currentRoom === "global") {
         localStorage.setItem('last_seen_messages_global', totalLoadedMessages);
     } else {
@@ -115,7 +117,6 @@
     }
     scrollToBottom();
     
-    // Emojis per Klick einfügen
     emojiButtons.forEach(button => {
         button.addEventListener('click', () => {
             messageInput.value += button.textContent;
@@ -123,7 +124,6 @@
         });
     });
 
-    // Hilfsfunktion: Wandelt Medien-Präfixe in valides HTML um
     function formatMessageText(text) {
         if (text.startsWith('[IMAGE]')) {
             const base64Data = text.replace('[IMAGE]', '');
@@ -136,12 +136,8 @@
         return text;
     }
         
-    // --- TEXTNACHRICHTEN SENDEN (Optimistic UI) ---
-    chatForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const text = messageInput.value.trim();
-        if (!text) return;
-
+    // --- OPTIMISTIC UI FÜR TEXT & MEDIEN ---
+    function appendTemporaryMessage(contentHtml) {
         const tempIndex = chatBox.children.length;
         const isMeAdmin = adminList.includes(currentUsername);
         const nameColor = isMeAdmin ? "#9b59b6" : "#00adb5";
@@ -150,17 +146,23 @@
         chatBox.innerHTML += `
         <div class="message" style="position: relative; padding-right: 40px; opacity: 0.6;" id="msg-temp-${tempIndex}">
             <b style="color: ${nameColor};">${crown}${currentUsername}</b>
-            <span>${text}</span>
+            <span>${contentHtml}</span>
             <span style="position: absolute; right: 8px; top: 8px; font-size: 10px; color: #aaa;">⏳</span>
         </div>`;
-        
-        messageInput.value = '';
         scrollToBottom();
+    }
+
+    chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const text = messageInput.value.trim();
+        if (!text) return;
+
+        appendTemporaryMessage(text);
+        messageInput.value = '';
 
         await sendMediaMessage(text);
     });
 
-    // --- HELPER ZUM SENDEN AN BACKEND ---
     async function sendMediaMessage(mediaData) {
         try {
             const formData = new FormData();
@@ -192,7 +194,6 @@
                     let deleteButton = '';
                     let statusHook = '';
 
-                    // NEU: Berechne Admin-Status live für JavaScript
                     const isSenderAdmin = adminList.includes(msg.name);
                     const nameColor = isSenderAdmin ? "#9b59b6" : "#00adb5";
                     const crown = isSenderAdmin ? "👑 " : "";
@@ -227,7 +228,7 @@
     }
     setInterval(loadMessages, 3000);
 
-    // --- 🖼️ BILD-UPLOAD ---
+    // --- 🖼️ BILD-UPLOAD OHNE REFRESH ---
     const imageInput = document.getElementById('imageInput');
     imageInput.addEventListener('change', function() {
         const file = this.files[0];
@@ -236,13 +237,18 @@
         const reader = new FileReader();
         reader.onloadend = async function() {
             const base64String = '[IMAGE]' + reader.result;
+            
+            // Zeigt das Bild sofort lokal an (Optimistic)
+            const previewHtml = `<img src="${reader.result}" style="max-width: 200px; border-radius: 8px; display: block; margin-top: 5px;">`;
+            appendTemporaryMessage(previewHtml);
+            
             await sendMediaMessage(base64String);
         };
         reader.readAsDataURL(file);
         imageInput.value = ""; 
     });
 
-    // --- 🎙️ SPRACHNACHRICHTEN ---
+    // --- 🎙️ SPRACHNACHRICHTEN OHNE REFRESH ---
     let mediaRecorder;
     let audioChunks = [];
     const voiceBtn = document.getElementById('voiceBtn');
@@ -261,6 +267,11 @@
                     const reader = new FileReader();
                     reader.onloadend = async function() {
                         const base64Audio = '[AUDIO]' + reader.result;
+                        
+                        // Lokale Sofort-Anzeige
+                        const previewHtml = `<audio controls src="${reader.result}" style="display: block; margin-top: 5px; max-width: 100%;"></audio>`;
+                        appendTemporaryMessage(previewHtml);
+
                         await sendMediaMessage(base64Audio);
                     };
                     reader.readAsDataURL(audioBlob);
@@ -279,17 +290,17 @@
         }
     });
 
-    // --- DM COMPANION LIVE BADGES ---
-    async function checkPrivateBadges() {
+    // --- DM BADGES & ONLINE STATUS UPDATER ---
+    async function checkSidebarUpdates() {
         try {
             const response = await fetch('/api/dashboard-stats');
             if (response.ok) {
                 const stats = await response.json();
                 const localPrivateStorage = JSON.parse(localStorage.getItem('last_seen_messages_private') || '{}');
                 
+                // 1. Nachrichten-Zähler (Badges)
                 for (const [partner, currentCount] of Object.entries(stats.private_messages_stats)) {
                     const badgeElement = document.getElementById(`badge-${partner}`);
-                    
                     if (badgeElement) {
                         if (currentRoom === partner) {
                             localPrivateStorage[partner] = currentCount;
@@ -297,7 +308,6 @@
                             badgeElement.style.display = 'none';
                             continue;
                         }
-                        
                         const lastSeenPrivate = localPrivateStorage[partner] || 0;
                         const newMessages = currentCount - lastSeenPrivate;
                         
@@ -309,11 +319,26 @@
                         }
                     }
                 }
+
+                // 2. Online-Status aktualisieren (Erwartet eine Liste 'online_users' vom Backend)
+                if (stats.online_users) {
+                    document.querySelectorAll('.partner-btn').forEach(btn => {
+                        const partnerName = btn.getAttribute('data-partner');
+                        const dot = document.getElementById(`status-${partnerName}`);
+                        if (dot) {
+                            if (stats.online_users.includes(partnerName)) {
+                                dot.classList.add('online');
+                            } else {
+                                dot.classList.remove('online');
+                            }
+                        }
+                    });
+                }
             }
-        } catch (e) { console.error("Fehler beim Laden der DM-Badges:", e); }
+        } catch (e) { console.error("Fehler beim Laden der Sidebar-Daten:", e); }
     }
-    setInterval(checkPrivateBadges, 5000);
-    checkPrivateBadges();
+    setInterval(checkSidebarUpdates, 4000);
+    checkSidebarUpdates();
 </script>
 </body>
 </html>
