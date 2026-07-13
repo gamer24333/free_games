@@ -3,7 +3,6 @@ from flask import Flask, redirect, render_template, request, session, url_for, j
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 
-
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY")
 
@@ -92,7 +91,6 @@ def update_last_seen():
         if user:
             user.last_seen = datetime.utcnow()
             db.session.commit()
-
 
 
 @app.route('/')
@@ -521,6 +519,29 @@ def delete_match(game_id):
         db.session.commit()
     return redirect(url_for('dashboard'))
 
+# --- PAUSIEREN & RESUMEN (NEU) ---
+
+@app.route('/api/tictactoe/pause/<game_id>', methods=['POST'])
+def tictactoe_pause(game_id):
+    if 'username' not in session: return {"error": "Nicht eingeloggt"}, 401
+    g = TicTacToeGame.query.filter_by(game_id=game_id).first()
+    if g and (session['username'] in [g.ersteller, g.gegner]):
+        g.status = "pausiert"
+        db.session.commit()
+        return {"status": "paused"}
+    return {"error": "Match nicht gefunden oder keine Rechte"}, 400
+
+@app.route('/api/tictactoe/resume/<game_id>', methods=['POST'])
+def tictactoe_resume(game_id):
+    if 'username' not in session: return {"error": "Nicht eingeloggt"}, 401
+    g = TicTacToeGame.query.filter_by(game_id=game_id).first()
+    if g and (session['username'] in [g.ersteller, g.gegner]):
+        g.status = "aktiv"
+        db.session.commit()
+        return {"status": "resumed"}
+    return {"error": "Match nicht gefunden oder keine Rechte"}, 400
+
+
 @app.route('/tictactoe/game/<game_id>')
 def tictactoe_game(game_id):
     if 'username' not in session: return redirect(url_for('login'))
@@ -530,7 +551,6 @@ def tictactoe_game(game_id):
 def ttt_status(game_id):
     g = TicTacToeGame.query.filter_by(game_id=game_id).first()
     if g:
-        # Repräsentiert das Board-Array wie in deiner alten JSON-Logik
         raw_board = g.board.split(',')
         cleaned_board = [cell.strip() for cell in raw_board]
         return jsonify({
@@ -572,7 +592,7 @@ def logout():
     session.pop('username', None)
     return redirect(url_for('login'))
 
-# --- HIER HIN: ERZWINGT DAS ERSTELLEN BEIM LADEN DER DATEI ---
+# --- ERZWINGT DAS ERSTELLEN BEIM LADEN DER DATEI ---
 with app.app_context():
     db.create_all()
 
