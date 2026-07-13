@@ -378,11 +378,16 @@ def games_menu():
     if 'username' not in session: return redirect(url_for('login'))
     me = session['username']
     
-    invites = TicTacToeGame.query.filter_by(gegner=me, status='eingeladen').all()
-    aktive_einladungen = [{"id": i.game_id, "von": i.ersteller} for i in invites]
+    # 1. Tic-Tac-Toe Einladungen holen
+    ttt_invites = TicTacToeGame.query.filter_by(gegner=me, status='eingeladen').all()
+    aktive_einladungen = [{"id": i.game_id, "von": i.ersteller, "typ": "tictactoe"} for i in ttt_invites]
+    
+    # 2. HIER WAR DER FEHLER: Tank Royale Einladungen wurden ignoriert!
+    tank_invites = TankGame.query.filter_by(gegner=me, status='eingeladen').all()
+    for i in tank_invites:
+        aktive_einladungen.append({"id": i.game_id, "von": i.ersteller, "typ": "tankroyale"})
             
     return render_template('games.html', einladungen=aktive_einladungen)
-
 @app.route('/geometry-dash')
 def game():
     if 'username' not in session: return redirect(url_for('login'))
