@@ -65,6 +65,17 @@ class TicTacToeGame(db.Model):
     turn = db.Column(db.String(50), nullable=False)
     status = db.Column(db.String(50), default="eingeladen")
 
+class TankGame(db.Model):
+    __tablename__ = 'tank_games'
+    game_id = db.Column(db.String(100), primary_key=True)
+    ersteller = db.Column(db.String(50), nullable=False)
+    gegner = db.Column(db.String(50), nullable=False)
+    # Speichert: player_hp, bot_hp (wird zum gegner_hp), player_x, gegner_x
+    state = db.Column(db.String(100), default="100,100,80,620") 
+    turn = db.Column(db.String(50), nullable=False)
+    status = db.Column(db.String(50), default="eingeladen")
+    last_shot = db.Column(db.String(100), default="") # Speichert den letzten Schuss: "winkel,kraft" für die Animation beim Gegner
+
 
 # --- HILFSFUNKTIONEN ---
 
@@ -596,6 +607,106 @@ def ttt_move(game_id):
             return {"status": "success"}
             
     return {"status": "invalid_move"}, 400
+
+# --- TANK ROYALE MULTIPLAYER ---
+
+@app.route('/tankroyale')
+def tankroyale_menu():
+    if 'username' not in session: return redirect(url_for('login'))
+    gegner_liste = sorted([s for s in KLASSEN_LISTE if s != session['username']])
+    return render_template('tankroyale_menu.html', gegner_liste=gegner_liste)
+
+@app.route('/tankroyale/invite', methods=['POST'])
+def tankroyale_invite():
+    if 'username' not in session: return redirect(url_for('login'))
+    gegner = request.form.get('gegner')
+    me = session['username']
+    
+    game_id = f"{min(me, gegner)}_tank_{max(me, gegner)}"
+    existing = TankGame.query.filter_by(game_id=game_id).first()
+    if existing:
+        db.session.delete(existing)
+    
+    new_game = TankGame(
+        game_id=game_id, ersteller=me, gegner=gegner,
+        state="100,100,80,620", turn=me, status="eingeladen"
+    )
+    db.session.add(new_game)
+    db.session.commit()
+    return redirect(url_for('tankroyale_match', game_id=game_id))
+
+@app.route('/tankroyale/accept/<game_id>', methods=['POST'])
+def tankroyale_accept(game_id):
+    if 'username' not in session: return redirect(url_for('login'))
+    g = TankGame.query.filter_by(game_id=game_id).first()
+    if g:
+        g.status = "aktiv"
+        db.session.commit()
+    return redirect(url_for('tankroyale_match', game_id=game_id))
+
+@app.route('/tankroyale/decline/<game_id>', methods=['POST'])
+def tankroyale_decline(game_id):
+    if 'username' not in session: return redirect(url_for('login'))
+    g = TankGame.query.filter_by(game_id=game_id).first()
+    if g:
+        db.session.delete(g)
+        db.session.commit()
+    return redirect(url_for('games_menu'))
+
+@app.route('/tankroyale/match/<game_id>')
+def tankroyale_match(game_id):
+    if 'username' not in session: return redirect(url_for('login'))
+    return render_template('tank_royale_match.html', game_id=game_id, me=session['username'])
+
+@app.route('/api/tankroyale/status/<game_id>')
+def tank_status(game_id):
+    g = TankGame.query.filter_by(game_id=game_id).first()
+    if g:
+        state_list = [int(x) for x in g.state.split(',')]
+        return jsonify({
+            "ersteller": g.ersteller, "gegner": g.gegner,
+            "p1_hp": state_list[0], "p2_hp": state_list[1],
+            "p1_x": state_list[2], "p2_x": state_list[3],
+            "turn": g.turn, "status": g.status, "last_shot": g.last_shot
+        })
+    return jsonify({})
+
+@app.route('/api/tankroyale/shoot/<game_id>', methods=['POST'])
+def tank_shoot(game_id):
+    if 'username' not in session: return {"error": "Nicht eingeloggt"}, 401
+    me = session['username']
+    angle = float(request.json.get('angle'))
+    power = float(request.json.get('power'))
+    hit = request.json.get('hit') # 'p1', 'p2' oder 'none'
+    
+    g = TankGame.query.filter_by(game_id=game_id).first()
+    if g and g.status == "aktiv" and g.turn == me:
+        state_list = [int(x) for x in g.state.split(',')]
+        
+        # Treffer verrechnen (Schaden = 35 HP)
+        if hit == "p1":
+            state_list[0] = max(0, state_list[0] - 35)
+        elif hit == "p2":
+            state_list[1] = max(0, state_list[1] - 35)
+            
+        g.state = f"{state_list[0]},{state_list[1]},{state_list[2]},{state_list[3]}"
+        g.last_shot = f"{angle},{power}"
+        
+        # Prüfen ob jemand tot ist
+        if state_list[0] <= 0:
+            g.status = f"gewonnen_{g.gegner}"
+        elif state_list[1] <= 0:
+            g.status = f"gewonnen_{g.ersteller}"
+        else:
+            # Rundenwechsel
+            g.turn = g.gegner if me == g.ersteller else g.ersteller
+            
+        db.session.commit()
+        return {"status": "success"}
+        
+    return {"status": "invalid_move"}, 400
+
+
 
 @app.route('/logout')
 def logout():
