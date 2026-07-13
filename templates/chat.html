@@ -195,16 +195,18 @@
                     let statusHook = '';
 
                     const isSenderAdmin = adminList.includes(msg.name);
+                    const isMeAdmin = adminList.includes(currentUsername); // NEU: Bist du selbst Admin?
                     const nameColor = isSenderAdmin ? "#9b59b6" : "#00adb5";
                     const crown = isSenderAdmin ? "👑 " : "";
-
-                    if (msg.name === currentUsername) {
+                    
+                    // Geändert: Button wird angezeigt, wenn es meine eigene Nachricht ist ODER wenn ich Admin bin
+                    if (msg.name === currentUsername || isMeAdmin) {
                         deleteButton = `
                         <form action="/chat/${currentRoom}/delete/${index}" method="POST" style="position: absolute; right: 8px; top: 8px; margin: 0;">
                             <button type="submit" style="background: none; border: none; color: #ff2e63; cursor: pointer; font-size: 14px; padding: 0;">🗑️</button>
                         </form>`;
                         
-                        if (currentRoom !== "global") {
+                        if (currentRoom !== "global" && msg.name === currentUsername) {
                             if (msg.gelesen) {
                                 statusHook = `<span style="font-size: 12px; color: #3498db; margin-left: 5px; vertical-align: middle;">✔️✔️</span>`;
                             } else {
