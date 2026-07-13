@@ -333,17 +333,27 @@ def api_chat_messages(room):
 
 @app.route('/chat/<room>/delete/<int:msg_index>', methods=['POST'])
 def delete_message(room, msg_index):
-    if 'username' not in session: return redirect(url_for('login'))
+    if 'username' not in session: 
+        return redirect(url_for('login'))
+        
     current_user = session['username']
+    
+    # 1. ADMIN-LISTE HOEN:
+    # Falls du 'admins' global definiert hast, brauchst du diese Zeile nicht.
+    # Wenn sie aus der DB kommt oder oben in der app.py steht, passe sie kurz an.
+    # Beispiel: admins = ["DeinName", "AdminZwei"] 
     
     actual_room = room
     if room != "global":
         actual_room = get_private_room_name(current_user, room)
         
     db_messages = ChatMessage.query.filter_by(room=actual_room).order_by(ChatMessage.id.asc()).all()
+    
     if 0 <= msg_index < len(db_messages):
         target_msg = db_messages[msg_index]
-        if target_msg.sender == current_user:
+        
+        # 2. BERECHTIGUNG PRÜFEN: Eigener Absender ODER der User ist Admin
+        if target_msg.sender == current_user or current_user in admins:
             db.session.delete(target_msg)
             db.session.commit()
                 
