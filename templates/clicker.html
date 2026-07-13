@@ -14,7 +14,9 @@
         
         .game-box { background: #333; border: 3px solid #00adb5; border-radius: 12px; padding: 30px; width: 350px; text-align: center; box-sizing: border-box; }
         .click-btn { width: 160px; height: 160px; border-radius: 50%; background: #00adb5; color: white; font-size: 20px; font-weight: bold; border: none; cursor: pointer; box-shadow: 0 0 15px rgba(0,173,181,0.4); transition: transform 0.05s; margin: 20px 0; user-select: none; -webkit-user-select: none; }
-        .click-btn:active { transform: scale(0.95); background: #008c9e; }
+        
+        /* .active Klasse hinzugefügt, damit das Einsinken auch via Keyboard-Events triggert */
+        .click-btn:active, .click-btn.active { transform: scale(0.95); background: #008c9e; }
         .click-btn:disabled { background: #555; box-shadow: none; cursor: not-allowed; }
         .stats { font-size: 22px; margin: 10px 0; }
         
@@ -99,12 +101,23 @@
             }
         });
 
-        // BEHOBEN: Leertasten-Support korrigiert (ID war falsch)
+        // GEÄNDERT: Unterstützt jetzt Leertaste (Space) und Enter
         window.addEventListener('keydown', function(e) {
-            if (e.code === 'Space' || e.keyCode === 32) {
-                e.preventDefault(); 
+            if (e.code === 'Space' || e.code === 'Enter' || e.keyCode === 32 || e.keyCode === 13) {
+                e.preventDefault(); // Verhindert das automatische Scrollen bei Leertaste
+                
                 if (clickBtn && !clickBtn.disabled) {
+                    clickBtn.classList.add('active'); // Visueller Klick-Effekt an
                     clickBtn.click(); 
+                }
+            }
+        });
+
+        // Setzt den visuellen Klick-Effekt wieder zurück, sobald man die Taste loslässt
+        window.addEventListener('keyup', function(e) {
+            if (e.code === 'Space' || e.code === 'Enter' || e.keyCode === 32 || e.keyCode === 13) {
+                if (clickBtn) {
+                    clickBtn.classList.remove('active'); // Visueller Klick-Effekt aus
                 }
             }
         });
@@ -113,6 +126,7 @@
             gameActive = false;
             clearInterval(timerInterval);
             clickBtn.disabled = true;
+            clickBtn.classList.remove('active');
             hintEl.textContent = `Fertig! Du hast ${clicks} Klicks geschafft.`;
             resetBtn.style.display = "inline-block";
 
