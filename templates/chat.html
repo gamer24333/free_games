@@ -26,8 +26,9 @@
     <br><a href="/welcome" class="btn btn-back">⬅️ Dashboard</a>
     <h1>💬 Chat-Zentrale</h1>
 
-    <div class="layout">
-        <div class="sidebar">
+    <div class="chat-wrapper">
+        
+        <div class="chat-sidebar">
             <h3>Räume</h3>
             <a href="/chat" class="{% if room == 'global' %}active{% endif %}">
                 <span>🌍 Gruppen-Chat</span>
@@ -70,14 +71,14 @@
             </div>
 
             <div class="emoji-bar" style="text-align: left; margin-bottom: 5px; padding: 5px 0;">
-                <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">😀</span>
-                <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">😂</span>
-                <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">💀</span>
-                <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">🔥</span>
-                <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">🤫</span>
-                <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">👍</span>
-                <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">👀</span>
-                <span class="emoji-btn" style="cursor: pointer; font-size: 20px; margin-right: 8px;">💯</span>
+                <span class="emoji-btn">😀</span>
+                <span class="emoji-btn">😂</span>
+                <span class="emoji-btn">💀</span>
+                <span class="emoji-btn">🔥</span>
+                <span class="emoji-btn">🤫</span>
+                <span class="emoji-btn">👍</span>
+                <span class="emoji-btn">👀</span>
+                <span class="emoji-btn">💯</span>
             </div>
 
             <form class="chat-input-area" id="chatForm" style="display: flex; gap: 8px; align-items: center;">
