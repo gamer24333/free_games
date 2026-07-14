@@ -679,13 +679,15 @@ def ttt_move(game_id):
 
 @app.route('/tankroyale')
 def tankroyale_menu():
-    if 'username' not in session: return redirect(url_for('login'))
+    if 'username' not in session: 
+        return redirect(url_for('login'))
     gegner_liste = sorted([s for s in KLASSEN_LISTE if s != session['username']])
     return render_template('tank_royale_menu.html', gegner_liste=gegner_liste)
 
 @app.route('/tankroyale/invite', methods=['POST'])
 def tankroyale_invite():
-    if 'username' not in session: return redirect(url_for('login'))
+    if 'username' not in session: 
+        return redirect(url_for('login'))
     gegner = request.form.get('gegner')
     me = session['username']
     
@@ -693,8 +695,9 @@ def tankroyale_invite():
     existing = TankGame.query.filter_by(game_id=game_id).first()
     if existing:
         db.session.delete(existing)
+        db.session.commit() # Direkt committen, um Konflikte zu vermeiden
     
-    # Gelände einmalig generieren (900 Punkte für die Canvas-Breite)
+    # Gelände einmalig generieren (901 Punkte für Canvas-Breite 900)
     terrain_points = []
     for x in range(901):
         y = 400 + math.sin(x * 0.008) * 40 + math.cos(x * 0.02) * 10
@@ -702,10 +705,14 @@ def tankroyale_invite():
     
     terrain_json = json.dumps(terrain_points)
 
+    # Start-State angepasst auf standardmäßig 3x Berta, 2x Triple (passend zum HTML-Fallback)
     new_game = TankGame(
-        game_id=game_id, ersteller=me, gegner=gegner,
-        state="100,100,80,620,100,100,1,1,1,1,-1,-1,0", 
-        turn=me, status="eingeladen",
+        game_id=game_id, 
+        ersteller=me, 
+        gegner=gegner,
+        state="100,100,80,620,100,100,3,2,3,2,-1,-1,0", 
+        turn=me, 
+        status="eingeladen",
         terrain=terrain_json
     )
     db.session.add(new_game)
@@ -714,7 +721,8 @@ def tankroyale_invite():
 
 @app.route('/tankroyale/accept/<game_id>', methods=['POST'])
 def tankroyale_accept(game_id):
-    if 'username' not in session: return redirect(url_for('login'))
+    if 'username' not in session: 
+        return redirect(url_for('login'))
     g = TankGame.query.filter_by(game_id=game_id).first()
     if g:
         g.status = "aktiv"
@@ -723,7 +731,8 @@ def tankroyale_accept(game_id):
 
 @app.route('/tankroyale/decline/<game_id>', methods=['POST'])
 def tankroyale_decline(game_id):
-    if 'username' not in session: return redirect(url_for('login'))
+    if 'username' not in session: 
+        return redirect(url_for('login'))
     g = TankGame.query.filter_by(game_id=game_id).first()
     if g:
         db.session.delete(g)
@@ -732,7 +741,8 @@ def tankroyale_decline(game_id):
 
 @app.route('/tankroyale/match/<game_id>')
 def tankroyale_match(game_id):
-    if 'username' not in session: return redirect(url_for('login'))
+    if 'username' not in session: 
+        return redirect(url_for('login'))
     return render_template('tank_royale_match.html', gameId=game_id, me=session['username'])
 
 @app.route('/api/tankroyale/status/<game_id>')
@@ -744,11 +754,9 @@ def tank_status(game_id):
     state_str = g.state or ""
     raw_parts = state_str.split(',') if state_str else []
     
-    # Absolute Sicherheit: Wenn das Array beschädigt ist oder Werte fehlen,
-    # füllen wir es mit sicheren Standardwerten auf.
+    # Absolute Sicherheit bei beschädigten States im Client
     if len(raw_parts) < 13:
         default_parts = ["100", "100", "80", "620", "100", "100", "3", "2", "3", "2", "-1", "-1", "0"]
-        # Bestehende Werte übernehmen, soweit vorhanden
         for i in range(len(raw_parts)):
             if raw_parts[i] and raw_parts[i] != "NaN":
                 default_parts[i] = raw_parts[i]
@@ -756,7 +764,6 @@ def tank_status(game_id):
         g.state = ",".join(raw_parts)
         db.session.commit()
     
-    # Fehlerhafte "NaN" Strings filtern, bevor int(float()) gecashed wird
     def safe_int(val, default=0):
         try:
             return int(float(val))
@@ -792,43 +799,53 @@ def tank_shoot(game_id):
     
     g = TankGame.query.filter_by(game_id=game_id).first()
     if g and g.status == "aktiv" and g.turn == me:
-        # Geländedaten aktualisieren, falls im Request-Body übergeben
+        # Deformiertes Gelände aus dem Schuss-Post übernehmen
         if "updated_terrain" in data and data["updated_terrain"]:
             g.terrain = json.dumps(data["updated_terrain"])
 
         raw_parts = g.state.split(',') if g.state else []
+        
+        # Helfer für die String-Konvertierung, um NaN-Abstürze zu blockieren
+        def safe_float_convert(val, default=0):
+            try:
+                return int(float(val))
+            except (ValueError, TypeError):
+                return default
+
         if len(raw_parts) < 13:
             st = [100, 100, int(g.p1_x or 80), int(g.p2_x or 620), 100, 100, 3, 2, 3, 2, -1, -1, 0]
         else:
-            st = [int(float(x)) for x in raw_parts]
+            st = [safe_float_convert(x) for x in raw_parts]
         
         # X-Positionen updaten
-        if data.get('new_p1_x') is not None: st[2] = int(float(data.get('new_p1_x')))
-        if data.get('new_p2_x') is not None: st[3] = int(float(data.get('new_p2_x')))
+        if data.get('new_p1_x') is not None: 
+            st[2] = safe_float_convert(data.get('new_p1_x'))
+        if data.get('new_p2_x') is not None: 
+            st[3] = safe_float_convert(data.get('new_p2_x'))
         
-        # SCHUTZ: Nur der aktive Spieler darf seinen EIGENEN Tank leeren (Senden vom Frontend)
+        # Benzinverbrauch synchronisieren
         if me == g.ersteller:
             if data.get('new_p1_fuel') is not None: 
-                st[4] = int(float(data.get('new_p1_fuel')))
+                st[4] = safe_float_convert(data.get('new_p1_fuel'))
         else:
             if data.get('new_p2_fuel') is not None: 
-                st[5] = int(float(data.get('new_p2_fuel')))
+                st[5] = safe_float_convert(data.get('new_p2_fuel'))
 
         # --- EFFEKTE BERECHNEN ---
         if hit == "crate_collected":
             if me == g.ersteller:
-                st[0] += 25
-                st[4] = 100  # P1 Tank randvoll
-                st[6] += 1   # Waffennachschub
-                st[7] += 1   
+                st[0] = min(100, st[0] + 25) # Max HP Limitierung
+                st[4] = 100  # P1 Tank voll
+                st[6] += 1   # Berta +1
+                st[7] += 1   # Triple +1
             else:
-                st[1] += 25
-                st[5] = 100  # P2 Tank randvoll
+                st[1] = min(100, st[1] + 25) # Max HP Limitierung
+                st[5] = 100  # P2 Tank voll
                 st[8] += 1
                 st[9] += 1
-            st[12] = 0       # Kiste einsammeln und vom Feld nehmen
+            st[12] = 0       # Kiste vom Feld nehmen
         else:
-            # Normaler Schuss: Munition abziehen
+            # Schuss-Munition abziehen
             if me == g.ersteller:
                 if waffentyp == "berta": st[6] = max(0, st[6] - 1)
                 elif waffentyp == "triple": st[7] = max(0, st[7] - 1)
@@ -836,27 +853,29 @@ def tank_shoot(game_id):
                 if waffentyp == "berta": st[8] = max(0, st[8] - 1)
                 elif waffentyp == "triple": st[9] = max(0, st[9] - 1)
 
-            # Schaden berechnen
-            schaden = 25
+            # Schaden abziehen
+            schaden = 20
             if waffentyp == "berta": schaden = 45
             elif waffentyp == "triple": schaden = 18
 
-            if hit == "p1": st[0] = max(0, st[0] - schaden)
-            elif hit == "p2": st[1] = max(0, st[1] - schaden)
+            if hit == "p1": 
+                st[0] = max(0, st[0] - schaden)
+            elif hit == "p2": 
+                st[1] = max(0, st[1] - schaden)
 
-        # Neue Kiste spawnen (35% Chance), wenn aktuell keine aktiv ist
+        # Neue Kiste spawnen (35% Chance), falls aktuell keine da ist
         if st[12] == 0 and random.random() < 0.35:
             st[10] = random.randint(150, 750)
             st[11] = 0
             st[12] = 1
 
-        # Synchronisierung mit Datenbank-Feldern
+        # DB-Felder aktualisieren
         g.p1_hp, g.p2_hp = st[0], st[1]
         g.p1_x, g.p2_x = st[2], st[3]
         g.state = ",".join(str(x) for x in st)
         g.last_shot = f"{angle},{power}"
         
-        # Spielstatus / Turn-Wechsel prüfen
+        # Spielende / Rundenwechsel
         if st[0] <= 0:
             g.status = f"gewonnen_{g.gegner}"
         elif st[1] <= 0:
