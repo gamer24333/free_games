@@ -5,25 +5,108 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Klassen-Clicker</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 30px; }
+        /* Grunddesign und Kontrastbereiche */
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: #222;
+            font-family: Arial, sans-serif;
+            color: white;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header-bar {
+            background-color: #161616;
+            padding: 20px 10px;
+            text-align: center;
+            border-bottom: 2px solid #2d2d2d;
+            box-sizing: border-box;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px 10px;
+            box-sizing: border-box;
+        }
+
+        .footer-bar {
+            background-color: #161616;
+            padding: 15px 10px;
+            text-align: center;
+            border-top: 2px solid #2d2d2d;
+            font-size: 14px;
+            color: #888;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            margin: 10px 0 0 0;
+            font-size: 28px;
+        }
+
         .btn { display: inline-block; padding: 12px 24px; background: #00adb5; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
         .btn:hover { background: #007c82; }
-        .btn-back { background: #555; margin-bottom: 20px; }
-        
-        /* Neuer Button-Style für das Vollbild */
-        .btn-fullscreen { background: #ff9f43; color: black; margin-bottom: 20px; font-size: 16px; }
+        .btn-back { background: #555; margin-right: 15px; }
+        .btn-fullscreen { background: #ff9f43; color: black; font-size: 16px; }
         .btn-fullscreen:hover { background: #e08b35; }
         
-        .game-layout { display: flex; justify-content: center; align-items: flex-start; gap: 40px; max-width: 900px; margin: 0 auto; padding: 20px; flex-wrap: wrap; }
+        .game-layout { display: flex; justify-content: center; align-items: flex-start; gap: 40px; max-width: 900px; margin: 0 auto; flex-wrap: wrap; }
         
-        .game-box { background: #333; border: 3px solid #00adb5; border-radius: 12px; padding: 30px; width: 350px; text-align: center; box-sizing: border-box; }
+        /* SPIELBOX (Der Bereich, der ins Vollbild geht) */
+        .game-box { 
+            background: #333; 
+            border: 3px solid #00adb5; 
+            border-radius: 12px; 
+            padding: 30px; 
+            width: 350px; 
+            text-align: center; 
+            box-sizing: border-box; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
+            transition: all 0.2s ease;
+        }
+
+        /* Automatisches CSS-Styling, sobald die Box im Vollbildmodus ist */
+        .game-box:fullscreen {
+            width: 100vw;
+            height: 100vh;
+            border: none;
+            border-radius: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: #222; /* Hintergrundfarbe im Vollbild */
+        }
+        
+        /* Vendor-Präfixe für andere Browser-Engines im Vollbild */
+        .game-box:-webkit-full-screen { width: 100vw; height: 100vh; border: none; border-radius: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #222; }
+        .game-box:-ms-fullscreen { width: 100vw; height: 100vh; border: none; border-radius: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #222; }
+
         .click-btn { width: 160px; height: 160px; border-radius: 50%; background: #00adb5; color: white; font-size: 20px; font-weight: bold; border: none; cursor: pointer; box-shadow: 0 0 15px rgba(0,173,181,0.4); transition: transform 0.05s; margin: 20px 0; user-select: none; -webkit-user-select: none; }
         
+        /* Skaliert den Button im Vollbildmodus etwas hoch, damit er besser zu treffen ist */
+        .game-box:fullscreen .click-btn {
+            width: 220px;
+            height: 220px;
+            font-size: 26px;
+        }
+        .game-box:-webkit-full-screen .click-btn { width: 220px; height: 220px; font-size: 26px; }
+
         .click-btn:active, .click-btn.active { transform: scale(0.95); background: #008c9e; }
         .click-btn:disabled { background: #555; box-shadow: none; cursor: not-allowed; }
         .stats { font-size: 22px; margin: 10px 0; }
         
-        .leaderboard-box { background: #333; border: 2px solid #444; border-radius: 12px; width: 300px; padding: 20px; box-sizing: border-box; text-align: left; }
+        /* Vergrößert die Schriftwerte im Vollbild */
+        .game-box:fullscreen .stats { font-size: 32px; }
+        .game-box:-webkit-full-screen .stats { font-size: 32px; }
+        
+        .leaderboard-box { background: #333; border: 2px solid #444; border-radius: 12px; width: 300px; padding: 20px; box-sizing: border-box; text-align: left; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         .leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         .leaderboard-table th, .leaderboard-table td { padding: 8px; border-bottom: 1px solid #444; text-align: left; }
         .leaderboard-table th { color: #00adb5; }
@@ -32,43 +115,50 @@
 </head>
 <body>
 
-    <a href="/games" class="btn btn-back">⬅️ Zurück zu den Spielen</a>
-    <button id="fullscreenBtn" class="btn btn-fullscreen">📺 Vollbildmodus</button>
+    <div class="header-bar">
+        <a href="/games" class="btn btn-back">⬅️ Zurück</a>
+        <button id="fullscreenBtn" class="btn btn-fullscreen">📺 Vollbildmodus</button>
+        <h1>⚡ Der 10-Sekunden-Clicker-Test</h1>
+    </div>
 
-    <h1>⚡ Der 10-Sekunden-Clicker-Test</h1>
+    <div class="main-content">
+        <div class="game-layout">
+            <div class="game-box" id="gameBox">
+                <div class="stats">Zeit: <b id="timer" style="color: #ff2e63;">10</b>s</div>
+                <div class="stats">Klicks: <b id="score" style="color: #00adb5;">0</b></div>
+                
+                <button id="clickMe" class="click-btn">KLICK MICH!</button>
+                
+                <p id="hint" style="color: #aaa;">Klicke einmal, um zu starten!</p>
+                <button id="resetBtn" class="btn" style="display:none; margin-top:10px; background: #ff2e63;">Nochmal versuchen</button>
+            </div>
+            
+            <div class="leaderboard-box">
+                <h3 style="margin-top: 0; color: #f9d423; text-align: center;">🏆 Clicker-Rangliste</h3>
+                <table class="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th>Platz</th>
+                            <th>Name</th>
+                            <th>Klicks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for player, score in leaderboard %}
+                        <tr>
+                            <td>{{ loop.index }}.</td>
+                            <td>{{ player }}</td>
+                            <td>{{ score }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 
-    <div class="game-layout">
-        <div class="game-box">
-            <div class="stats">Zeit: <b id="timer" style="color: #ff2e63;">10</b>s</div>
-            <div class="stats">Klicks: <b id="score" style="color: #00adb5;">0</b></div>
-            
-            <button id="clickMe" class="click-btn">KLICK MICH!</button>
-            
-            <p id="hint" style="color: #aaa;">Klicke einmal, um zu starten!</p>
-            <button id="resetBtn" class="btn" style="display:none; margin-top:10px; background: #ff2e63;">Nochmal versuchen</button>
-        </div>
-        
-        <div class="leaderboard-box">
-            <h3 style="margin-top: 0; color: #f9d423; text-align: center;">🏆 Clicker-Rangliste</h3>
-            <table class="leaderboard-table">
-                <thead>
-                    <tr>
-                        <th>Platz</th>
-                        <th>Name</th>
-                        <th>Klicks</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for player, score in leaderboard %}
-                    <tr>
-                        <td>{{ loop.index }}.</td>
-                        <td>{{ player }}</td>
-                        <td>{{ score }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+    <div class="footer-bar">
+        <span>Viel Erfolg! Gib alles und knacke den Highscore! 🚀</span>
     </div>
 
     <script>
@@ -84,23 +174,24 @@
         const hintEl = document.getElementById('hint');
         const resetBtn = document.getElementById('resetBtn');
         const fullscreenBtn = document.getElementById('fullscreenBtn');
+        
+        // Holt die Spielbox statt der ganzen Seite
+        const gameBox = document.getElementById('gameBox');
 
-        // Hilfsvariable für die Tastatursteuerung (Verhindert Spam durch Gedrückthalten)
         let isKeyPressed = false;
 
-        // --- VOLLBILD STEUERUNG ---
+        // --- SPEZIFISCHE VOLLBILD STEUERUNG ---
         fullscreenBtn.addEventListener('click', () => {
             if (!document.fullscreenElement) {
-                // Versuche die gesamte Seite ins Vollbild zu bringen
-                const element = document.documentElement;
-                if (element.requestFullscreen) {
-                    element.requestFullscreen();
-                } else if (element.mozRequestFullScreen) { /* Firefox */
-                    element.mozRequestFullScreen();
-                } else if (element.webkitRequestFullscreen) { /* Chrome, Safari, Opera */
-                    element.webkitRequestFullscreen();
-                } else if (element.msRequestFullscreen) { /* IE/Edge */
-                    element.msRequestFullscreen();
+                // Wir schicken nur das "gameBox"-Div ins Vollbild!
+                if (gameBox.requestFullscreen) {
+                    gameBox.requestFullscreen();
+                } else if (gameBox.mozRequestFullScreen) {
+                    gameBox.mozRequestFullScreen();
+                } else if (gameBox.webkitRequestFullscreen) {
+                    gameBox.webkitRequestFullscreen();
+                } else if (gameBox.msRequestFullscreen) {
+                    gameBox.msRequestFullscreen();
                 }
                 fullscreenBtn.textContent = "📺 Vollbild beenden";
             } else {
@@ -111,7 +202,6 @@
             }
         });
 
-        // Falls der Nutzer mit "Esc" das Vollbild manuell verlässt
         document.addEventListener('fullscreenchange', () => {
             if (!document.fullscreenElement) {
                 fullscreenBtn.textContent = "📺 Vollbildmodus";
@@ -141,12 +231,12 @@
             }
         });
 
-        // Keyboard-Event mit Spam-Schutz (Man muss die Taste jedes Mal neu drücken)
+        // Tastatursteuerung
         window.addEventListener('keydown', function(e) {
             if (e.code === 'Space' || e.code === 'Enter' || e.keyCode === 32 || e.keyCode === 13) {
-                e.preventDefault(); // Verhindert das lästige Scrollen im Browser
+                e.preventDefault();
                 
-                if (isKeyPressed) return; // Blockiert, wenn die Taste bereits gehalten wird
+                if (isKeyPressed) return;
                 isKeyPressed = true;
 
                 if (clickBtn && !clickBtn.disabled) {
@@ -182,7 +272,16 @@
                 
                 if (response.ok) {
                     setTimeout(() => {
-                        window.location.reload();
+                        // Verlasse vor dem Neuladen den Vollbildmodus, damit die Seite nicht hängen bleibt
+                        if (document.fullscreenElement) {
+                            document.exitFullscreen().then(() => {
+                                window.location.reload();
+                            }).catch(() => {
+                                window.location.reload();
+                            });
+                        } else {
+                            window.location.reload();
+                        }
                     }, 1500);
                 }
             } catch (e) { 
