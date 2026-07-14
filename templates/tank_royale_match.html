@@ -53,13 +53,13 @@
         const lockStatusText = document.getElementById('lockStatus');
 
         let gameState = {};
-        let bullet = null;
+        let bullets = []; // Geändert von 'bullet' zu einem Array für Mehrfachschüsse
         const gravity = 0.15;
 
         let myAngle = 45;
-        let myPower = 12; // Startpower angepasst
+        let myPower = 12; 
         let myXOffset = 0;
-        let isAiming = false; // Für flüssiges Ziehen
+        let isAiming = false; 
         let selectedWeapon = 'standard';
 
         let myFuel = 100;
@@ -83,9 +83,8 @@
             document.getElementById(`wpn-${type}`).classList.add('active');
         }
 
-        // Zentrale Rechenfunktion für Maus und Touch (Verhindert Absturz & skaliert Power korrekt)
         function calculateAim(clientX, clientY) {
-            if (gameState.turn !== me || gameState.status !== "aktiv" || bullet !== null) return;
+            if (gameState.turn !== me || gameState.status !== "aktiv" || bullets.length > 0) return;
             const rect = canvas.getBoundingClientRect();
             const mouseX = ((clientX - rect.left) / rect.width) * canvas.width;
             const mouseY = ((clientY - rect.top) / rect.height) * canvas.height;
@@ -101,31 +100,26 @@
             myAngle = Math.round(rad * (180 / Math.PI));
             if (myAngle < 0) myAngle = 0; if (myAngle > 90) myAngle = 90;
             
-            // Fix: Höhere maximale Power (bis zu 16), damit die Linie weit genug fliegt und nicht einfriert
             let distance = Math.sqrt(dx*dx + dy*dy);
             myPower = Math.min(16, Math.max(4, Math.round(distance / 25)));
             
             lockStatusText.innerText = `Winkel: ${myAngle}° | Kraft: ${myPower}`;
         }
 
-        // --- MAUS STEUERUNG ---
+        // Mouse & Touch Inputs...
         canvas.addEventListener('mousedown', (e) => { isAiming = true; calculateAim(e.clientX, e.clientY); });
         canvas.addEventListener('mousemove', (e) => { if (isAiming) calculateAim(e.clientX, e.clientY); });
         window.addEventListener('mouseup', () => { isAiming = false; });
-
-        // --- IPAD / TOUCH STEUERUNG ---
         canvas.addEventListener('touchstart', (e) => {
             isAiming = true;
             if(e.touches.length > 0) calculateAim(e.touches[0].clientX, e.touches[0].clientY);
             if (e.cancelable) e.preventDefault();
         }, { passive: false });
-
         canvas.addEventListener('touchmove', (e) => {
             if (!isAiming) return;
             if(e.touches.length > 0) calculateAim(e.touches[0].clientX, e.touches[0].clientY);
             if (e.cancelable) e.preventDefault();
         }, { passive: false });
-
         window.addEventListener('touchend', () => { isAiming = false; });
 
         async function updateStatus() {
@@ -160,7 +154,7 @@
                 }
 
                 const isMyTurn = (gameState.turn === me && gameState.status === "aktiv");
-                shootBtn.disabled = !isMyTurn || bullet !== null;
+                shootBtn.disabled = !isMyTurn || bullets.length > 0;
                 if (gameState.status === "aktiv") {
                     document.getElementById('matchInfo').innerText = isMyTurn ? "🔴 DU BIST DRAN!" : `⏳ ${gameState.turn} zielt...`;
                 } else if (gameState.status.startsWith("gewonnen")) {
@@ -172,7 +166,7 @@
         }
         
         function handleInput() {
-            if (gameState.turn !== me || gameState.status !== "aktiv" || bullet !== null) return;
+            if (gameState.turn !== me || gameState.status !== "aktiv" || bullets.length > 0) return;
             if (myFuel > 0) {
                 if (keys['a'] || keys['A'] || moveLeftActive) { myXOffset -= 1.5; myFuel -= 0.5; }
                 if (keys['d'] || keys['D'] || moveRightActive) { myXOffset += 1.5; myFuel -= 0.5; }
@@ -180,7 +174,6 @@
             }
         }
 
-        // Touch-Unterstützung für die Bewegungsknöpfe unten
         ['touchstart', 'mousedown'].forEach(evt => {
             document.getElementById('moveLeftBtn').addEventListener(evt, (e) => { moveLeftActive = true; e.preventDefault(); });
             document.getElementById('moveRightBtn').addEventListener(evt, (e) => { moveRightActive = true; e.preventDefault(); });
@@ -240,27 +233,24 @@
 
             [p1, p2].forEach(p => {
                 ctx.save();
-                // Detaillierterer Panzer (Ketten + Gehäuse + Kuppel)
                 ctx.fillStyle = '#333'; ctx.fillRect(p.x - 22, p.y + 8, 44, 8);
                 ctx.fillStyle = p.color; ctx.fillRect(p.x - 18, p.y, 36, 10);
                 ctx.beginPath(); ctx.arc(p.x, p.y, 8, Math.PI, 0); ctx.fill();
 
-                // Rohr ausrichten
                 let rad = (p.name === me ? myAngle : 45) * Math.PI / 180;
                 let direction = p.dX; 
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(p.x, p.y - 2);
                 ctx.lineTo(p.x + Math.cos(rad) * 18 * direction, p.y - 2 - Math.sin(rad) * 18);
                 ctx.stroke(); ctx.restore();
 
-                // Beschriftung & HUD über den Panzern
                 ctx.fillStyle = '#fff'; ctx.font = "bold 15px Arial";
                 ctx.fillText(`${p.name} (${p.hp} HP)`, p.x - 35, p.y - 35);
                 ctx.fillStyle = '#555'; ctx.fillRect(p.x - 20, p.y - 15, 40, 5);
                 ctx.fillStyle = '#76ff03'; ctx.fillRect(p.x - 20, p.y - 15, (p.fuel / 100) * 40, 5);
             });
 
-            // Ziel-Hilfslinie (Berechnung synchronisiert mit `myPower`)
-            if (gameState.turn === me && !bullet && gameState.status === "aktiv") {
+            // Ziel-Hilfslinie
+            if (gameState.turn === me && bullets.length === 0 && gameState.status === "aktiv") {
                 let activeTank = amIErsteller ? p1 : p2;
                 let rad = (myAngle * Math.PI) / 180;
                 let pX = activeTank.x; let pY = activeTank.y - 2;
@@ -271,38 +261,79 @@
                 ctx.stroke(); ctx.setLineDash([]);
             }
 
-            // Projektilflug & Kollisionsabfrage
-            if (bullet) {
-                bullet.vy += gravity; bullet.x += bullet.vx; bullet.y += bullet.vy;
-                ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(bullet.x, bullet.y, selectedWeapon === 'berta' ? 8 : 5, 0, Math.PI*2); ctx.fill();
+            // NEU: Berechnung ALLER aktiven Projektile im Array
+            if (bullets.length > 0) {
+                let hitRegistered = false;
+                let finalHitType = "none";
 
-                let target = amIErsteller ? p2 : p1;
-                if (bullet.x > target.x - 20 && bullet.x < target.x + 20 && bullet.y > target.y && bullet.y < target.y + 18) {
-                    sendShotResult(myAngle, myPower, amIErsteller ? "p2" : "p1", p1.x, p2.x);
-                    bullet = null;
-                } 
-                else if (bullet.x >= 0 && bullet.x <= canvas.width && bullet.y > terrainPoints[Math.floor(bullet.x)]) {
-                    destroyTerrain(bullet.x, selectedWeapon === 'berta' ? 45 : 25);
-                    sendShotResult(myAngle, myPower, "none", p1.x, p2.x);
-                    bullet = null;
-                }
-                else if (bullet.x < 0 || bullet.x > canvas.width || bullet.y > canvas.height) { // Spielfeldrand absichern
-                    sendShotResult(myAngle, myPower, "none", p1.x, p2.x);
-                    bullet = null;
+                bullets.forEach((bullet, index) => {
+                    if (!bullet.active) return;
+
+                    bullet.vy += gravity; bullet.x += bullet.vx; bullet.y += bullet.vy;
+                    ctx.fillStyle = '#fff'; ctx.beginPath(); 
+                    ctx.arc(bullet.x, bullet.y, bullet.type === 'berta' ? 8 : 5, 0, Math.PI*2); 
+                    ctx.fill();
+
+                    let target = amIErsteller ? p2 : p1;
+                    
+                    // Kollision mit gegnerischem Panzer
+                    if (bullet.x > target.x - 20 && bullet.x < target.x + 20 && bullet.y > target.y && bullet.y < target.y + 18) {
+                        bullet.active = false;
+                        hitRegistered = true;
+                        finalHitType = amIErsteller ? "p2" : "p1";
+                    } 
+                    // Kollision mit Boden
+                    else if (bullet.x >= 0 && bullet.x <= canvas.width && bullet.y > terrainPoints[Math.floor(bullet.x)]) {
+                        destroyTerrain(bullet.x, bullet.type === 'berta' ? 45 : 25);
+                        bullet.active = false;
+                        hitRegistered = true;
+                    }
+                    // Out of bounds
+                    else if (bullet.x < 0 || bullet.x > canvas.width || bullet.y > canvas.height) {
+                        bullet.active = false;
+                    }
+                });
+
+                // Prüfen ob alle Kugeln eingeschlagen sind
+                if (bullets.every(b => !b.active)) {
+                    bullets = []; // Array leeren
+                    sendShotResult(myAngle, myPower, finalHitType, p1.x, p2.x);
                 }
             }
         }
         
         function fireTank() {
-            if (gameState.turn !== me || gameState.status !== "aktiv" || bullet !== null) return;
-            let rad = (myAngle * Math.PI) / 180;
+            if (gameState.turn !== me || gameState.status !== "aktiv" || bullets.length > 0) return;
             let amIErsteller = (me === gameState.ersteller);
             let currentX = Math.max(20, Math.min(canvas.width - 20, (amIErsteller ? gameState.p1_x + myXOffset : gameState.p2_x + myXOffset)));
-            bullet = {
-                x: currentX, y: terrainPoints[Math.floor(currentX)] - 17,
-                vx: Math.cos(rad) * (myPower * 1.2) * (amIErsteller ? 1 : -1),
-                vy: -Math.sin(rad) * (myPower * 1.2)
-            };
+            let startY = terrainPoints[Math.floor(currentX)] - 17;
+
+            bullets = []; // Sicherstellen, dass das Array leer ist
+
+            if (selectedWeapon === 'triple') {
+                // Streuschuss feuert 3 Kugeln mit versetzten Winkeln (-6°, 0°, +6°)
+                let offsets = [-6, 0, 6];
+                offsets.forEach(offset => {
+                    let rad = ((myAngle + offset) * Math.PI) / 180;
+                    bullets.push({
+                        x: currentX, y: startY,
+                        vx: Math.cos(rad) * (myPower * 1.2) * (amIErsteller ? 1 : -1),
+                        vy: -Math.sin(rad) * (myPower * 1.2),
+                        type: 'triple',
+                        active: true
+                    });
+                });
+            } else {
+                // Normaler Schuss oder Dicke Berta (1 Kugel)
+                let rad = (myAngle * Math.PI) / 180;
+                bullets.push({
+                    x: currentX, y: startY,
+                    vx: Math.cos(rad) * (myPower * 1.2) * (amIErsteller ? 1 : -1),
+                    vy: -Math.sin(rad) * (myPower * 1.2),
+                    type: selectedWeapon,
+                    active: true
+                });
+            }
             shootBtn.disabled = true;
         }
 
