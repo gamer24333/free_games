@@ -179,6 +179,7 @@ def dashboard():
     # --- NEU: Spezial-Nachricht für eine bestimmte Person trigger ---
     # Ersetze "Ben" mit dem Namen der gewünschten Person aus deiner KLASSEN_LISTE
     zeige_spezial_nachricht = (me == "Liam") 
+    spezial_nachricht_id = "nachricht_v1"  # <- Wenn du eine NEUE Nachricht senden willst, ändere das z.B. in "nachricht_v2"
     
     aktive_matches = []
     
@@ -193,13 +194,13 @@ def dashboard():
     user = UserSetting.query.filter_by(username=me).first()
     is_admin = True if (me == "Till" or (user and user.is_admin)) else False
     
-    # Übergib 'zeige_spezial_nachricht' an das Template
+    # Übergib die ID zusätzlich an das Template
     return render_template('dashboard.html', 
-                           name=me, 
-                           einladungen=aktive_matches, 
-                           is_admin=is_admin, 
-                           zeige_spezial_nachricht=zeige_spezial_nachricht)
-
+                       name=me, 
+                       einladungen=aktive_matches, 
+                       is_admin=is_admin, 
+                       zeige_spezial_nachricht=zeige_spezial_nachricht,
+                       spezial_nachricht_id=spezial_nachricht_id) # <- NEU
 
 @app.route('/api/dashboard-stats')
 def dashboard_stats():
