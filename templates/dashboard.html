@@ -67,6 +67,10 @@
         </a>
         
         <a href="/games" class="btn" style="background: #2ecc71;">🎮 Spiele-Zentrale</a>
+        
+        <button id="fullscreen-btn" onclick="toggleFullscreen()" class="btn" style="background: #eccc68; color: #222; border: none; cursor: pointer;">
+            📺 Vollbildmodus (F)
+        </button>
     </div>
 
     {% if einladungen %}
@@ -123,12 +127,9 @@
     // --- Logik für das Einmalige Overlay (Mit ID-Prüfung) ---
     {% if zeige_spezial_nachricht %}
     document.addEventListener("DOMContentLoaded", function() {
-        // Wir holen uns die ID aus Python (Sollte in app.py übergeben werden)
-        // Falls in Python vergessen wurde eine ID zu senden, nutzen wir standardmäßig "version_1"
         const nachrichtId = "{{ spezial_nachricht_id }}" || "version_1";
         const storageKey = "gesehen_" + nachrichtId;
         
-        // Wenn dieser Browser diese spezifische Nachrichten-ID noch nicht gesehen hat: anzeigen!
         if (!localStorage.getItem(storageKey)) {
             document.getElementById("special-overlay").style.display = "flex";
         }
@@ -140,10 +141,56 @@
         const nachrichtId = "{{ spezial_nachricht_id }}" || "version_1";
         const storageKey = "gesehen_" + nachrichtId;
         
-        // Speichert dauerhaft ab, dass genau DIESE Nachricht gesehen wurde
         localStorage.setItem(storageKey, "true");
     }
     {% endif %}
+
+    // --- NEU: VOLLBILD LOGIK (Button + Tasten F / F11) ---
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen()
+                .then(() => {
+                    document.getElementById("fullscreen-btn").textContent = "📺 Vollbild beenden";
+                })
+                .catch((err) => {
+                    console.error("Fehler beim Aktivieren des Vollbildmodus:", err.message);
+                });
+        } else {
+            document.exitFullscreen()
+                .then(() => {
+                    document.getElementById("fullscreen-btn").textContent = "📺 Vollbildmodus (F)";
+                });
+        }
+    }
+
+    // Tastatur-Event-Listener für F und F11
+    document.addEventListener("keydown", function(event) {
+        // 'f' oder 'F' drücken, wenn kein Textfeld fokussiert ist
+        if (event.key === "f" || event.key === "F") {
+            if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                event.preventDefault();
+                toggleFullscreen();
+            }
+        }
+        
+        // F11-Taste abfangen
+        if (event.key === "F11") {
+            event.preventDefault(); // Verhindert den Browser-Standard, um den eigenen Toggle sauber auszuführen
+            toggleFullscreen();
+        }
+    });
+
+    // Passt den Button-Text an, wenn das Vollbild z. B. per ESC-Taste verlassen wird
+    document.addEventListener("fullscreenchange", function() {
+        const btn = document.getElementById("fullscreen-btn");
+        if (btn) {
+            if (document.fullscreenElement) {
+                btn.textContent = "📺 Vollbild beenden";
+            } else {
+                btn.textContent = "📺 Vollbildmodus (F)";
+            }
+        }
+    });
 
     // --- Dein bestehendes Message-Polling-Skript ---
     async function checkNewMessages() {
