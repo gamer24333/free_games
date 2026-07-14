@@ -1,3 +1,4 @@
+HTML
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -106,25 +107,54 @@
             box-sizing: border-box;
         }
 
-        /* PERFEKTES VOLLBILD OHNE VERZERRUNG (3:4 Seitenverhältnis behalten) */
-        #flappyCanvas:fullscreen {
-            width: auto !important;
-            height: 100vh !important;
-            max-width: 75vh !important; /* 75% der Höhe entspricht dem 3:4-Verhältnis */
-            aspect-ratio: 3 / 4;
-            border: none;
-            border-radius: 0;
-            margin: 0 auto;
-            background: #70c5ce;
+        /* PERFEKTES VOLLBILD OHNE VERZERRUNG (Ganze Box wird vergrößert) */
+        .game-container:fullscreen {
+            background-color: #111;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
         }
-        #flappyCanvas:-webkit-full-screen {
+        .game-container:-webkit-full-screen {
+            background-color: #111;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+        }
+
+        /* Skaliert das Canvas im Vollbild harmonisch mit */
+        .game-container:fullscreen #flappyCanvas {
+            height: 80vh !important;
             width: auto !important;
-            height: 100vh !important;
-            max-width: 75vh !important;
+            max-width: 60vh !important;
             aspect-ratio: 3 / 4;
-            border: none;
-            border-radius: 0;
-            margin: 0 auto;
+            border-radius: 12px;
+        }
+        .game-container:-webkit-full-screen #flappyCanvas {
+            height: 80vh !important;
+            width: auto !important;
+            max-width: 60vh !important;
+            aspect-ratio: 3 / 4;
+            border-radius: 12px;
+        }
+
+        /* Passt die Textzeile im Vollbildmodus an */
+        .game-container:fullscreen .game-controls-info {
+            width: auto;
+            gap: 40px;
+            font-size: 16px;
+        }
+        .game-container:-webkit-full-screen .game-controls-info {
+            width: auto;
+            gap: 40px;
+            font-size: 16px;
         }
 
         /* Rangliste */
@@ -192,29 +222,27 @@
         const canvas = document.getElementById('flappyCanvas');
         const ctx = canvas.getContext('2d');
         const fullscreenLink = document.getElementById('fullscreenLink');
+        const gameContainer = document.querySelector('.game-container');
 
         // --- AUDIO DATEIEN ---
-        const bgMusic = new Audio('/static/sounds/music.mp3');
+        const bgMusic = new Audio('/static/flappy_bird.mp3');
         bgMusic.loop = true;
         bgMusic.volume = 0.4;
 
-        const jumpSound = new Audio('/static/sounds/wing.mp3');
-        jumpSound.volume = 0.5;
+        // Timer für das verzögerte Neuladen der Seite
+        let reloadTimeout = null;
 
-        const crashSound = new Audio('/static/sounds/hit.mp3');
-        crashSound.volume = 0.5;
-
-        // --- VOLLBILD FUNKTIONEN (Link & Taste 'F') ---
+        // --- VOLLBILD FUNKTIONEN (Auf den Container angewendet) ---
         function toggleFullscreen() {
             if (!document.fullscreenElement) {
-                if (canvas.requestFullscreen) {
-                    canvas.requestFullscreen();
-                } else if (canvas.mozRequestFullScreen) {
-                    canvas.mozRequestFullScreen();
-                } else if (canvas.webkitRequestFullscreen) {
-                    canvas.webkitRequestFullscreen();
-                } else if (canvas.msRequestFullscreen) {
-                    canvas.msRequestFullscreen();
+                if (gameContainer.requestFullscreen) {
+                    gameContainer.requestFullscreen();
+                } else if (gameContainer.mozRequestFullScreen) {
+                    gameContainer.mozRequestFullScreen();
+                } else if (gameContainer.webkitRequestFullscreen) {
+                    gameContainer.webkitRequestFullscreen();
+                } else if (gameContainer.msRequestFullscreen) {
+                    gameContainer.msRequestFullscreen();
                 }
                 fullscreenLink.textContent = "📺 [F] Vollbild beenden";
             } else {
@@ -390,11 +418,17 @@
             gameActive = false;
             bgMusic.pause();
             bgMusic.currentTime = 0;
-            crashSound.play().catch(e => console.log("Audio-Autoplay verhindert:", e));
+            
             submitScore(score);
         }
 
         function resetGame() {
+            // WICHTIG: Falls ein Neuladen der Seite aussteht, brechen wir es ab!
+            if (reloadTimeout) {
+                clearTimeout(reloadTimeout);
+                reloadTimeout = null;
+            }
+
             birdY = 200;
             birdVelocity = 0;
             score = 0;
@@ -426,8 +460,6 @@
                 bgMusic.play().catch(e => console.log("Audio-Autoplay verhindert:", e));
             } else {
                 birdVelocity = jump;
-                jumpSound.currentTime = 0;
-                jumpSound.play().catch(e => console.log("Audio-Autoplay verhindert:", e));
             }
         }
 
@@ -468,7 +500,8 @@
                     body: JSON.stringify({ score: finalScore })
                 });
                 if (response.ok) {
-                    setTimeout(() => {
+                    // Timeout-Referenz sichern
+                    reloadTimeout = setTimeout(() => {
                         window.location.reload();
                     }, 1500);
                 }
