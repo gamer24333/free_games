@@ -47,7 +47,7 @@
 
     <script>
         // Sicheres Fallback für Jinja-Variablen
-        const gameId = "{{ gameId }}".includes("{{") || !"{{ gameId }}" ? "offline_bot_game" : "{{ gameId }}";
+        const gameId = "{{ gameId }}".includes({% raw %}"{{"{% endraw %}) || !"{{ gameId }}" ? "offline_bot_game" : "{{ gameId }}";
         const me = "{{ me }}".includes("{{") || !"{{ me }}" ? "Spieler 1" : "{{ me }}";
         const gegnerName = "{{ gegner }}".includes("{{") || !"{{ gegner }}" ? "Computer-Bot 🤖" : "{{ gegner }}";
         
