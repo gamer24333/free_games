@@ -8,43 +8,6 @@
         body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1a1a; color: white; margin: 0; padding: 10px; font-size: 16px; }
         h2 { font-size: 28px; margin-bottom: 5px; } 
         
-        /* Modus-Auswahl Overlay */
-        .setup-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(16, 16, 16, 0.95);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-        }
-        .setup-box {
-            background: #222;
-            padding: 30px;
-            border-radius: 12px;
-            border: 3px solid #ff9f43;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.6);
-            max-width: 400px;
-            width: 90%;
-        }
-        .setup-btn {
-            background: #ff9f43;
-            color: black;
-            border: none;
-            padding: 15px 25px;
-            font-size: 18px;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            margin: 10px 0;
-            width: 100%;
-            transition: transform 0.2s;
-        }
-        .setup-btn:hover { transform: scale(1.05); background: #e08b35; }
-        .setup-btn.secondary { background: #00adb5; color: white; }
-        .setup-btn.secondary:hover { background: #008c92; }
-
         canvas { background: linear-gradient(to bottom, #111 60%, #1f1f2e 100%); border: 4px solid #ff9f43; border-radius: 8px; margin-top: 10px; max-width: 100%; height: auto; touch-action: none; }
         .controls-info { background: #222; max-width: 900px; margin: 10px auto; padding: 20px; border-radius: 8px; font-size: 18px; color: #ccc; } 
         .weapon-selector { display: flex; justify-content: center; gap: 15px; margin: 20px 0; }
@@ -60,18 +23,6 @@
 </head>
 <body>
 
-    <div id="setupOverlay" class="setup-overlay">
-        <div class="setup-box">
-            <h2 style="color: #ff9f43; margin-top:0;">🤖 Modus wählen</h2>
-            <p>Gegen wen möchtest du in dieser Runde antreten?</p>
-            <button class="setup-btn" id="playBotBtn">Gegen Bot antreten (Offline) 🤖</button>
-            <button class="setup-btn secondary" id="playPlayerBtn">Gegen echten Spieler 👥</button>
-            <div style="margin-top: 15px;">
-                <a href="/games" style="color: #aaa; text-decoration: underline;">Zurück zur Spieleliste</a>
-            </div>
-        </div>
-    </div>
-
     <a href="/games" class="btn btn-back" style="margin-top:10px;">⬅️ Zur Spieleliste</a>
     <h2 id="matchInfo">Verbinde zum Spiel...</h2>
 
@@ -82,8 +33,8 @@
         
         <div class="weapon-selector">
             <button class="btn-weapon active" id="wpn-standard" onclick="selectWeapon('standard')">Normal (∞)</button>
-            <button class="btn-weapon" id="wpn-berta" onclick="selectWeapon('berta')">Dicke Berta (<span id="ammo-berta">0</span>)</button>
-            <button class="btn-weapon" id="wpn-triple" onclick="selectWeapon('triple')">Streuschuss (<span id="ammo-triple">0</span>)</button>
+            <button class="btn-weapon" id="wpn-berta" onclick="selectWeapon('berta')">Dicke Berta (<span id="ammo-berta">3</span>)</button>
+            <button class="btn-weapon" id="wpn-triple" onclick="selectWeapon('triple')">Streuschuss (<span id="ammo-triple">2</span>)</button>
         </div>
 
         <div class="button-row">
@@ -97,12 +48,12 @@
     <script>
         const gameId = "{{ gameId }}";
         const me = "{{ me }}";
+        const gegnerName = "{{ gegner }}"; // Wird vom Backend übergeben (z.B. "Computer-Bot 🤖")
         
         const canvas = document.getElementById('tankCanvas');
         const ctx = canvas.getContext('2d');
         const shootBtn = document.getElementById('shootBtn');
         const lockStatusText = document.getElementById('lockStatus');
-        const setupOverlay = document.getElementById('setupOverlay');
 
         let gameState = {};
         let bullets = []; 
@@ -127,8 +78,7 @@
         window.addEventListener('keydown', e => { keys[e.key] = true; });
         window.addEventListener('keyup', e => { keys[e.key] = false; });
 
-        // --- MAP GENERATOR (10 verschiedene vordefinierte mathematische Maps) ---
-        // Generiert reproduzierbare Zufallszahlen basierend auf der gameId (Seed)
+        // --- MAP GENERATOR ---
         function getSeededRandom(seedStr) {
             let hash = 0;
             for (let i = 0; i < seedStr.length; i++) {
@@ -141,61 +91,59 @@
         }
 
         const seedFunc = getSeededRandom(gameId);
-        const mapIndex = Math.floor(seedFunc() * 10); // Eine von 10 Maps (0 bis 9)
+        const mapIndex = Math.floor(seedFunc() * 10);
 
         const terrainPoints = [];
         for (let x = 0; x <= canvas.width; x++) {
-            let height = 400; // Basis-Höhe
+            let height = 400;
             
             switch (mapIndex) {
-                case 0: // Typ 1: Sanfte grüne Hügel
+                case 0:
                     height = 380 + Math.sin(x * 0.008) * 50 + Math.cos(x * 0.02) * 10;
                     break;
-                case 1: // Typ 2: Der Doppel-Berg (Zwei massive Hügel)
+                case 1:
                     height = 340 + Math.cos(x * 0.006 - 2) * 90;
                     break;
-                case 2: // Typ 3: Tiefer Canyon (Schlucht in der Mitte)
+                case 2:
                     height = 420 - Math.sin(x * 0.0035) * 110;
                     if (x > 350 && x < 550) height += 40; 
                     break;
-                case 3: // Typ 4: Stufenplateau (Erhöhung in der Mitte)
+                case 3:
                     height = (x > 300 && x < 600) ? 290 + Math.sin(x * 0.03) * 10 : 390 + Math.cos(x * 0.01) * 15;
                     break;
-                case 4: // Typ 5: Die Sprungschanze (Aufsteigend von links nach rechts)
+                case 4:
                     height = 440 - (x * 0.18) + Math.sin(x * 0.01) * 20;
                     break;
-                case 5: // Typ 6: Zackiges Gebirge (Kleine Kanten)
+                case 5:
                     height = 360 + Math.sin(x * 0.015) * 40 + Math.sin(x * 0.05) * 15;
                     break;
-                case 6: // Typ 7: Der Krater (Große Mulde in der Mitte)
+                case 6:
                     let distFromCenter = Math.abs(x - canvas.width / 2);
                     height = distFromCenter < 180 ? 440 - Math.cos(distFromCenter * 0.009) * 60 : 360;
                     break;
-                case 7: // Typ 8: Sinus-Wellen (Viele kleine Täler)
+                case 7:
                     height = 370 + Math.sin(x * 0.025) * 65;
                     break;
-                case 8: // Typ 9: Flachland mit kleiner Barrikade in der Mitte
+                case 8:
                     height = (x > 420 && x < 480) ? 260 : 400 + Math.sin(x * 0.002) * 10;
                     break;
-                case 9: // Typ 10: Insel-Stil (Rechts und links tief, Mitte hoch)
+                case 9:
                     height = 300 + Math.cos((x - canvas.width/2) * 0.005) * 120;
                     break;
             }
-            terrainPoints.push(Math.max(150, Math.min(canvas.height - 20, height))); // Grenzen sichern
+            terrainPoints.push(Math.max(150, Math.min(canvas.height - 20, height)));
         }
 
-        // --- SETUP MODUS-AUSWAHL ---
-        document.getElementById('playBotBtn').addEventListener('click', () => {
-            isBotMode = true;
-            setupOverlay.style.display = 'none';
-            initBotGame();
-        });
-
-        document.getElementById('playPlayerBtn').addEventListener('click', () => {
-            isBotMode = false;
-            setupOverlay.style.display = 'none';
-            updateStatus();
-        });
+        // --- AUTOMATISCHE INITIALISIERUNG BASIEREND AUF DEM MENÜ ---
+        function initMatch() {
+            if (gegnerName === "Computer-Bot 🤖" || gameId.includes("bot")) {
+                isBotMode = true;
+                initBotGame();
+            } else {
+                isBotMode = false;
+                updateStatus();
+            }
+        }
 
         // Bot-Spiel initialisieren (Offline/Lokale Werte)
         function initBotGame() {
@@ -208,7 +156,7 @@
                 p2_x: 750,
                 p1_hp: 100,
                 p2_hp: 100,
-                raw_state: "100,100,150,750,100,100,3,2,3,2,-100,-100,0" // p1_hp, p2_hp, p1_x, p2_x, p1_fuel, p2_fuel, ...
+                raw_state: "100,100,150,750,100,100,3,2,3,2,-100,-100,0"
             };
             document.getElementById('matchInfo').innerText = "🔴 DU BIST DRAN! (Gegen Bot)";
             shootBtn.disabled = false;
@@ -268,14 +216,12 @@
             shootBtn.disabled = true;
 
             setTimeout(() => {
-                let st = gameState.raw_state.split(',').map(Number);
                 let p1_x = gameState.p1_x;
                 let p2_x = gameState.p2_x;
                 let startY = terrainPoints[p2_x] - 17;
 
-                // Intelligente Berechnung: Schusswinkel und Stärke in Richtung des Spielers
-                let dx = p1_x - p2_x; // Wird negativ sein, da Bot rechts steht
-                let targetAngle = 35 + Math.floor(Math.random() * 25); // Zufälliger Winkel zwischen 35° und 60°
+                let dx = p1_x - p2_x;
+                let targetAngle = 35 + Math.floor(Math.random() * 25);
                 let targetPower = Math.min(16, Math.max(7, Math.round(Math.abs(dx) / 45) + (Math.random() * 4 - 2)));
 
                 let rad = (targetAngle * Math.PI) / 180;
@@ -283,18 +229,18 @@
                 bullets = [{
                     x: p2_x,
                     y: startY,
-                    vx: Math.cos(rad) * (targetPower * 1.2) * -1, // Schießt nach links zum Spieler (daher -1)
+                    vx: Math.cos(rad) * (targetPower * 1.2) * -1,
                     vy: -Math.sin(rad) * (targetPower * 1.2),
                     type: Math.random() > 0.7 ? 'berta' : 'standard',
                     active: true
                 }];
 
                 botCalculated = false;
-            }, 2000); // 2 Sekunden Verzögerung für Realismus
+            }, 2000);
         }
 
         async function updateStatus() {
-            if (isBotMode) return; // Im Bot-Modus keine Server-Updates abrufen
+            if (isBotMode) return;
             if (!gameId || gameId.includes("{")) return;
             try {
                 let res = await fetch(`/api/tankroyale/status/${encodeURIComponent(gameId)}`);
@@ -438,7 +384,7 @@
                 ctx.stroke(); ctx.setLineDash([]);
             }
 
-            // Projektile rendern und berechnen
+            // Projektile rendern
             if (bullets.length > 0) {
                 let hitRegistered = false;
                 let finalHitType = "none";
@@ -453,25 +399,21 @@
 
                     let target = (gameState.turn === me) ? p2 : p1;
                     
-                    // Kollision mit gegnerischem Panzer
                     if (bullet.x > target.x - 20 && bullet.x < target.x + 20 && bullet.y > target.y && bullet.y < target.y + 18) {
                         bullet.active = false;
                         hitRegistered = true;
                         finalHitType = (gameState.turn === me) ? "p2" : "p1";
                     } 
-                    // Kollision mit Boden
                     else if (bullet.x >= 0 && bullet.x <= canvas.width && bullet.y > terrainPoints[Math.floor(bullet.x)]) {
                         destroyTerrain(bullet.x, bullet.type === 'berta' ? 45 : 25);
                         bullet.active = false;
                         hitRegistered = true;
                     }
-                    // Out of bounds
                     else if (bullet.x < 0 || bullet.x > canvas.width || bullet.y > canvas.height) {
                         bullet.active = false;
                     }
                 });
 
-                // Wenn alle Kugeln eingeschlagen sind, Runde abschließen
                 if (bullets.every(b => !b.active)) {
                     bullets = []; 
                     if (isBotMode) {
@@ -525,20 +467,17 @@
             let dmg = (selectedWeapon === 'berta') ? 35 : 20;
 
             if (gameState.turn === me) {
-                // Spieler hat geschossen
                 if (hit === "p2") p2_hp = Math.max(0, p2_hp - dmg);
                 gameState.p1_x = Math.max(20, Math.min(canvas.width - 20, gameState.p1_x + myXOffset));
                 gameState.turn = "Computer-Bot 🤖";
                 document.getElementById('matchInfo').innerText = "⏳ Bot ist dran...";
             } else {
-                // Bot hat geschossen
                 if (hit === "p1") p1_hp = Math.max(0, p1_hp - dmg);
                 gameState.turn = me;
                 document.getElementById('matchInfo').innerText = "🔴 DU BIST DRAN!";
                 shootBtn.disabled = false;
             }
 
-            // Siegbedingungen prüfen
             if (p1_hp <= 0) {
                 gameState.status = "gewonnen_Bot";
                 document.getElementById('matchInfo').innerText = "❌ Der Bot hat dich zerstört!";
@@ -549,10 +488,9 @@
                 shootBtn.disabled = true;
             }
 
-            // Status updaten
             st[0] = p1_hp;
             st[1] = p2_hp;
-            st[4] = 100; // Fuel wieder aufladen
+            st[4] = 100;
             st[5] = 100;
             gameState.raw_state = st.join(',');
 
@@ -594,11 +532,13 @@
             requestAnimationFrame(gameLoop); 
         }
 
-        // Online-Polling nur starten, wenn kein Bot-Spiel läuft
+        // Intervall-Update (Nur für echte Spieler-Runden)
         setInterval(() => {
             if (!isBotMode) updateStatus();
         }, 2000);
 
+        // Spiel & Modus beim Laden initialisieren
+        initMatch();
         gameLoop();
     </script>
 </body>
