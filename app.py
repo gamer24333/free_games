@@ -795,7 +795,9 @@ def tank_shoot(game_id):
     angle = float(data.get('angle', 0))
     power = float(data.get('power', 0))
     hit = data.get('hit', 'none')
-    waffentyp = data.get('waffenTyp', 'standard')
+    
+    # .lower() stellt sicher, dass "Triple", "TRIPLE" oder "triple" immer zu "triple" werden
+    waffentyp = str(data.get('waffenTyp', 'standard')).lower().strip()
     
     g = TankGame.query.filter_by(game_id=game_id).first()
     if g and g.status == "aktiv" and g.turn == me:
@@ -847,17 +849,26 @@ def tank_shoot(game_id):
         else:
             # Schuss-Munition abziehen
             if me == g.ersteller:
-                if waffentyp == "berta": st[6] = max(0, st[6] - 1)
-                elif waffentyp == "triple": st[7] = max(0, st[7] - 1)
+                if waffentyp == "berta": 
+                    st[6] = max(0, st[6] - 1)
+                elif waffentyp == "triple": 
+                    st[7] = max(0, st[7] - 1)
             else:
-                if waffentyp == "berta": st[8] = max(0, st[8] - 1)
-                elif waffentyp == "triple": st[9] = max(0, st[9] - 1)
+                if waffentyp == "berta": 
+                    st[8] = max(0, st[8] - 1)
+                elif waffentyp == "triple": 
+                    st[9] = max(0, st[9] - 1)
 
-            # Schaden abziehen
+            # Schaden ermitteln
             schaden = 20
-            if waffentyp == "berta": schaden = 45
-            elif waffentyp == "triple": schaden = 18
+            if waffentyp == "berta": 
+                schaden = 45
+            elif waffentyp == "triple": 
+                schaden = 18
 
+            # Treffer zuweisen (Sowohl direkter Panzertreffer "p1"/"p2" als auch "terrain"-Einschlag)
+            # Da im JS bei Geländetreffern "terrain" übergeben wird, ziehen wir Schaden ab, 
+            # wenn das Projektil in der Nähe gelandet ist (wird im JS geregelt, welches "p1" oder "p2" meldet)
             if hit == "p1": 
                 st[0] = max(0, st[0] - schaden)
             elif hit == "p2": 
