@@ -448,21 +448,27 @@
             let st = gameState.raw_state.split(',').map(Number);
             let p1_hp = st[0];
             let p2_hp = st[1];
-
-            let dmg = (selectedWeapon === 'berta') ? 45 : 20;
-
+        
+            // Schadensberechnung je nach Waffentyp
+            let dmg = 20; // Standard-Schaden
+            if (selectedWeapon === 'berta') {
+                dmg = 45;
+            } else if (selectedWeapon === 'triple') {
+                dmg = 15; // 15 Schaden pro Treffer (da man mehrfach treffen kann)
+            }
+        
             if (gameState.turn === me) {
                 if (hit === "p2") p2_hp = Math.max(0, p2_hp - dmg);
                 gameState.p1_x = Math.max(20, Math.min(canvas.width - 20, gameState.p1_x + myXOffset));
                 gameState.turn = "Computer-Bot 🤖";
                 document.getElementById('matchInfo').innerText = "⏳ Bot ist dran...";
-                botCalculated = false; // Erst JETZT darf der Bot für seinen nächsten Zug planen
+                botCalculated = false;
             } else {
                 if (hit === "p1") p1_hp = Math.max(0, p1_hp - dmg);
                 gameState.turn = me;
                 document.getElementById('matchInfo').innerText = "🔴 DU BIST DRAN!";
                 shootBtn.disabled = false;
-                botCalculated = false; // Zurücksetzen für den nächsten Bot-Turn
+                botCalculated = false;
             }
 
             if (p1_hp <= 0) {
