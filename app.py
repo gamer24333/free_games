@@ -460,6 +460,23 @@ def submit_score():
     return {"status": "success"}
 
 # --- CLICKER ---
+
+# --- CLICKER ---
+@app.route('/clicker')
+def clicker_game():
+    if 'username' not in session: return redirect(url_for('login'))
+    
+    # Alle Highscores aus der Datenbank holen
+    all_scores = GameScore.query.all()
+    scores_dict = {s.username: s.clicker for s in all_scores}
+    
+    # Rangliste für die Klassenliste erstellen (Standardwert: 0 Klicks)
+    vollstaendige_liste = [(s, scores_dict.get(s, 0) if scores_dict.get(s) is not None else 0) for s in KLASSEN_LISTE]
+    leaderboard = sorted(vollstaendige_liste, key=lambda x: x[1], reverse=True)
+    
+    # clicker.html (oder wie deine HTML-Datei heißt) mit dem Leaderboard laden
+    return render_template('clicker.html', leaderboard=leaderboard)
+    
 @app.route('/api/submit-clicker', methods=['POST'])
 def submit_clicker():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
