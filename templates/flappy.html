@@ -28,7 +28,7 @@
             z-index: 10;
         }
 
-        /* Hauptbereich nach oben verschoben */
+        /* Hauptbereich weit oben ausgerichtet */
         .main-content {
             flex: 1;
             display: flex;
@@ -66,13 +66,31 @@
         .btn:hover { background: #444; }
         .btn-back { float: left; }
 
-        /* Dezenter, kleiner Vollbild-Link direkt beim Spiel */
+        /* Spiel-Container hält Canvas, Steuerung & Vollbild-Button zusammen */
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Tasten-Steuerungsanzeige unter dem Game */
+        .game-controls-info {
+            display: flex;
+            justify-content: space-between;
+            width: 320px;
+            font-size: 13px;
+            color: #aaa;
+            box-sizing: border-box;
+            padding: 0 5px;
+        }
+
+        /* Dezenter, kleiner Vollbild-Link */
         .fullscreen-link {
             color: #ff9f43;
             text-decoration: underline;
             cursor: pointer;
             font-weight: bold;
-            margin-left: 10px;
         }
         .fullscreen-link:hover {
             color: #e08b35;
@@ -85,18 +103,29 @@
             background: #70c5ce;
             box-shadow: 0 8px 25px rgba(0,0,0,0.6);
             display: block;
-            transition: all 0.2s ease;
+            box-sizing: border-box;
         }
 
-        /* Spezifisches Verhalten für das Canvas im Vollbildmodus */
+        /* PERFEKTES VOLLBILD OHNE VERZERRUNG (3:4 Seitenverhältnis behalten) */
         #flappyCanvas:fullscreen {
-            width: auto;
-            height: 100vh;
+            width: auto !important;
+            height: 100vh !important;
+            max-width: 75vh !important; /* 75% der Höhe entspricht dem 3:4-Verhältnis */
+            aspect-ratio: 3 / 4;
             border: none;
             border-radius: 0;
+            margin: 0 auto;
             background: #70c5ce;
         }
-        #flappyCanvas:-webkit-full-screen { width: auto; height: 100vh; border: none; border-radius: 0; }
+        #flappyCanvas:-webkit-full-screen {
+            width: auto !important;
+            height: 100vh !important;
+            max-width: 75vh !important;
+            aspect-ratio: 3 / 4;
+            border: none;
+            border-radius: 0;
+            margin: 0 auto;
+        }
 
         /* Rangliste */
         .leaderboard-box {
@@ -123,7 +152,14 @@
     </div>
 
     <div class="main-content">
-        <canvas id="flappyCanvas" width="320" height="480"></canvas>
+        <div class="game-container">
+            <canvas id="flappyCanvas" width="320" height="480"></canvas>
+            
+            <div class="game-controls-info">
+                <span>⏸️ <b>ESC</b> / <b>P</b> zum Pausieren</span>
+                <span id="fullscreenLink" class="fullscreen-link">📺 [F] Vollbildmodus</span>
+            </div>
+        </div>
 
         <div class="leaderboard-box">
             <h3 style="margin-top: 0; color: #f9d423; text-align: center; margin-bottom: 5px;">🏆 Flappy-Rangliste</h3>
@@ -149,8 +185,7 @@
     </div>
 
     <div class="footer-bar">
-        <span>Drücke die <b>Leertaste</b>, <b>Enter</b> oder klicke ins Feld zum Springen! 🚀 
-        <span id="fullscreenLink" class="fullscreen-link">[📺 Vollbildmodus]</span></span>
+        <span>Drücke die <b>Leertaste</b>, <b>Enter</b> oder klicke ins Feld zum Springen! 🚀</span>
     </div>
 
     <script>
@@ -158,14 +193,19 @@
         const ctx = canvas.getContext('2d');
         const fullscreenLink = document.getElementById('fullscreenLink');
 
-        // --- AUDIO DATEIEN LADEN ---
-        // Die Pfade können angepasst werden, falls deine Dateien anders heißen!
-        const bgMusic = new Audio('/static/flappy_bird.mp3');
-        bgMusic.loop = true; // Musik soll sich wiederholen
-        bgMusic.volume = 0.4; // Lautstärke einstellen (0.0 bis 1.0)
-        
-        // --- VOLLBILD NUR FÜR DAS SPIELFELD ---
-        fullscreenLink.addEventListener('click', () => {
+        // --- AUDIO DATEIEN ---
+        const bgMusic = new Audio('/static/sounds/music.mp3');
+        bgMusic.loop = true;
+        bgMusic.volume = 0.4;
+
+        const jumpSound = new Audio('/static/sounds/wing.mp3');
+        jumpSound.volume = 0.5;
+
+        const crashSound = new Audio('/static/sounds/hit.mp3');
+        crashSound.volume = 0.5;
+
+        // --- VOLLBILD FUNKTIONEN (Link & Taste 'F') ---
+        function toggleFullscreen() {
             if (!document.fullscreenElement) {
                 if (canvas.requestFullscreen) {
                     canvas.requestFullscreen();
@@ -176,18 +216,20 @@
                 } else if (canvas.msRequestFullscreen) {
                     canvas.msRequestFullscreen();
                 }
-                fullscreenLink.textContent = "[📺 Vollbild beenden]";
+                fullscreenLink.textContent = "📺 [F] Vollbild beenden";
             } else {
                 if (document.exitFullscreen) {
                     document.exitFullscreen();
                 }
-                fullscreenLink.textContent = "[📺 Vollbildmodus]";
+                fullscreenLink.textContent = "📺 [F] Vollbildmodus";
             }
-        });
+        }
+
+        fullscreenLink.addEventListener('click', toggleFullscreen);
 
         document.addEventListener('fullscreenchange', () => {
             if (!document.fullscreenElement) {
-                fullscreenLink.textContent = "[📺 Vollbildmodus]";
+                fullscreenLink.textContent = "📺 [F] Vollbildmodus";
             }
         });
 
@@ -199,11 +241,12 @@
         let score = 0;
         let gameActive = false;
         let gameOver = false;
+        let gamePaused = false;
 
         // Rohre
         let pipes = [];
         const pipeWidth = 52;
-        const pipeGap = 90; // Schwieriger Original-Abstand
+        const pipeGap = 90; 
         let frameCount = 0;
 
         // Grafiken zeichnen
@@ -224,11 +267,9 @@
                 ctx.strokeStyle = '#55801a';
                 ctx.lineWidth = 3;
 
-                // Oberes Rohr
                 ctx.fillRect(pipe.x, 0, pipeWidth, pipe.top);
                 ctx.strokeRect(pipe.x, 0, pipeWidth, pipe.top);
 
-                // Unteres Rohr
                 ctx.fillRect(pipe.x, canvas.height - pipe.bottom, pipeWidth, pipe.bottom);
                 ctx.strokeRect(pipe.x, canvas.height - pipe.bottom, pipeWidth, pipe.bottom);
             });
@@ -270,10 +311,22 @@
             ctx.strokeText(score, canvas.width / 2, 50);
             ctx.fillText(score, canvas.width / 2, 50);
 
-            if (!gameActive && !gameOver) {
+            if (!gameActive && !gameOver && !gamePaused) {
                 ctx.font = 'bold 18px Arial';
                 ctx.strokeText("Klicke zum Starten!", canvas.width / 2, canvas.height / 2);
                 ctx.fillText("Klicke zum Starten!", canvas.width / 2, canvas.height / 2);
+            }
+
+            if (gamePaused) {
+                ctx.font = 'bold 28px Arial';
+                ctx.fillStyle = '#ff9f43';
+                ctx.strokeText("PAUSIERT", canvas.width / 2, canvas.height / 2 - 10);
+                ctx.fillText("PAUSIERT", canvas.width / 2, canvas.height / 2 - 10);
+                
+                ctx.font = 'bold 14px Arial';
+                ctx.fillStyle = 'white';
+                ctx.strokeText("ESC oder P zum Weiterspielen", canvas.width / 2, canvas.height / 2 + 25);
+                ctx.fillText("ESC oder P zum Weiterspielen", canvas.width / 2, canvas.height / 2 + 25);
             }
 
             if (gameOver) {
@@ -290,7 +343,7 @@
         }
 
         function update() {
-            if (gameActive && !gameOver) {
+            if (gameActive && !gameOver && !gamePaused) {
                 birdVelocity += gravity;
                 birdY += birdVelocity;
 
@@ -335,12 +388,9 @@
         function triggerGameOver() {
             gameOver = true;
             gameActive = false;
-            
-            // Musik stoppen und Crash abspielen
             bgMusic.pause();
             bgMusic.currentTime = 0;
-            
-
+            crashSound.play().catch(e => console.log("Audio-Autoplay verhindert:", e));
             submitScore(score);
         }
 
@@ -352,12 +402,23 @@
             frameCount = 0;
             gameOver = false;
             gameActive = true;
-
-            // Musik von vorne starten
+            gamePaused = false;
             bgMusic.play().catch(e => console.log("Audio-Autoplay verhindert:", e));
         }
 
+        function togglePause() {
+            if (!gameActive || gameOver) return;
+            gamePaused = !gamePaused;
+            if (gamePaused) {
+                bgMusic.pause();
+            } else {
+                bgMusic.play().catch(e => console.log(e));
+            }
+        }
+
         function action() {
+            if (gamePaused) return; 
+            
             if (gameOver) {
                 resetGame();
             } else if (!gameActive) {
@@ -365,16 +426,27 @@
                 bgMusic.play().catch(e => console.log("Audio-Autoplay verhindert:", e));
             } else {
                 birdVelocity = jump;
-                // Ton abspielen (zurücksetzen, falls er noch läuft)
-                
+                jumpSound.currentTime = 0;
+                jumpSound.play().catch(e => console.log("Audio-Autoplay verhindert:", e));
             }
         }
 
         // --- CONTROLS ---
         window.addEventListener('keydown', (e) => {
+            // Leertaste oder Enter zum Springen
             if (e.code === 'Space' || e.code === 'Enter') {
                 e.preventDefault();
                 action();
+            }
+            // ESC oder P zum Pausieren
+            if (e.key === 'Escape' || e.code === 'Escape' || e.key === 'p' || e.key === 'P') {
+                e.preventDefault();
+                togglePause();
+            }
+            // F zum Vollbildmodus
+            if (e.key === 'f' || e.key === 'F') {
+                e.preventDefault();
+                toggleFullscreen();
             }
         });
 
