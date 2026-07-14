@@ -4,10 +4,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tank Royale Match</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1a1a; color: white; margin: 0; padding: 10px; font-size: 16px; }
         h2 { font-size: 28px; margin-bottom: 5px; } 
+        
+        /* Modus-Auswahl Overlay */
+        .setup-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(16, 16, 16, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .setup-box {
+            background: #222;
+            padding: 30px;
+            border-radius: 12px;
+            border: 3px solid #ff9f43;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+            max-width: 400px;
+            width: 90%;
+        }
+        .setup-btn {
+            background: #ff9f43;
+            color: black;
+            border: none;
+            padding: 15px 25px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px 0;
+            width: 100%;
+            transition: transform 0.2s;
+        }
+        .setup-btn:hover { transform: scale(1.05); background: #e08b35; }
+        .setup-btn.secondary { background: #00adb5; color: white; }
+        .setup-btn.secondary:hover { background: #008c92; }
+
         canvas { background: linear-gradient(to bottom, #111 60%, #1f1f2e 100%); border: 4px solid #ff9f43; border-radius: 8px; margin-top: 10px; max-width: 100%; height: auto; touch-action: none; }
         .controls-info { background: #222; max-width: 900px; margin: 10px auto; padding: 20px; border-radius: 8px; font-size: 18px; color: #ccc; } 
         .weapon-selector { display: flex; justify-content: center; gap: 15px; margin: 20px 0; }
@@ -18,10 +55,24 @@
         .btn-move { background: #333; color: white; border: 1px solid #555; padding: 15px 30px; font-size: 22px; border-radius: 5px; user-select: none; cursor: pointer; }
         .btn-shoot { background: #ff2e63; color: white; border: none; padding: 16px 40px; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 20px; margin-top: 15px; width: 100%; max-width: 400px; }
         #lockStatus { font-weight: bold; color: #76ff03; font-size: 18px; }
+        .btn-back { display: inline-block; background: #555; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <a href="/games" class="btn btn-back" style="margin-top:10px; display:inline-block;">⬅️ Zur Spieleliste</a>
+
+    <div id="setupOverlay" class="setup-overlay">
+        <div class="setup-box">
+            <h2 style="color: #ff9f43; margin-top:0;">🤖 Modus wählen</h2>
+            <p>Gegen wen möchtest du in dieser Runde antreten?</p>
+            <button class="setup-btn" id="playBotBtn">Gegen Bot antreten (Offline) 🤖</button>
+            <button class="setup-btn secondary" id="playPlayerBtn">Gegen echten Spieler 👥</button>
+            <div style="margin-top: 15px;">
+                <a href="/games" style="color: #aaa; text-decoration: underline;">Zurück zur Spieleliste</a>
+            </div>
+        </div>
+    </div>
+
+    <a href="/games" class="btn btn-back" style="margin-top:10px;">⬅️ Zur Spieleliste</a>
     <h2 id="matchInfo">Verbinde zum Spiel...</h2>
 
     <canvas id="tankCanvas" width="900" height="500"></canvas>
@@ -51,9 +102,10 @@
         const ctx = canvas.getContext('2d');
         const shootBtn = document.getElementById('shootBtn');
         const lockStatusText = document.getElementById('lockStatus');
+        const setupOverlay = document.getElementById('setupOverlay');
 
         let gameState = {};
-        let bullets = []; // Geändert von 'bullet' zu einem Array für Mehrfachschüsse
+        let bullets = []; 
         const gravity = 0.15;
 
         let myAngle = 45;
@@ -67,14 +119,99 @@
         let ammoTriple = 2;
         let crate = { x: -100, y: -100, active: false };
 
+        let isBotMode = false;
+        let botCalculated = false;
+
         let moveLeftActive = false; let moveRightActive = false;
         const keys = {};
         window.addEventListener('keydown', e => { keys[e.key] = true; });
         window.addEventListener('keyup', e => { keys[e.key] = false; });
 
+        // --- MAP GENERATOR (10 verschiedene vordefinierte mathematische Maps) ---
+        // Generiert reproduzierbare Zufallszahlen basierend auf der gameId (Seed)
+        function getSeededRandom(seedStr) {
+            let hash = 0;
+            for (let i = 0; i < seedStr.length; i++) {
+                hash = seedStr.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return function() {
+                let x = Math.sin(hash++) * 10000;
+                return x - Math.floor(x);
+            };
+        }
+
+        const seedFunc = getSeededRandom(gameId);
+        const mapIndex = Math.floor(seedFunc() * 10); // Eine von 10 Maps (0 bis 9)
+
         const terrainPoints = [];
         for (let x = 0; x <= canvas.width; x++) {
-            terrainPoints.push(400 + Math.sin(x * 0.008) * 40 + Math.cos(x * 0.02) * 10);
+            let height = 400; // Basis-Höhe
+            
+            switch (mapIndex) {
+                case 0: // Typ 1: Sanfte grüne Hügel
+                    height = 380 + Math.sin(x * 0.008) * 50 + Math.cos(x * 0.02) * 10;
+                    break;
+                case 1: // Typ 2: Der Doppel-Berg (Zwei massive Hügel)
+                    height = 340 + Math.cos(x * 0.006 - 2) * 90;
+                    break;
+                case 2: // Typ 3: Tiefer Canyon (Schlucht in der Mitte)
+                    height = 420 - Math.sin(x * 0.0035) * 110;
+                    if (x > 350 && x < 550) height += 40; 
+                    break;
+                case 3: // Typ 4: Stufenplateau (Erhöhung in der Mitte)
+                    height = (x > 300 && x < 600) ? 290 + Math.sin(x * 0.03) * 10 : 390 + Math.cos(x * 0.01) * 15;
+                    break;
+                case 4: // Typ 5: Die Sprungschanze (Aufsteigend von links nach rechts)
+                    height = 440 - (x * 0.18) + Math.sin(x * 0.01) * 20;
+                    break;
+                case 5: // Typ 6: Zackiges Gebirge (Kleine Kanten)
+                    height = 360 + Math.sin(x * 0.015) * 40 + Math.sin(x * 0.05) * 15;
+                    break;
+                case 6: // Typ 7: Der Krater (Große Mulde in der Mitte)
+                    let distFromCenter = Math.abs(x - canvas.width / 2);
+                    height = distFromCenter < 180 ? 440 - Math.cos(distFromCenter * 0.009) * 60 : 360;
+                    break;
+                case 7: // Typ 8: Sinus-Wellen (Viele kleine Täler)
+                    height = 370 + Math.sin(x * 0.025) * 65;
+                    break;
+                case 8: // Typ 9: Flachland mit kleiner Barrikade in der Mitte
+                    height = (x > 420 && x < 480) ? 260 : 400 + Math.sin(x * 0.002) * 10;
+                    break;
+                case 9: // Typ 10: Insel-Stil (Rechts und links tief, Mitte hoch)
+                    height = 300 + Math.cos((x - canvas.width/2) * 0.005) * 120;
+                    break;
+            }
+            terrainPoints.push(Math.max(150, Math.min(canvas.height - 20, height))); // Grenzen sichern
+        }
+
+        // --- SETUP MODUS-AUSWAHL ---
+        document.getElementById('playBotBtn').addEventListener('click', () => {
+            isBotMode = true;
+            setupOverlay.style.display = 'none';
+            initBotGame();
+        });
+
+        document.getElementById('playPlayerBtn').addEventListener('click', () => {
+            isBotMode = false;
+            setupOverlay.style.display = 'none';
+            updateStatus();
+        });
+
+        // Bot-Spiel initialisieren (Offline/Lokale Werte)
+        function initBotGame() {
+            gameState = {
+                status: "aktiv",
+                turn: me,
+                ersteller: me,
+                gegner: "Computer-Bot 🤖",
+                p1_x: 150,
+                p2_x: 750,
+                p1_hp: 100,
+                p2_hp: 100,
+                raw_state: "100,100,150,750,100,100,3,2,3,2,-100,-100,0" // p1_hp, p2_hp, p1_x, p2_x, p1_fuel, p2_fuel, ...
+            };
+            document.getElementById('matchInfo').innerText = "🔴 DU BIST DRAN! (Gegen Bot)";
+            shootBtn.disabled = false;
         }
 
         function selectWeapon(type) {
@@ -106,7 +243,7 @@
             lockStatusText.innerText = `Winkel: ${myAngle}° | Kraft: ${myPower}`;
         }
 
-        // Mouse & Touch Inputs...
+        // Mouse & Touch Inputs
         canvas.addEventListener('mousedown', (e) => { isAiming = true; calculateAim(e.clientX, e.clientY); });
         canvas.addEventListener('mousemove', (e) => { if (isAiming) calculateAim(e.clientX, e.clientY); });
         window.addEventListener('mouseup', () => { isAiming = false; });
@@ -122,7 +259,42 @@
         }, { passive: false });
         window.addEventListener('touchend', () => { isAiming = false; });
 
+        // --- BOT GEGENZUG LOGIK ---
+        function triggerBotTurn() {
+            if (!isBotMode || botCalculated || gameState.status !== "aktiv") return;
+            botCalculated = true;
+
+            document.getElementById('matchInfo').innerText = "🤖 Bot berechnet Schuss...";
+            shootBtn.disabled = true;
+
+            setTimeout(() => {
+                let st = gameState.raw_state.split(',').map(Number);
+                let p1_x = gameState.p1_x;
+                let p2_x = gameState.p2_x;
+                let startY = terrainPoints[p2_x] - 17;
+
+                // Intelligente Berechnung: Schusswinkel und Stärke in Richtung des Spielers
+                let dx = p1_x - p2_x; // Wird negativ sein, da Bot rechts steht
+                let targetAngle = 35 + Math.floor(Math.random() * 25); // Zufälliger Winkel zwischen 35° und 60°
+                let targetPower = Math.min(16, Math.max(7, Math.round(Math.abs(dx) / 45) + (Math.random() * 4 - 2)));
+
+                let rad = (targetAngle * Math.PI) / 180;
+                
+                bullets = [{
+                    x: p2_x,
+                    y: startY,
+                    vx: Math.cos(rad) * (targetPower * 1.2) * -1, // Schießt nach links zum Spieler (daher -1)
+                    vy: -Math.sin(rad) * (targetPower * 1.2),
+                    type: Math.random() > 0.7 ? 'berta' : 'standard',
+                    active: true
+                }];
+
+                botCalculated = false;
+            }, 2000); // 2 Sekunden Verzögerung für Realismus
+        }
+
         async function updateStatus() {
+            if (isBotMode) return; // Im Bot-Modus keine Server-Updates abrufen
             if (!gameId || gameId.includes("{")) return;
             try {
                 let res = await fetch(`/api/tankroyale/status/${encodeURIComponent(gameId)}`);
@@ -216,6 +388,7 @@
             let p1 = { x: p1_x, y: terrainPoints[p1_x] - 15, hp: st[0], fuel: p1_f, color: '#00adb5', name: gameState.ersteller, dX: 1 };
             let p2 = { x: p2_x, y: terrainPoints[p2_x] - 15, hp: st[1], fuel: p2_f, color: '#ff2e63', name: gameState.gegner, dX: -1 };
 
+            // Kisten-Logik
             if (crate.active) {
                 let groundY = terrainPoints[Math.floor(crate.x)] - 12;
                 if (crate.y < groundY) crate.y += 1.5;
@@ -227,7 +400,11 @@
                 let activeTank = amIErsteller ? p1 : p2;
                 if (Math.abs(activeTank.x - crate.x) < 25 && Math.abs(activeTank.y - crate.y) < 25) {
                     crate.active = false;
-                    sendShotResult(myAngle, myPower, "crate_collected", p1.x, p2.x);
+                    if (isBotMode) {
+                        myFuel = 100;
+                    } else {
+                        sendShotResult(myAngle, myPower, "crate_collected", p1.x, p2.x);
+                    }
                 }
             }
 
@@ -261,7 +438,7 @@
                 ctx.stroke(); ctx.setLineDash([]);
             }
 
-            // NEU: Berechnung ALLER aktiven Projektile im Array
+            // Projektile rendern und berechnen
             if (bullets.length > 0) {
                 let hitRegistered = false;
                 let finalHitType = "none";
@@ -274,13 +451,13 @@
                     ctx.arc(bullet.x, bullet.y, bullet.type === 'berta' ? 8 : 5, 0, Math.PI*2); 
                     ctx.fill();
 
-                    let target = amIErsteller ? p2 : p1;
+                    let target = (gameState.turn === me) ? p2 : p1;
                     
                     // Kollision mit gegnerischem Panzer
                     if (bullet.x > target.x - 20 && bullet.x < target.x + 20 && bullet.y > target.y && bullet.y < target.y + 18) {
                         bullet.active = false;
                         hitRegistered = true;
-                        finalHitType = amIErsteller ? "p2" : "p1";
+                        finalHitType = (gameState.turn === me) ? "p2" : "p1";
                     } 
                     // Kollision mit Boden
                     else if (bullet.x >= 0 && bullet.x <= canvas.width && bullet.y > terrainPoints[Math.floor(bullet.x)]) {
@@ -294,10 +471,14 @@
                     }
                 });
 
-                // Prüfen ob alle Kugeln eingeschlagen sind
+                // Wenn alle Kugeln eingeschlagen sind, Runde abschließen
                 if (bullets.every(b => !b.active)) {
-                    bullets = []; // Array leeren
-                    sendShotResult(myAngle, myPower, finalHitType, p1.x, p2.x);
+                    bullets = []; 
+                    if (isBotMode) {
+                        resolveBotShot(finalHitType);
+                    } else {
+                        sendShotResult(myAngle, myPower, finalHitType, p1.x, p2.x);
+                    }
                 }
             }
         }
@@ -308,10 +489,9 @@
             let currentX = Math.max(20, Math.min(canvas.width - 20, (amIErsteller ? gameState.p1_x + myXOffset : gameState.p2_x + myXOffset)));
             let startY = terrainPoints[Math.floor(currentX)] - 17;
 
-            bullets = []; // Sicherstellen, dass das Array leer ist
+            bullets = []; 
 
             if (selectedWeapon === 'triple') {
-                // Streuschuss feuert 3 Kugeln mit versetzten Winkeln (-6°, 0°, +6°)
                 let offsets = [-6, 0, 6];
                 offsets.forEach(offset => {
                     let rad = ((myAngle + offset) * Math.PI) / 180;
@@ -324,7 +504,6 @@
                     });
                 });
             } else {
-                // Normaler Schuss oder Dicke Berta (1 Kugel)
                 let rad = (myAngle * Math.PI) / 180;
                 bullets.push({
                     x: currentX, y: startY,
@@ -335,6 +514,53 @@
                 });
             }
             shootBtn.disabled = true;
+        }
+
+        // --- SCHUSS-AUFLÖSUNG IM BOT-MODUS (Lokal gelöst) ---
+        function resolveBotShot(hit) {
+            let st = gameState.raw_state.split(',').map(Number);
+            let p1_hp = st[0];
+            let p2_hp = st[1];
+
+            let dmg = (selectedWeapon === 'berta') ? 35 : 20;
+
+            if (gameState.turn === me) {
+                // Spieler hat geschossen
+                if (hit === "p2") p2_hp = Math.max(0, p2_hp - dmg);
+                gameState.p1_x = Math.max(20, Math.min(canvas.width - 20, gameState.p1_x + myXOffset));
+                gameState.turn = "Computer-Bot 🤖";
+                document.getElementById('matchInfo').innerText = "⏳ Bot ist dran...";
+            } else {
+                // Bot hat geschossen
+                if (hit === "p1") p1_hp = Math.max(0, p1_hp - dmg);
+                gameState.turn = me;
+                document.getElementById('matchInfo').innerText = "🔴 DU BIST DRAN!";
+                shootBtn.disabled = false;
+            }
+
+            // Siegbedingungen prüfen
+            if (p1_hp <= 0) {
+                gameState.status = "gewonnen_Bot";
+                document.getElementById('matchInfo').innerText = "❌ Der Bot hat dich zerstört!";
+                shootBtn.disabled = true;
+            } else if (p2_hp <= 0) {
+                gameState.status = `gewonnen_${me}`;
+                document.getElementById('matchInfo').innerText = "🎉 DU HAST GEWONNEN! 🎉";
+                shootBtn.disabled = true;
+            }
+
+            // Status updaten
+            st[0] = p1_hp;
+            st[1] = p2_hp;
+            st[4] = 100; // Fuel wieder aufladen
+            st[5] = 100;
+            gameState.raw_state = st.join(',');
+
+            myXOffset = 0;
+
+            if (gameState.turn === "Computer-Bot 🤖" && gameState.status === "aktiv") {
+                triggerBotTurn();
+            }
         }
 
         async function sendShotResult(angle, power, hit, finalP1X, finalP2X) {
@@ -359,9 +585,21 @@
 
         shootBtn.addEventListener('click', fireTank);
 
-        function gameLoop() { handleInput(); draw(); requestAnimationFrame(gameLoop); }
-        setInterval(updateStatus, 2000);
-        updateStatus(); gameLoop();
+        function gameLoop() { 
+            handleInput(); 
+            draw(); 
+            if (isBotMode && gameState.turn === "Computer-Bot 🤖") {
+                triggerBotTurn();
+            }
+            requestAnimationFrame(gameLoop); 
+        }
+
+        // Online-Polling nur starten, wenn kein Bot-Spiel läuft
+        setInterval(() => {
+            if (!isBotMode) updateStatus();
+        }, 2000);
+
+        gameLoop();
     </script>
 </body>
 </html>
