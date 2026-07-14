@@ -88,24 +88,25 @@
 
         // --- AUTOMATISCHE INITIALISIERUNG ---
         function initMatch() {
-        const gegnerNameClean = gegnerName.toLowerCase();
-        const gameIdClean = gameId.toLowerCase();
-    
-        // Erkennt zuverlässig, ob es sich um ein Bot-Match handelt
-        if (
-            gameIdClean === "offline_bot_game" || 
-            gameIdClean.includes("bot") || 
-            gegnerNameClean.includes("bot") || 
-            gegnerNameClean.includes("computer")
-        ) {
-            isBotMode = true;
-            initBotGame();
-        } else {
-            isBotMode = false;
-            // Sofortige Synchronisierung für echte Spieler im Multiplayer
-            updateStatus();
+            const gegnerNameClean = gegnerName.toLowerCase();
+            const gameIdClean = gameId.toLowerCase();
+            
+            // Erkennt zuverlässig, ob es sich um ein Bot-Match handelt
+            if (
+                gameIdClean === "offline_bot_game" || 
+                gameIdClean.includes("bot") || 
+                gegnerNameClean.includes("bot") || 
+                gegnerNameClean.includes("computer")
+            ) {
+                isBotMode = true;
+                initBotGame();
+            } else {
+                isBotMode = false;
+                // Sofortige Synchronisierung für echte Spieler im Multiplayer
+                updateStatus();
+            }
         }
-    }
+
         function initBotGame() {
             gameState = {
                 status: "aktiv",
@@ -169,7 +170,6 @@
 
         // --- BOT GEGENZUG LOGIK ---
         function triggerBotTurn() {
-            // Absolute Absicherung vor Mehrfachfeuer
             if (!isBotMode || botCalculated || gameState.status !== "aktiv" || bullets.length > 0) return;
             botCalculated = true;
 
@@ -177,7 +177,6 @@
             shootBtn.disabled = true;
 
             setTimeout(() => {
-                // Sicherstellen, dass der Status sich während des Wartens nicht geändert hat
                 if (gameState.turn !== "Computer-Bot 🤖" || gameState.status !== "aktiv") {
                     botCalculated = false;
                     return;
@@ -200,6 +199,7 @@
                     vx: Math.cos(rad) * (targetPower * 1.2) * -1,
                     vy: -Math.sin(rad) * (targetPower * 1.2),
                     type: Math.random() > 0.7 ? 'berta' : 'standard',
+                    owner: "Computer-Bot 🤖",
                     active: true
                 }];
 
@@ -325,7 +325,7 @@
                 }
             }
 
-            // Panzer
+            // Panzer zeichnen
             [p1, p2].forEach(p => {
                 ctx.save();
                 ctx.fillStyle = '#333'; ctx.fillRect(p.x - 22, p.y + 8, 44, 8);
@@ -357,7 +357,6 @@
             }
 
             // Projektile rendern
-            // Projektile rendern
             if (bullets.length > 0) {
                 let hitRegistered = false;
                 let finalHitType = "none";
@@ -370,11 +369,10 @@
                     ctx.arc(bullet.x, bullet.y, bullet.type === 'berta' ? 8 : 5, 0, Math.PI*2); 
                     ctx.fill();
 
-                    // Wer ist der Gegner dieses Schusses?
-                    // Wenn der Schütze 'me' (ich) ist, ist das Ziel der Gegner (target = p2 im Bot-Modus oder eben der andere Spieler)
+                    // Gegner ermitteln
                     let target = (bullet.owner === me) ? p2 : p1;
                     
-                    // Kollisionsprüfung NUR mit dem echten Gegner, niemals mit dem Schützen selbst!
+                    // Kollisionsprüfung mit Gegner
                     if (bullet.x > target.x - 22 && bullet.x < target.x + 22 && bullet.y > target.y - 12 && bullet.y < target.y + 15) {
                         bullet.active = false;
                         hitRegistered = true;
@@ -402,59 +400,58 @@
                     }
                 }
             }
+        } // <--- Hier hat die geschlossene Klammer gefehlt!
             
         function fireTank() {
-        if (gameState.turn !== me || gameState.status !== "aktiv" || bullets.length > 0) return;
-        let amIErsteller = (me === gameState.ersteller);
-        let currentX = Math.max(20, Math.min(canvas.width - 20, (amIErsteller ? gameState.p1_x + myXOffset : gameState.p2_x + myXOffset)));
-        let startY = terrainPoints[Math.floor(currentX)] - 15; // Etwas höher ansetzen (Panzermitte)
-    
-        bullets = []; 
-        let direction = amIErsteller ? 1 : -1;
-        let rad = (myAngle * Math.PI) / 180;
-    
-        // Wir berechnen das Rohrende, damit die Kugel nicht im Panzer startet
-        const rohrLaenge = 22; 
-        let spawnX = currentX + Math.cos(rad) * rohrLaenge * direction;
-        let spawnY = startY - 2 - Math.sin(rad) * rohrLaenge;
-    
-        if (selectedWeapon === 'triple') {
-            let offsets = [-6, 0, 6];
-            offsets.forEach(offset => {
-                let r = ((myAngle + offset) * Math.PI) / 180;
+            if (gameState.turn !== me || gameState.status !== "aktiv" || bullets.length > 0) return;
+            let amIErsteller = (me === gameState.ersteller);
+            let currentX = Math.max(20, Math.min(canvas.width - 20, (amIErsteller ? gameState.p1_x + myXOffset : gameState.p2_x + myXOffset)));
+            let startY = terrainPoints[Math.floor(currentX)] - 15;
+
+            bullets = []; 
+            let direction = amIErsteller ? 1 : -1;
+            let rad = (myAngle * Math.PI) / 180;
+        
+            const rohrLaenge = 22; 
+            let spawnX = currentX + Math.cos(rad) * rohrLaenge * direction;
+            let spawnY = startY - 2 - Math.sin(rad) * rohrLaenge;
+        
+            if (selectedWeapon === 'triple') {
+                let offsets = [-6, 0, 6];
+                offsets.forEach(offset => {
+                    let r = ((myAngle + offset) * Math.PI) / 180;
+                    bullets.push({
+                        x: spawnX, y: spawnY,
+                        vx: Math.cos(r) * (myPower * 1.2) * direction,
+                        vy: -Math.sin(r) * (myPower * 1.2),
+                        type: 'triple',
+                        owner: me,
+                        active: true
+                    });
+                });
+            } else {
                 bullets.push({
                     x: spawnX, y: spawnY,
-                    vx: Math.cos(r) * (myPower * 1.2) * direction,
-                    vy: -Math.sin(r) * (myPower * 1.2),
-                    type: 'triple',
-                    owner: me, // Wir merken uns, wer geschossen hat!
+                    vx: Math.cos(rad) * (myPower * 1.2) * direction,
+                    vy: -Math.sin(rad) * (myPower * 1.2),
+                    type: selectedWeapon,
+                    owner: me,
                     active: true
                 });
-            });
-        } else {
-            bullets.push({
-                x: spawnX, y: spawnY,
-                vx: Math.cos(rad) * (myPower * 1.2) * direction,
-                vy: -Math.sin(rad) * (myPower * 1.2),
-                type: selectedWeapon,
-                owner: me, // Wir merken uns, wer geschossen hat!
-                active: true
-            });
+            }
+            shootBtn.disabled = true;
         }
-        shootBtn.disabled = true;
-    }
 
         function resolveBotShot(hit) {
             let st = gameState.raw_state.split(',').map(Number);
             let p1_hp = st[0];
             let p2_hp = st[1];
         
-            // Schadensberechnung je nach Waffentyp
-            let dmg = 20; // Standard-Schaden
+            let dmg = 20; 
             if (selectedWeapon === 'berta') {
                 dmg = 45;
             } else if (selectedWeapon === 'triple') {
-                dmg = 15; // 15 Schaden pro Treffer (da man mehrfach treffen kann)
+                dmg = 15;
             }
         
             if (gameState.turn === me) {
