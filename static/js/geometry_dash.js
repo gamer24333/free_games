@@ -91,10 +91,12 @@ function spawnObstacle() {
 
     let rand = Math.random();
     
-    // Erhöhte Schwierigkeit, wenn der Spieler im Ball-Modus ist
+    // ----------------------------------------------------
+    // 1. KUGEL-MODUS (Seltener und purer Hindernis-Flug)
+    // ----------------------------------------------------
     if (player.mode === 'ball') {
-        if (rand < 0.40) {
-            // Variante 1: Decken- oder Bodenstachel (50/50 Chance)
+        if (rand < 0.50) {
+            // Decken- oder Bodenstachel
             let onCeiling = Math.random() > 0.5;
             obstacles.push({ 
                 x: canvas.width, 
@@ -103,19 +105,8 @@ function spawnObstacle() {
                 type: 'spike',
                 ceil: onCeiling
             });
-        } else if (rand < 0.75) {
-            // Variante 2: Mittige GEMEINE grüne Pflicht-Plattform
-            let heightLevel = floorY - 110; 
-            obstacles.push({
-                x: canvas.width,
-                y: heightLevel,
-                width: 100, height: 20, 
-                type: 'platform',
-                mustTouch: true, // Markiert als Pflicht-Plattform für den Ball
-                touched: false
-            });
         } else {
-            // Variante 3: Gelbe Blöcke am Boden oder hängend
+            // Gelbe Blöcke als Hindernis im Weg
             let onCeiling = Math.random() > 0.5;
             obstacles.push({
                 x: canvas.width,
@@ -124,25 +115,47 @@ function spawnObstacle() {
                 ceil: onCeiling
             });
         }
-    } else {
-        // Normaler Cube-Modus (unverändert)
-        if (rand < 0.35) {
+    } 
+    // ----------------------------------------------------
+    // 2. WÜRFEL-MODUS (Jetzt mit der neuen Plattform-Herausforderung!)
+    // ----------------------------------------------------
+    else {
+        if (rand < 0.30) {
+            // Normaler Stachel am Boden
             obstacles.push({ x: canvas.width, y: floorY, width: 30, height: 35, type: 'spike', ceil: false });
-        } else if (rand < 0.65) {
-            let heightLevel = floorY - 70 - Math.floor(Math.random() * 2) * 50;
-            obstacles.push({ x: canvas.width, y: heightLevel, width: 90, height: 20, type: 'platform', mustTouch: false });
-        } else if (rand < 0.85) {
+        } 
+        else if (rand < 0.65) {
+            // NEU: Die "Doppel-Plattform-Challange" über Stacheln!
+            // Wir spawnen sofort ZWEI Plattformen hintereinander weg
+            let height1 = floorY - 65;
+            let height2 = floorY - 110; // Die zweite ist etwas höher für einen Doppel-Sprung
+            
+            // Erste Plattform
+            obstacles.push({ x: canvas.width, y: height1, width: 90, height: 20, type: 'platform', mustTouch: false });
+            
+            // Zweite Plattform kurz dahinter versetzt
+            obstacles.push({ x: canvas.width + 140, y: height2, width: 90, height: 20, type: 'platform', mustTouch: false });
+            
+            // Ein Teppich aus Stacheln DARUNTER am Boden, damit man sterben MUSS, wenn man runterfällt
+            obstacles.push({ x: canvas.width + 30, y: floorY, width: 30, height: 35, type: 'spike', ceil: false });
+            obstacles.push({ x: canvas.width + 90, y: floorY, width: 30, height: 35, type: 'spike', ceil: false });
+            obstacles.push({ x: canvas.width + 150, y: floorY, width: 30, height: 35, type: 'spike', ceil: false });
+        } 
+        else if (rand < 0.85) {
+            // Normaler gelber Block zum Drüberspringen
             obstacles.push({ x: canvas.width, y: floorY, width: 35, height: 35, type: 'block' });
-        } else {
+        } 
+        else {
+            // PORTAL: Die Chance auf das Ball-Portal wurde verringert (nur noch bei den restlichen 15%)
             let nextMode = 'ball';
             obstacles.push({ x: canvas.width, y: floorY - 100, width: 30, height: 100, type: 'portal', targetMode: nextMode });
         }
     }
 
-    let nextSpawn = 900 + Math.random() * 1200; // Etwas schnellerer Spawn für mehr Action
+    // Spawn-Zeit anpassen (etwas mehr Abstand, falls eine Doppel-Plattform kam)
+    let nextSpawn = (rand >= 0.30 && rand < 0.65 && player.mode === 'cube') ? 2200 : (1000 + Math.random() * 1200);
     spawnTimeout = setTimeout(spawnObstacle, nextSpawn / (gameSpeed / 5));
 }
-
 async function sendScoreToServer(finalScore) {
     try {
         await fetch('/api/submit-score', {
