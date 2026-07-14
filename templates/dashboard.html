@@ -47,8 +47,8 @@
         <div class="overlay-content">
             <h1 style="font-size: 2.5rem; margin-top: 0; color: #ff2e63;">Wichtige Ankündigung! 📢</h1>
             <p style="font-size: 1.25rem; line-height: 1.6; color: #eee; margin: 25px 0;">
-                Hallo {{ name }}! Hier steht deine ganz persönliche Nachricht für diese Person. 
-                Du kannst diesen Text im HTML-Template völlig frei nach deinen Wünschen gestalten.
+                Hallo {{ name }}! Wir haben mitbekommen, dass du in Geometry Dash einfach so einen sehr hohen Score bekommen 
+                hast. Es tut mir leid, aber wir setzen deinen Score auf 150 zurück, weil das sonst unfair wäre.
             </p>
             <button onclick="schliesseNachricht()" class="btn" style="background: #2ecc71; border: none; cursor: pointer; padding: 15px 40px; font-size: 18px;">
                 Verstanden & Schließen
@@ -120,19 +120,28 @@
     <a href="/logout" style="color: #ff2e63; text-decoration: none; font-weight: bold;">Abmelden</a>
 
     <script>
-    // --- Logik für das Einmalige Overlay ---
+    // --- Logik für das Einmalige Overlay (Mit ID-Prüfung) ---
     {% if zeige_spezial_nachricht %}
     document.addEventListener("DOMContentLoaded", function() {
-        // Kontrolliert, ob dieser spezifische Browser die Nachricht schon weggeklickt hat
-        if (!localStorage.getItem("spezialNachrichtGesehen")) {
+        // Wir holen uns die ID aus Python (Sollte in app.py übergeben werden)
+        // Falls in Python vergessen wurde eine ID zu senden, nutzen wir standardmäßig "version_1"
+        const nachrichtId = "{{ spezial_nachricht_id }}" || "version_1";
+        const storageKey = "gesehen_" + nachrichtId;
+        
+        // Wenn dieser Browser diese spezifische Nachrichten-ID noch nicht gesehen hat: anzeigen!
+        if (!localStorage.getItem(storageKey)) {
             document.getElementById("special-overlay").style.display = "flex";
         }
     });
 
     function schliesseNachricht() {
         document.getElementById("special-overlay").style.display = "none";
-        // Speichert dauerhaft im Browser, dass nicht mehr gefragt werden muss
-        localStorage.setItem("spezialNachrichtGesehen", "true");
+        
+        const nachrichtId = "{{ spezial_nachricht_id }}" || "version_1";
+        const storageKey = "gesehen_" + nachrichtId;
+        
+        // Speichert dauerhaft ab, dass genau DIESE Nachricht gesehen wurde
+        localStorage.setItem(storageKey, "true");
     }
     {% endif %}
 
