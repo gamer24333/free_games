@@ -91,42 +91,55 @@ function spawnObstacle() {
 
     let rand = Math.random();
     
-    if (rand < 0.35) {
-        let onCeiling = player.mode === 'ball' && Math.random() > 0.5;
-        obstacles.push({ 
-            x: canvas.width, 
-            y: onCeiling ? ceilingY : floorY, 
-            width: 30, height: 35, 
-            type: 'spike',
-            ceil: onCeiling
-        });
-    } else if (rand < 0.65) {
-        let heightLevel = floorY - 70 - Math.floor(Math.random() * 2) * 50;
-        obstacles.push({
-            x: canvas.width,
-            y: heightLevel,
-            width: 90, height: 20, 
-            type: 'platform'
-        });
-    } else if (rand < 0.85) {
-        let onFloor = Math.random() > 0.4;
-        obstacles.push({
-            x: canvas.width,
-            y: onFloor ? floorY : floorY - 65,
-            width: 35, height: 35, type: 'block'
-        });
+    // Erhöhte Schwierigkeit, wenn der Spieler im Ball-Modus ist
+    if (player.mode === 'ball') {
+        if (rand < 0.40) {
+            // Variante 1: Decken- oder Bodenstachel (50/50 Chance)
+            let onCeiling = Math.random() > 0.5;
+            obstacles.push({ 
+                x: canvas.width, 
+                y: onCeiling ? ceilingY : floorY, 
+                width: 30, height: 35, 
+                type: 'spike',
+                ceil: onCeiling
+            });
+        } else if (rand < 0.75) {
+            // Variante 2: Mittige GEMEINE grüne Pflicht-Plattform
+            let heightLevel = floorY - 110; 
+            obstacles.push({
+                x: canvas.width,
+                y: heightLevel,
+                width: 100, height: 20, 
+                type: 'platform',
+                mustTouch: true, // Markiert als Pflicht-Plattform für den Ball
+                touched: false
+            });
+        } else {
+            // Variante 3: Gelbe Blöcke am Boden oder hängend
+            let onCeiling = Math.random() > 0.5;
+            obstacles.push({
+                x: canvas.width,
+                y: onCeiling ? ceilingY + 35 : floorY,
+                width: 35, height: 35, type: 'block',
+                ceil: onCeiling
+            });
+        }
     } else {
-        let nextMode = player.mode === 'cube' ? 'ball' : 'cube';
-        obstacles.push({
-            x: canvas.width,
-            y: floorY - 100,
-            width: 30, height: 100,
-            type: 'portal',
-            targetMode: nextMode
-        });
+        // Normaler Cube-Modus (unverändert)
+        if (rand < 0.35) {
+            obstacles.push({ x: canvas.width, y: floorY, width: 30, height: 35, type: 'spike', ceil: false });
+        } else if (rand < 0.65) {
+            let heightLevel = floorY - 70 - Math.floor(Math.random() * 2) * 50;
+            obstacles.push({ x: canvas.width, y: heightLevel, width: 90, height: 20, type: 'platform', mustTouch: false });
+        } else if (rand < 0.85) {
+            obstacles.push({ x: canvas.width, y: floorY, width: 35, height: 35, type: 'block' });
+        } else {
+            let nextMode = 'ball';
+            obstacles.push({ x: canvas.width, y: floorY - 100, width: 30, height: 100, type: 'portal', targetMode: nextMode });
+        }
     }
 
-    let nextSpawn = 1000 + Math.random() * 1400;
+    let nextSpawn = 900 + Math.random() * 1200; // Etwas schnellerer Spawn für mehr Action
     spawnTimeout = setTimeout(spawnObstacle, nextSpawn / (gameSpeed / 5));
 }
 
@@ -150,7 +163,6 @@ function resetGame() {
     isGameOver = false; isPaused = false; gameStarted = false;
     if (pauseBtn) { pauseBtn.style.display = "none"; pauseBtn.textContent = "⏸️ Pause"; }
     
-    // MUSIK ZURÜCKSETZEN: Stoppt die alte Musik und setzt sie auf Sekunde 0 zurück
     if (bgMusic) {
         bgMusic.pause();
         bgMusic.currentTime = 0;
@@ -183,7 +195,7 @@ function update() {
     if (!isPaused && gameStarted && !isGameOver) {
         player.vy += player.gravity;
         player.y += player.vy;
-        gameSpeed += 0.0015; 
+        gameSpeed += 0.0018; // Speed zieht minimal schneller an
 
         if (player.y >= floorY - player.size) {
             player.y = floorY - player.size; player.vy = 0; player.isGrounded = true;
@@ -225,6 +237,7 @@ function update() {
         let obs = obstacles[i];
         if (!isGameOver && !isPaused) obs.x -= gameSpeed;
 
+        // --- ZEICHNEN ---
         if (obs.type === 'spike') {
             ctx.fillStyle = '#ff2e63';
             ctx.beginPath();
@@ -240,13 +253,27 @@ function update() {
             ctx.closePath(); ctx.fill();
         } 
         else if (obs.type === 'platform') {
-            ctx.fillStyle = '#4ee54e'; ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+            // Zeige Pflicht-Plattformen in hellem Neongrün, normale in Standardgrün
+            ctx.fillStyle = obs.mustTouch ? '#2ecc71' : '#4ee54e'; 
+            ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
+            
+            // Kleiner optischer Indikator für Pflicht-Inseln
+            if (obs.mustTouch) {
+                ctx.fillStyle = '#fff'; ctx.font = '9px Arial';
+                ctx.fillText("HIER DRAUF!", obs.x + 18, obs.y + 13);
+            }
         } 
         else if (obs.type === 'block') {
             ctx.fillStyle = '#f9d423';
-            ctx.fillRect(obs.x, obs.y - obs.height, obs.width, obs.height);
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(obs.x, obs.y - obs.height, obs.width, obs.height);
+            let blockY = obs.ceil ? obs.y - obs.height : obs.y - obs.height;
+            if (obs.ceil) {
+                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
+            } else {
+                ctx.fillRect(obs.x, obs.y - obs.height, obs.width, obs.height);
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(obs.x, obs.y - obs.height, obs.width, obs.height);
+            }
         } 
         else if (obs.type === 'portal') {
             let portalColor = obs.targetMode === 'ball' ? '#ff9f43' : '#00adb5';
@@ -258,42 +285,63 @@ function update() {
             ctx.fillText(obs.targetMode.toUpperCase(), obs.x - 5, obs.y - 10);
         }
         
+        // --- LOGIK & BERÜHRUNGEN DER PLATTFORMEN ---
         if (obs.type === 'platform') {
             if (player.x + player.size > obs.x && player.x < obs.x + obs.width) {
-                if (player.gravity > 0 && player.y + player.size >= obs.y && player.y + player.size - player.vy <= obs.y + 10) {
+                // Landung von oben (Gravitation normal)
+                if (player.y + player.size >= obs.y && player.y + player.size - player.vy <= obs.y + 12) {
                     player.y = obs.y - player.size; player.vy = 0; player.isGrounded = true;
                     onAnyPlatform = true;
+                    if (obs.mustTouch) obs.touched = true; // Pflicht erfüllt!
                 }
-                if (player.gravity < 0 && player.y <= obs.y + obs.height && player.y - player.vy >= obs.y + obs.height - 10) {
+                // Landung von unten (Ball an Decke/Plattform-Unterseite kleben)
+                if (player.y <= obs.y + obs.height && player.y - player.vy >= obs.y + obs.height - 12) {
                     player.y = obs.y + obs.height; player.vy = 0; player.isGrounded = true;
                     onAnyPlatform = true;
+                    if (obs.mustTouch) obs.touched = true; // Pflicht erfüllt!
                 }
             }
         }
 
-        // KOLLISION / GAME OVER DETEKTION
+        // --- SCHWERE PFLICHT-REGEL: Verpasst man die grüne Plattform im Ball-Modus -> Tod! ---
+        if (obs.type === 'platform' && obs.mustTouch && !isGameOver) {
+            // Sobald die Plattform am Spieler vorbei gezogen ist
+            if (obs.x + obs.width < player.x && !obs.touched) {
+                isGameOver = true;
+                if (pauseBtn) pauseBtn.style.display = "none";
+                if (bgMusic) bgMusic.pause();
+                sendScoreToServer(score);
+            }
+        }
+
+        // --- STANDARD KOLLISIONEN (STACHELN & BLÖCKE) ---
         if (obs.type === 'spike' || obs.type === 'block') {
-            let collisionY = obs.type === 'spike' && obs.ceil ? obs.y : obs.y - obs.height;
+            let collisionMinY, collisionMaxY;
+            
+            if (obs.type === 'spike') {
+                collisionMinY = obs.ceil ? obs.y : obs.y - obs.height;
+                collisionMaxY = obs.ceil ? obs.y + obs.height : obs.y;
+            } else { // Block
+                collisionMinY = obs.ceil ? obs.y : obs.y - obs.height;
+                collisionMaxY = obs.ceil ? obs.y + obs.height : obs.y;
+            }
+
             if (
                 player.x < obs.x + obs.width &&
                 player.x + player.size > obs.x &&
-                player.y + player.size > collisionY &&
-                player.y < (obs.type === 'spike' && obs.ceil ? obs.y + obs.height : obs.y)
+                player.y + player.size > collisionMinY &&
+                player.y < collisionMaxY
             ) {
                 if (!isGameOver) {
                     isGameOver = true;
                     if (pauseBtn) pauseBtn.style.display = "none";
-                    
-                    // MUSIK STOPPEN BEI GAME OVER
-                    if (bgMusic) {
-                        bgMusic.pause();
-                    }
-                    
+                    if (bgMusic) bgMusic.pause();
                     sendScoreToServer(score);
                 }
             }
         }
 
+        // --- PORTAL WECHSEL ---
         if (obs.type === 'portal') {
             if (player.x < obs.x + obs.width && player.x + player.size > obs.x && player.y + player.size > obs.y && player.y < obs.y + obs.height) {
                 if (player.mode !== obs.targetMode) {
@@ -303,6 +351,7 @@ function update() {
             }
         }
 
+        // --- SCORE-ZÄHLUNG & LEVEL UP ---
         if (!isPaused && obs.x + obs.width < player.x && !obs.passed) {
             obs.passed = true;
             score++;
