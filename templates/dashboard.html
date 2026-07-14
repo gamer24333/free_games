@@ -12,9 +12,50 @@
         .invite-box { background: #333; padding: 15px; border-radius: 8px; max-width: 500px; margin: 25px auto; border: 2px solid #ff2e63; text-align: left; }
         .invite-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; }
         .admin-box { margin-top: 40px; border-top: 2px dashed #555; padding-top: 20px; }
+        
+        /* Overlay-Styling */
+        .overlay-container {
+            display: none; 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100vw; 
+            height: 100vh; 
+            background-color: rgba(17, 17, 17, 0.98); 
+            color: white; 
+            z-index: 99999; 
+            justify-content: center; 
+            align-items: center; 
+            flex-direction: column; 
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .overlay-content {
+            max-width: 600px;
+            background: #2a2a2a;
+            padding: 40px;
+            border-radius: 12px;
+            border: 2px solid #00adb5;
+            box-shadow: 0 0 20px rgba(0, 173, 181, 0.3);
+        }
     </style>
 </head>
 <body>
+
+    {% if zeige_spezial_nachricht %}
+    <div id="special-overlay" class="overlay-container">
+        <div class="overlay-content">
+            <h1 style="font-size: 2.5rem; margin-top: 0; color: #ff2e63;">Wichtige Ankündigung! 📢</h1>
+            <p style="font-size: 1.25rem; line-height: 1.6; color: #eee; margin: 25px 0;">
+                Hallo {{ name }}! Hier steht deine ganz persönliche Nachricht für diese Person. 
+                Du kannst diesen Text im HTML-Template völlig frei nach deinen Wünschen gestalten.
+            </p>
+            <button onclick="schliesseNachricht()" class="btn" style="background: #2ecc71; border: none; cursor: pointer; padding: 15px 40px; font-size: 18px;">
+                Verstanden & Schließen
+            </button>
+        </div>
+    </div>
+    {% endif %}
 
     <h1>Willkommen, {{ name }}! 👋</h1>
     <p>Schön, dass du da bist. Was willst du machen?</p>
@@ -79,17 +120,32 @@
     <a href="/logout" style="color: #ff2e63; text-decoration: none; font-weight: bold;">Abmelden</a>
 
     <script>
+    // --- Logik für das Einmalige Overlay ---
+    {% if zeige_spezial_nachricht %}
+    document.addEventListener("DOMContentLoaded", function() {
+        // Kontrolliert, ob dieser spezifische Browser die Nachricht schon weggeklickt hat
+        if (!localStorage.getItem("spezialNachrichtGesehen")) {
+            document.getElementById("special-overlay").style.display = "flex";
+        }
+    });
+
+    function schliesseNachricht() {
+        document.getElementById("special-overlay").style.display = "none";
+        // Speichert dauerhaft im Browser, dass nicht mehr gefragt werden muss
+        localStorage.setItem("spezialNachrichtGesehen", "true");
+    }
+    {% endif %}
+
+    // --- Dein bestehendes Message-Polling-Skript ---
     async function checkNewMessages() {
         try {
             const response = await fetch('/api/dashboard-stats');
             if (response.ok) {
                 const stats = await response.json();
                 
-                // 1. Globale Nachrichten auswerten
                 const lastSeenGlobal = localStorage.getItem('last_seen_messages_global') || 0;
                 const newGlobal = stats.global_messages_count - lastSeenGlobal;
                 
-                // 2. Private Nachrichten auswerten
                 let newPrivateTotal = 0;
                 const localPrivateStorage = JSON.parse(localStorage.getItem('last_seen_messages_private') || '{}');
                 
@@ -100,7 +156,6 @@
                     }
                 }
                 
-                // 3. Gesamtzahl berechnen und anzeigen
                 const totalNewMessages = (newGlobal > 0 ? newGlobal : 0) + newPrivateTotal;
                 const badge = document.getElementById('chatBadge');
                 
@@ -114,9 +169,8 @@
         } catch (e) { console.error(e); }
     }
 
-    // Alle 5 Sekunden prüfen
     setInterval(checkNewMessages, 5000);
     checkNewMessages();
-</script>
+    </script>
 </body>
 </html>
