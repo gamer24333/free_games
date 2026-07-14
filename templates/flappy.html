@@ -10,71 +10,93 @@
             margin: 0;
             padding: 0;
             height: 100%;
-            background-color: #222; /* Hintergrund für den Spielbereich */
+            background-color: #222;
             font-family: Arial, sans-serif;
             color: white;
             display: flex;
             flex-direction: column;
-            overflow: hidden; /* Verhindert Scrollbalken */
+            overflow: hidden;
         }
 
-        /* Oberer Header-Bereich mit leicht anderer, dunklerer Farbe */
+        /* Oberer Header-Bereich */
         .header-bar {
             background-color: #161616;
-            padding: 15px 10px;
+            padding: 10px;
             text-align: center;
             border-bottom: 2px solid #2d2d2d;
             box-sizing: border-box;
             z-index: 10;
         }
 
-        /* Mittlerer Hauptbereich, der das Canvas und die Rangliste hält */
+        /* Hauptbereich nach oben verschoben */
         .main-content {
             flex: 1;
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start;
             gap: 30px;
             padding: 20px;
             box-sizing: border-box;
             flex-wrap: wrap;
-            overflow-y: auto; /* Erlaubt Scrollen auf Handys, falls das Leaderboard lang ist */
+            overflow-y: auto;
         }
 
-        /* Unterer Footer-Bereich mit leicht anderer Farbe */
+        /* Unterer Footer-Bereich */
         .footer-bar {
             background-color: #161616;
             padding: 12px 10px;
             text-align: center;
             border-top: 2px solid #2d2d2d;
             font-size: 14px;
-            color: #888;
+            color: #ccc;
             box-sizing: border-box;
             z-index: 10;
         }
 
         h1 {
-            margin: 5px 0 0 0;
-            font-size: 24px;
+            margin: 0;
+            font-size: 22px;
             color: #f9d423;
+            display: inline-block;
+            vertical-align: middle;
         }
 
         /* Buttons */
-        .btn { display: inline-block; padding: 10px 20px; background: #00adb5; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
-        .btn:hover { background: #007c82; }
-        .btn-back { background: #555; margin-right: 15px; }
-        
-        .btn-fullscreen { background: #ff9f43; color: black; font-size: 15px; }
-        .btn-fullscreen:hover { background: #e08b35; }
+        .btn { display: inline-block; padding: 8px 16px; background: #555; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; font-size: 14px; }
+        .btn:hover { background: #444; }
+        .btn-back { float: left; }
+
+        /* Dezenter, kleiner Vollbild-Link direkt beim Spiel */
+        .fullscreen-link {
+            color: #ff9f43;
+            text-decoration: underline;
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .fullscreen-link:hover {
+            color: #e08b35;
+        }
 
         /* Das Canvas (Spielfeld) */
-        canvas {
+        #flappyCanvas {
             border: 4px solid #f9d423;
             border-radius: 8px;
-            background: #70c5ce; /* Standard Flappy-Himmelblau, falls das Bild lädt */
+            background: #70c5ce;
             box-shadow: 0 8px 25px rgba(0,0,0,0.6);
             display: block;
+            transition: all 0.2s ease;
         }
+
+        /* Spezifisches Verhalten für das Canvas im Vollbildmodus */
+        #flappyCanvas:fullscreen {
+            width: auto;
+            height: 100vh;
+            border: none;
+            border-radius: 0;
+            background: #70c5ce;
+        }
+        #flappyCanvas:-webkit-full-screen { width: auto; height: 100vh; border: none; border-radius: 0; }
 
         /* Rangliste */
         .leaderboard-box {
@@ -88,7 +110,7 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
         .leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .leaderboard-table th, .leaderboard-table td { padding: 8px; border-bottom: 1px solid #444; text-align: left; }
+        .leaderboard-table th, .leaderboard-table td { padding: 6px 8px; border-bottom: 1px solid #444; text-align: left; font-size: 14px; }
         .leaderboard-table th { color: #f9d423; }
         .leaderboard-table tr:nth-child(1) td { color: #ffd700; font-weight: bold; }
     </style>
@@ -97,7 +119,6 @@
 
     <div class="header-bar">
         <a href="/games" class="btn btn-back">⬅️ Zurück</a>
-        <button id="fullscreenBtn" class="btn btn-fullscreen">📺 Vollbildmodus</button>
         <h1>🐦 Klassen-Flappy</h1>
     </div>
 
@@ -128,39 +149,45 @@
     </div>
 
     <div class="footer-bar">
-        <span>Drücke die <b>Leertaste</b>, <b>Enter</b> oder klicke ins Feld zum Springen! 🚀</span>
+        <span>Drücke die <b>Leertaste</b>, <b>Enter</b> oder klicke ins Feld zum Springen! 🚀 
+        <span id="fullscreenLink" class="fullscreen-link">[📺 Vollbildmodus]</span></span>
     </div>
 
     <script>
         const canvas = document.getElementById('flappyCanvas');
         const ctx = canvas.getContext('2d');
-        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const fullscreenLink = document.getElementById('fullscreenLink');
 
-        // --- VOLLBILD STEUERUNG ---
-        fullscreenBtn.addEventListener('click', () => {
+        // --- AUDIO DATEIEN LADEN ---
+        // Die Pfade können angepasst werden, falls deine Dateien anders heißen!
+        const bgMusic = new Audio('/static/flappy_bird.mp3');
+        bgMusic.loop = true; // Musik soll sich wiederholen
+        bgMusic.volume = 0.4; // Lautstärke einstellen (0.0 bis 1.0)
+        
+        // --- VOLLBILD NUR FÜR DAS SPIELFELD ---
+        fullscreenLink.addEventListener('click', () => {
             if (!document.fullscreenElement) {
-                const element = document.documentElement;
-                if (element.requestFullscreen) {
-                    element.requestFullscreen();
-                } else if (element.mozRequestFullScreen) {
-                    element.mozRequestFullScreen();
-                } else if (element.webkitRequestFullscreen) {
-                    element.webkitRequestFullscreen();
-                } else if (element.msRequestFullscreen) {
-                    element.msRequestFullscreen();
+                if (canvas.requestFullscreen) {
+                    canvas.requestFullscreen();
+                } else if (canvas.mozRequestFullScreen) {
+                    canvas.mozRequestFullScreen();
+                } else if (canvas.webkitRequestFullscreen) {
+                    canvas.webkitRequestFullscreen();
+                } else if (canvas.msRequestFullscreen) {
+                    canvas.msRequestFullscreen();
                 }
-                fullscreenBtn.textContent = "📺 Vollbild beenden";
+                fullscreenLink.textContent = "[📺 Vollbild beenden]";
             } else {
                 if (document.exitFullscreen) {
                     document.exitFullscreen();
                 }
-                fullscreenBtn.textContent = "📺 Vollbildmodus";
+                fullscreenLink.textContent = "[📺 Vollbildmodus]";
             }
         });
 
         document.addEventListener('fullscreenchange', () => {
             if (!document.fullscreenElement) {
-                fullscreenBtn.textContent = "📺 Vollbildmodus";
+                fullscreenLink.textContent = "[📺 Vollbildmodus]";
             }
         });
 
@@ -176,16 +203,16 @@
         // Rohre
         let pipes = [];
         const pipeWidth = 52;
-        const pipeGap = 110;
+        const pipeGap = 90; // Schwieriger Original-Abstand
         let frameCount = 0;
 
-        // Dummy-Grafiken zeichnen (Falls du Bilder hast, kannst du diese hier laden)
+        // Grafiken zeichnen
         function draw() {
             // Hintergrund-Himmel
             ctx.fillStyle = '#70c5ce';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Wolken/Boden (vereinfacht)
+            // Wolken/Boden
             ctx.fillStyle = '#ded895';
             ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
             ctx.fillStyle = '#73bf2e';
@@ -267,12 +294,10 @@
                 birdVelocity += gravity;
                 birdY += birdVelocity;
 
-                // Kollision mit Boden oder Decke
                 if (birdY + 12 >= canvas.height - 58 || birdY - 12 <= 0) {
                     triggerGameOver();
                 }
 
-                // Rohre bewegen und erstellen
                 frameCount++;
                 if (frameCount % 100 === 0) {
                     const topLimit = 50;
@@ -291,21 +316,18 @@
                 pipes.forEach(pipe => {
                     pipe.x -= 2;
 
-                    // Kollisionsprüfung mit Rohren
                     if (60 + 12 > pipe.x && 60 - 12 < pipe.x + pipeWidth) {
                         if (birdY - 12 < pipe.top || birdY + 12 > canvas.height - pipe.bottom) {
                             triggerGameOver();
                         }
                     }
 
-                    // Score erhöhen, wenn Rohr passiert
                     if (!pipe.passed && pipe.x + pipeWidth < 60) {
                         score++;
                         pipe.passed = true;
                     }
                 });
 
-                // Abgelaufene Rohre entfernen
                 pipes = pipes.filter(pipe => pipe.x + pipeWidth > 0);
             }
         }
@@ -313,6 +335,12 @@
         function triggerGameOver() {
             gameOver = true;
             gameActive = false;
+            
+            // Musik stoppen und Crash abspielen
+            bgMusic.pause();
+            bgMusic.currentTime = 0;
+            
+
             submitScore(score);
         }
 
@@ -324,6 +352,9 @@
             frameCount = 0;
             gameOver = false;
             gameActive = true;
+
+            // Musik von vorne starten
+            bgMusic.play().catch(e => console.log("Audio-Autoplay verhindert:", e));
         }
 
         function action() {
@@ -331,12 +362,15 @@
                 resetGame();
             } else if (!gameActive) {
                 gameActive = true;
+                bgMusic.play().catch(e => console.log("Audio-Autoplay verhindert:", e));
             } else {
                 birdVelocity = jump;
+                // Ton abspielen (zurücksetzen, falls er noch läuft)
+                
             }
         }
 
-        // --- EVENTS ---
+        // --- CONTROLS ---
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Space' || e.code === 'Enter') {
                 e.preventDefault();
@@ -354,7 +388,6 @@
             action();
         }, { passive: false });
 
-        // API Score Übertragung
         async function submitScore(finalScore) {
             try {
                 const response = await fetch('/api/submit-flappy', {
@@ -372,7 +405,6 @@
             }
         }
 
-        // Game Loop
         function loop() {
             update();
             draw();
