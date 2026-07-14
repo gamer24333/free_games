@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Klassen-Clicker</title>
+    <title>Klassen-Flappy</title>
     <style>
-        /* Grunddesign und Kontrastbereiche */
+        /* Grunddesign und Kontrastbereiche oben/unten */
         html, body {
             margin: 0;
             padding: 0;
@@ -15,101 +15,103 @@
             color: white;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
 
+        /* Oberer Header-Bereich */
         .header-bar {
             background-color: #161616;
-            padding: 20px 10px;
+            padding: 10px;
             text-align: center;
             border-bottom: 2px solid #2d2d2d;
             box-sizing: border-box;
+            z-index: 10;
         }
 
+        /* Hauptbereich nach oben verschoben */
         .main-content {
             flex: 1;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
-            padding: 30px 10px;
+            align-items: flex-start;
+            gap: 30px;
+            padding: 20px;
             box-sizing: border-box;
+            flex-wrap: wrap;
+            overflow-y: auto;
         }
 
+        /* Unterer Footer-Bereich */
         .footer-bar {
             background-color: #161616;
-            padding: 15px 10px;
+            padding: 12px 10px;
             text-align: center;
             border-top: 2px solid #2d2d2d;
             font-size: 14px;
-            color: #888;
+            color: #ccc;
             box-sizing: border-box;
+            z-index: 10;
         }
 
         h1 {
-            margin: 10px 0 0 0;
-            font-size: 28px;
+            margin: 0;
+            font-size: 22px;
+            color: #f9d423;
+            display: inline-block;
+            vertical-align: middle;
         }
 
-        .btn { display: inline-block; padding: 12px 24px; background: #00adb5; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
-        .btn:hover { background: #007c82; }
-        .btn-back { background: #555; margin-right: 15px; }
-        .btn-fullscreen { background: #ff9f43; color: black; font-size: 16px; }
-        .btn-fullscreen:hover { background: #e08b35; }
-        
-        .game-layout { display: flex; justify-content: center; align-items: flex-start; gap: 40px; max-width: 900px; margin: 0 auto; flex-wrap: wrap; }
-        
-        /* SPIELBOX (Der Bereich, der ins Vollbild geht) */
-        .game-box { 
-            background: #333; 
-            border: 3px solid #00adb5; 
-            border-radius: 12px; 
-            padding: 30px; 
-            width: 350px; 
-            text-align: center; 
-            box-sizing: border-box; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
+        /* Buttons */
+        .btn { display: inline-block; padding: 8px 16px; background: #555; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; font-size: 14px; }
+        .btn:hover { background: #444; }
+        .btn-back { float: left; }
+
+        /* Dezenter, kleiner Vollbild-Link direkt beim Spiel */
+        .fullscreen-link {
+            color: #ff9f43;
+            text-decoration: underline;
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .fullscreen-link:hover {
+            color: #e08b35;
+        }
+
+        /* Das Canvas (Spielfeld) */
+        #flappyCanvas {
+            border: 4px solid #f9d423;
+            border-radius: 8px;
+            background: #70c5ce;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+            display: block;
             transition: all 0.2s ease;
         }
 
-        /* Automatisches CSS-Styling, sobald die Box im Vollbildmodus ist */
-        .game-box:fullscreen {
-            width: 100vw;
+        /* Spezifisches Verhalten für das Canvas im Vollbildmodus */
+        #flappyCanvas:fullscreen {
+            width: auto;
             height: 100vh;
             border: none;
             border-radius: 0;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            background: #222; /* Hintergrundfarbe im Vollbild */
+            background: #70c5ce;
         }
-        
-        /* Vendor-Präfixe für andere Browser-Engines im Vollbild */
-        .game-box:-webkit-full-screen { width: 100vw; height: 100vh; border: none; border-radius: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #222; }
-        .game-box:-ms-fullscreen { width: 100vw; height: 100vh; border: none; border-radius: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #222; }
+        #flappyCanvas:-webkit-full-screen { width: auto; height: 100vh; border: none; border-radius: 0; }
 
-        .click-btn { width: 160px; height: 160px; border-radius: 50%; background: #00adb5; color: white; font-size: 20px; font-weight: bold; border: none; cursor: pointer; box-shadow: 0 0 15px rgba(0,173,181,0.4); transition: transform 0.05s; margin: 20px 0; user-select: none; -webkit-user-select: none; }
-        
-        /* Skaliert den Button im Vollbildmodus etwas hoch, damit er besser zu treffen ist */
-        .game-box:fullscreen .click-btn {
-            width: 220px;
-            height: 220px;
-            font-size: 26px;
+        /* Rangliste */
+        .leaderboard-box {
+            background: #333;
+            border: 2px solid #444;
+            border-radius: 12px;
+            width: 280px;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: left;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
-        .game-box:-webkit-full-screen .click-btn { width: 220px; height: 220px; font-size: 26px; }
-
-        .click-btn:active, .click-btn.active { transform: scale(0.95); background: #008c9e; }
-        .click-btn:disabled { background: #555; box-shadow: none; cursor: not-allowed; }
-        .stats { font-size: 22px; margin: 10px 0; }
-        
-        /* Vergrößert die Schriftwerte im Vollbild */
-        .game-box:fullscreen .stats { font-size: 32px; }
-        .game-box:-webkit-full-screen .stats { font-size: 32px; }
-        
-        .leaderboard-box { background: #333; border: 2px solid #444; border-radius: 12px; width: 300px; padding: 20px; box-sizing: border-box; text-align: left; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         .leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .leaderboard-table th, .leaderboard-table td { padding: 8px; border-bottom: 1px solid #444; text-align: left; }
-        .leaderboard-table th { color: #00adb5; }
+        .leaderboard-table th, .leaderboard-table td { padding: 6px 8px; border-bottom: 1px solid #444; text-align: left; font-size: 14px; }
+        .leaderboard-table th { color: #f9d423; }
         .leaderboard-table tr:nth-child(1) td { color: #ffd700; font-weight: bold; }
     </style>
 </head>
@@ -117,189 +119,299 @@
 
     <div class="header-bar">
         <a href="/games" class="btn btn-back">⬅️ Zurück</a>
-        <button id="fullscreenBtn" class="btn btn-fullscreen">📺 Vollbildmodus</button>
-        <h1>⚡ Der 10-Sekunden-Clicker-Test</h1>
+        <h1>🐦 Klassen-Flappy</h1>
     </div>
 
     <div class="main-content">
-        <div class="game-layout">
-            <div class="game-box" id="gameBox">
-                <div class="stats">Zeit: <b id="timer" style="color: #ff2e63;">10</b>s</div>
-                <div class="stats">Klicks: <b id="score" style="color: #00adb5;">0</b></div>
-                
-                <button id="clickMe" class="click-btn">KLICK MICH!</button>
-                
-                <p id="hint" style="color: #aaa;">Klicke einmal, um zu starten!</p>
-                <button id="resetBtn" class="btn" style="display:none; margin-top:10px; background: #ff2e63;">Nochmal versuchen</button>
-            </div>
-            
-            <div class="leaderboard-box">
-                <h3 style="margin-top: 0; color: #f9d423; text-align: center;">🏆 Clicker-Rangliste</h3>
-                <table class="leaderboard-table">
-                    <thead>
-                        <tr>
-                            <th>Platz</th>
-                            <th>Name</th>
-                            <th>Klicks</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for player, score in leaderboard %}
-                        <tr>
-                            <td>{{ loop.index }}.</td>
-                            <td>{{ player }}</td>
-                            <td>{{ score }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+        <canvas id="flappyCanvas" width="320" height="480"></canvas>
+
+        <div class="leaderboard-box">
+            <h3 style="margin-top: 0; color: #f9d423; text-align: center; margin-bottom: 5px;">🏆 Flappy-Rangliste</h3>
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>Platz</th>
+                        <th>Name</th>
+                        <th>Highscore</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for player, score in leaderboard %}
+                    <tr>
+                        <td>{{ loop.index }}.</td>
+                        <td>{{ player }}</td>
+                        <td>{{ score }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 
     <div class="footer-bar">
-        <span>Viel Erfolg! Gib alles und knacke den Highscore! 🚀</span>
+        <span>Drücke die <b>Leertaste</b>, <b>Enter</b> oder klicke ins Feld zum Springen! 🚀 
+        <span id="fullscreenLink" class="fullscreen-link">[📺 Vollbildmodus]</span></span>
     </div>
 
     <script>
-        let clicks = 0;
-        let timeLeft = 10;
-        let gameActive = false;
-        let hasStarted = false;
-        let timerInterval;
+        const canvas = document.getElementById('flappyCanvas');
+        const ctx = canvas.getContext('2d');
+        const fullscreenLink = document.getElementById('fullscreenLink');
 
-        const clickBtn = document.getElementById('clickMe');
-        const timerEl = document.getElementById('timer');
-        const scoreEl = document.getElementById('score');
-        const hintEl = document.getElementById('hint');
-        const resetBtn = document.getElementById('resetBtn');
-        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        // --- AUDIO DATEIEN LADEN ---
+        // Die Pfade können angepasst werden, falls deine Dateien anders heißen!
+        const bgMusic = new Audio('/static/flappy_bird.mp3');
+        bgMusic.loop = true; // Musik soll sich wiederholen
+        bgMusic.volume = 0.4; // Lautstärke einstellen (0.0 bis 1.0)
         
-        // Holt die Spielbox statt der ganzen Seite
-        const gameBox = document.getElementById('gameBox');
-
-        let isKeyPressed = false;
-
-        // --- SPEZIFISCHE VOLLBILD STEUERUNG ---
-        fullscreenBtn.addEventListener('click', () => {
+        // --- VOLLBILD NUR FÜR DAS SPIELFELD ---
+        fullscreenLink.addEventListener('click', () => {
             if (!document.fullscreenElement) {
-                // Wir schicken nur das "gameBox"-Div ins Vollbild!
-                if (gameBox.requestFullscreen) {
-                    gameBox.requestFullscreen();
-                } else if (gameBox.mozRequestFullScreen) {
-                    gameBox.mozRequestFullScreen();
-                } else if (gameBox.webkitRequestFullscreen) {
-                    gameBox.webkitRequestFullscreen();
-                } else if (gameBox.msRequestFullscreen) {
-                    gameBox.msRequestFullscreen();
+                if (canvas.requestFullscreen) {
+                    canvas.requestFullscreen();
+                } else if (canvas.mozRequestFullScreen) {
+                    canvas.mozRequestFullScreen();
+                } else if (canvas.webkitRequestFullscreen) {
+                    canvas.webkitRequestFullscreen();
+                } else if (canvas.msRequestFullscreen) {
+                    canvas.msRequestFullscreen();
                 }
-                fullscreenBtn.textContent = "📺 Vollbild beenden";
+                fullscreenLink.textContent = "[📺 Vollbild beenden]";
             } else {
                 if (document.exitFullscreen) {
                     document.exitFullscreen();
                 }
-                fullscreenBtn.textContent = "📺 Vollbildmodus";
+                fullscreenLink.textContent = "[📺 Vollbildmodus]";
             }
         });
 
         document.addEventListener('fullscreenchange', () => {
             if (!document.fullscreenElement) {
-                fullscreenBtn.textContent = "📺 Vollbildmodus";
+                fullscreenLink.textContent = "[📺 Vollbildmodus]";
             }
         });
 
-        // --- SPIELLOGIK ---
-        clickBtn.addEventListener('click', () => {
-            if (!hasStarted) {
-                hasStarted = true;
-                gameActive = true;
-                hintEl.textContent = "SCHNELLER! 🔥";
+        // --- SPIELVARIABLEN ---
+        let birdY = 200;
+        let birdVelocity = 0;
+        const gravity = 0.4;
+        const jump = -6.5;
+        let score = 0;
+        let gameActive = false;
+        let gameOver = false;
+
+        // Rohre
+        let pipes = [];
+        const pipeWidth = 52;
+        const pipeGap = 90; // Schwieriger Original-Abstand
+        let frameCount = 0;
+
+        // Grafiken zeichnen
+        function draw() {
+            // Hintergrund-Himmel
+            ctx.fillStyle = '#70c5ce';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Wolken/Boden
+            ctx.fillStyle = '#ded895';
+            ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+            ctx.fillStyle = '#73bf2e';
+            ctx.fillRect(0, canvas.height - 58, canvas.width, 8);
+
+            // Rohre zeichnen
+            pipes.forEach(pipe => {
+                ctx.fillStyle = '#73bf2e';
+                ctx.strokeStyle = '#55801a';
+                ctx.lineWidth = 3;
+
+                // Oberes Rohr
+                ctx.fillRect(pipe.x, 0, pipeWidth, pipe.top);
+                ctx.strokeRect(pipe.x, 0, pipeWidth, pipe.top);
+
+                // Unteres Rohr
+                ctx.fillRect(pipe.x, canvas.height - pipe.bottom, pipeWidth, pipe.bottom);
+                ctx.strokeRect(pipe.x, canvas.height - pipe.bottom, pipeWidth, pipe.bottom);
+            });
+
+            // Vogel zeichnen
+            ctx.fillStyle = '#f9d423';
+            ctx.beginPath();
+            ctx.arc(60, birdY, 12, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Auge
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(64, birdY - 4, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(65, birdY - 4, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Schnabel
+            ctx.fillStyle = '#ff9f43';
+            ctx.beginPath();
+            ctx.moveTo(70, birdY - 2);
+            ctx.lineTo(80, birdY + 1);
+            ctx.lineTo(70, birdY + 4);
+            ctx.closePath();
+            ctx.fill();
+
+            // Score-Anzeige
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 4;
+            ctx.font = 'bold 32px Arial';
+            ctx.textAlign = 'center';
+            ctx.strokeText(score, canvas.width / 2, 50);
+            ctx.fillText(score, canvas.width / 2, 50);
+
+            if (!gameActive && !gameOver) {
+                ctx.font = 'bold 18px Arial';
+                ctx.strokeText("Klicke zum Starten!", canvas.width / 2, canvas.height / 2);
+                ctx.fillText("Klicke zum Starten!", canvas.width / 2, canvas.height / 2);
+            }
+
+            if (gameOver) {
+                ctx.font = 'bold 24px Arial';
+                ctx.fillStyle = '#ff2e63';
+                ctx.strokeText("GAME OVER", canvas.width / 2, canvas.height / 2 - 20);
+                ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 20);
                 
-                timerInterval = setInterval(() => {
-                    timeLeft--;
-                    timerEl.textContent = timeLeft;
-                    
-                    if (timeLeft <= 0) {
-                        endGame();
-                    }
-                }, 1000);
-            }
-
-            if (gameActive) {
-                clicks++;
-                scoreEl.textContent = clicks;
-            }
-        });
-
-        // Tastatursteuerung
-        window.addEventListener('keydown', function(e) {
-            if (e.code === 'Space' || e.code === 'Enter' || e.keyCode === 32 || e.keyCode === 13) {
-                e.preventDefault();
-                
-                if (isKeyPressed) return;
-                isKeyPressed = true;
-
-                if (clickBtn && !clickBtn.disabled) {
-                    clickBtn.classList.add('active');
-                    clickBtn.click(); 
-                }
-            }
-        });
-
-        window.addEventListener('keyup', function(e) {
-            if (e.code === 'Space' || e.code === 'Enter' || e.keyCode === 32 || e.keyCode === 13) {
-                isKeyPressed = false;
-                if (clickBtn) {
-                    clickBtn.classList.remove('active');
-                }
-            }
-        });
-
-        async function endGame() {
-            gameActive = false;
-            clearInterval(timerInterval);
-            clickBtn.disabled = true;
-            clickBtn.classList.remove('active');
-            hintEl.textContent = `Fertig! Du hast ${clicks} Klicks geschafft.`;
-            resetBtn.style.display = "inline-block";
-
-            try {
-                const response = await fetch('/api/submit-clicker', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ score: clicks })
-                });
-                
-                if (response.ok) {
-                    setTimeout(() => {
-                        // Verlasse vor dem Neuladen den Vollbildmodus, damit die Seite nicht hängen bleibt
-                        if (document.fullscreenElement) {
-                            document.exitFullscreen().then(() => {
-                                window.location.reload();
-                            }).catch(() => {
-                                window.location.reload();
-                            });
-                        } else {
-                            window.location.reload();
-                        }
-                    }, 1500);
-                }
-            } catch (e) { 
-                console.error("Fehler beim Senden des Scores:", e); 
+                ctx.font = 'bold 16px Arial';
+                ctx.fillStyle = 'white';
+                ctx.strokeText("Klicke für Neustart", canvas.width / 2, canvas.height / 2 + 20);
+                ctx.fillText("Klicke für Neustart", canvas.width / 2, canvas.height / 2 + 20);
             }
         }
 
-        resetBtn.addEventListener('click', () => {
-            clicks = 0;
-            timeLeft = 10;
+        function update() {
+            if (gameActive && !gameOver) {
+                birdVelocity += gravity;
+                birdY += birdVelocity;
+
+                if (birdY + 12 >= canvas.height - 58 || birdY - 12 <= 0) {
+                    triggerGameOver();
+                }
+
+                frameCount++;
+                if (frameCount % 100 === 0) {
+                    const topLimit = 50;
+                    const bottomLimit = canvas.height - 58 - pipeGap - 50;
+                    const topHeight = Math.floor(Math.random() * (bottomLimit - topLimit)) + topLimit;
+                    const bottomHeight = canvas.height - 58 - pipeGap - topHeight;
+
+                    pipes.push({
+                        x: canvas.width,
+                        top: topHeight,
+                        bottom: bottomHeight,
+                        passed: false
+                    });
+                }
+
+                pipes.forEach(pipe => {
+                    pipe.x -= 2;
+
+                    if (60 + 12 > pipe.x && 60 - 12 < pipe.x + pipeWidth) {
+                        if (birdY - 12 < pipe.top || birdY + 12 > canvas.height - pipe.bottom) {
+                            triggerGameOver();
+                        }
+                    }
+
+                    if (!pipe.passed && pipe.x + pipeWidth < 60) {
+                        score++;
+                        pipe.passed = true;
+                    }
+                });
+
+                pipes = pipes.filter(pipe => pipe.x + pipeWidth > 0);
+            }
+        }
+
+        function triggerGameOver() {
+            gameOver = true;
             gameActive = false;
-            hasStarted = false;
-            timerEl.textContent = timeLeft;
-            scoreEl.textContent = clicks;
-            clickBtn.disabled = false;
-            hintEl.textContent = "Klicke einmal, um zu starten!";
-            resetBtn.style.display = "none";
+            
+            // Musik stoppen und Crash abspielen
+            bgMusic.pause();
+            bgMusic.currentTime = 0;
+            
+
+            submitScore(score);
+        }
+
+        function resetGame() {
+            birdY = 200;
+            birdVelocity = 0;
+            score = 0;
+            pipes = [];
+            frameCount = 0;
+            gameOver = false;
+            gameActive = true;
+
+            // Musik von vorne starten
+            bgMusic.play().catch(e => console.log("Audio-Autoplay verhindert:", e));
+        }
+
+        function action() {
+            if (gameOver) {
+                resetGame();
+            } else if (!gameActive) {
+                gameActive = true;
+                bgMusic.play().catch(e => console.log("Audio-Autoplay verhindert:", e));
+            } else {
+                birdVelocity = jump;
+                // Ton abspielen (zurücksetzen, falls er noch läuft)
+                
+            }
+        }
+
+        // --- CONTROLS ---
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.code === 'Enter') {
+                e.preventDefault();
+                action();
+            }
         });
+
+        canvas.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            action();
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            action();
+        }, { passive: false });
+
+        async function submitScore(finalScore) {
+            try {
+                const response = await fetch('/api/submit-flappy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ score: finalScore })
+                });
+                if (response.ok) {
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                }
+            } catch (e) {
+                console.error("Score-Übertragungsfehler:", e);
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        loop();
     </script>
 </body>
 </html>
