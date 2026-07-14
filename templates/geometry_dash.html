@@ -7,11 +7,59 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
         .game-layout { display: flex; justify-content: center; gap: 20px; max-width: 1100px; margin: 0 auto; padding: 10px; }
-        canvas { background-color: #222; border: 4px solid #00adb5; border-radius: 8px; }
+        
+        /* Neuer Wrapper für Geometry Dash */
+        .game-wrapper {
+            position: relative;
+            background-color: #222;
+            border: 4px solid #00adb5;
+            border-radius: 8px;
+            display: inline-block;
+        }
+        canvas { display: block; background-color: #222; max-width: 100%; }
+        
         .leaderboard-box { background: #1e1e1e; border: 2px solid #333; border-radius: 8px; width: 250px; padding: 15px; text-align: left; }
         .leaderboard-table { width: 100%; border-collapse: collapse; }
         .leaderboard-table th, .leaderboard-table td { padding: 8px; border-bottom: 1px solid #333; }
         .leaderboard-table tr:nth-child(2) td { color: #ffd700; font-weight: bold; } /* Gold für Platz 1 */
+        
+        /* Vollbild-Button Styling */
+        .fullscreen-toggle-btn {
+            background: #eccc68;
+            color: #222;
+            border: none;
+            padding: 10px 20px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        /* --- VOLLBILD STYLES --- */
+        .game-wrapper:fullscreen {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #111;
+            border: none;
+        }
+        .game-wrapper:fullscreen canvas {
+            width: 95vw;
+            height: auto;
+            max-height: 80vh;
+            border: 4px solid #00adb5;
+        }
+        .game-wrapper:fullscreen .fullscreen-toggle-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #ff2e63;
+            color: white;
+            padding: 12px 24px;
+            z-index: 99999;
+        }
     </style>
 </head>
 <body>
@@ -19,9 +67,10 @@
     <h1>🎮 Fake Geometry Dash</h1>
 
     <div class="game-layout">
-        <div>
+        <div id="gdWrapper" class="game-wrapper">
+            <button id="fullscreenBtn" class="fullscreen-toggle-btn" onclick="toggleFullscreen()">📺 Vollbildmodus</button>
             <canvas id="gameCanvas" width="750" height="400"></canvas>
-            <p>Drücke <b>Leertaste</b> oder <b>Tippe das Feld an</b> zum Springen!</p>
+            <p style="margin: 10px 0; color: #ccc;">Drücke <b>Leertaste</b> oder <b>Tippe das Feld an</b> zum Springen!</p>
         </div>
         
         <div class="leaderboard-box">
@@ -48,5 +97,28 @@
     </audio>
 
     <script src="{{ url_for('static', filename='js/geometry_dash.js') }}"></script>
+    
+    <script>
+        const wrapper = document.getElementById('gdWrapper');
+        const fsBtn = document.getElementById('fullscreenBtn');
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                wrapper.requestFullscreen().catch(err => {
+                    console.error("Vollbild fehlgeschlagen:", err.message);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        document.addEventListener("fullscreenchange", () => {
+            if (document.fullscreenElement) {
+                fsBtn.textContent = "❌ Vollbild beenden";
+            } else {
+                fsBtn.textContent = "📺 Vollbildmodus";
+            }
+        });
+    </script>
 </body>
 </html>
