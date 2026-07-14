@@ -395,6 +395,9 @@ def game():
     leaderboard = sorted(vollstaendige_liste, key=lambda x: x[1], reverse=True)
     return render_template('geometry_dash.html', leaderboard=leaderboard)
     
+
+
+# --- GEOMETRY DASH ---
 @app.route('/api/submit-score', methods=['POST'])
 def submit_score():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
@@ -405,22 +408,16 @@ def submit_score():
     if not user_score:
         user_score = GameScore(username=current_user, geometry_dash=score)
         db.session.add(user_score)
-    elif score > user_score.geometry_dash:
-        user_score.geometry_dash = score
+    else:
+        # Falls geometry_dash in der DB None ist, fahre mit 0 fort
+        current_best = user_score.geometry_dash if user_score.geometry_dash is not None else 0
+        if score > current_best:
+            user_score.geometry_dash = score
+            
     db.session.commit()
     return {"status": "success"}
 
-@app.route('/clicker')
-def clicker_game():
-    if 'username' not in session: return redirect(url_for('login'))
-    
-    all_scores = GameScore.query.all()
-    scores_dict = {s.username: s.clicker for s in all_scores}
-    
-    leaderboard_data = [(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE]
-    leaderboard_sorted = sorted(leaderboard_data, key=lambda x: x[1], reverse=True)
-    return render_template('clicker.html', leaderboard=leaderboard_sorted)
-
+# --- CLICKER ---
 @app.route('/api/submit-clicker', methods=['POST'])
 def submit_clicker():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
@@ -431,8 +428,11 @@ def submit_clicker():
     if not user_score:
         user_score = GameScore(username=current_user, clicker=score)
         db.session.add(user_score)
-    elif score > user_score.clicker:
-        user_score.clicker = score
+    else:
+        current_best = user_score.clicker if user_score.clicker is not None else 0
+        if score > current_best:
+            user_score.clicker = score
+            
     db.session.commit()
     return {"status": "success"}
 
@@ -447,18 +447,23 @@ def flappy_game():
     leaderboard = sorted(leaderboard_data, key=lambda x: x[1], reverse=True)
     return render_template('flappy.html', leaderboard=leaderboard)
 
+# --- FLAPPY BIRD ---
 @app.route('/api/submit-flappy', methods=['POST'])
 def submit_flappy():
     if 'username' not in session: return {"error": "401"}, 401
     user = session['username']
-    val = request.json.get('score', 0)
+    val = int(request.json.get('score', 0))
     
     user_score = GameScore.query.filter_by(username=user).first()
     if not user_score:
         user_score = GameScore(username=user, flappy=val)
         db.session.add(user_score)
-    elif val > user_score.flappy:
-        user_score.flappy = val
+    else:
+        # Standardmäßig ist Flappy Bird bei -1 gestartet
+        current_best = user_score.flappy if user_score.flappy is not None else -1
+        if val > current_best:
+            user_score.flappy = val
+            
     db.session.commit()
     return {"status": "ok"}
 
@@ -473,21 +478,26 @@ def reaction_game():
     leaderboard = sorted(leaderboard_data, key=lambda x: x[1], reverse=False)
     return render_template('reaction.html', leaderboard=leaderboard)
 
+# --- REACTION TIME ---
 @app.route('/api/submit-reaction', methods=['POST'])
 def submit_reaction():
     if 'username' not in session: return {"error": "401"}, 401
     user = session['username']
-    val = request.json.get('score', 9999)
+    val = int(request.json.get('score', 9999))
     
     user_score = GameScore.query.filter_by(username=user).first()
     if not user_score:
         user_score = GameScore(username=user, reaction=val)
         db.session.add(user_score)
-    elif val < user_score.reaction:
-        user_score.reaction = val
+    else:
+        # WICHTIG: Beim Reaktionstest gewinnt die KLEINERE Zahl (Millisekunden).
+        # Wenn None in der DB steht, nutzen wir 9999 als Vergleichswert.
+        current_best = user_score.reaction if user_score.reaction is not None else 9999
+        if val < current_best:
+            user_score.reaction = val
+            
     db.session.commit()
     return {"status": "ok"}
-
 # --- TIC-TAC-TOE ---
 
 @app.route('/tictactoe')
