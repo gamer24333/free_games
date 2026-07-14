@@ -130,10 +130,32 @@ function gameLoop() {
         birdY += velocity;
 
         if (pipes.length === 0 || pipes[pipes.length - 1].x < canvas.width - 160) {
-            let gap = 110;
-            let topHeight = Math.floor(Math.random() * (canvas.height - gap - 100)) + 30;
-            pipes.push({ x: canvas.width, top: topHeight, bottom: canvas.height - topHeight - gap, passed: false });
-        }
+    let gap = 110; // Die Lücke zwischen den Rohren
+    let minHeight = 30;
+    let maxHeight = canvas.height - gap - 100;
+    let topHeight;
+
+    // Wenn es schon ein Rohr gibt, generiere das nächste in der Nähe
+    if (pipes.length > 0) {
+        let lastTop = pipes[pipes.length - 1].top;
+        let maxChange = 140; // Maximaler Höhenunterschied zum vorherigen Rohr in Pixeln
+        
+        let lowestPossible = Math.max(minHeight, lastTop - maxChange);
+        let highestPossible = Math.min(maxHeight, lastTop + maxChange);
+        
+        topHeight = Math.floor(Math.random() * (highestPossible - lowestPossible + 1)) + lowestPossible;
+    } else {
+        // Erstes Rohr des Spiels komplett zufällig
+        topHeight = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+    }
+
+    pipes.push({ 
+        x: canvas.width, 
+        top: topHeight, 
+        bottom: canvas.height - topHeight - gap, 
+        passed: false 
+    });
+}
 
         pipes.forEach(pipe => {
             pipe.x -= 2;
