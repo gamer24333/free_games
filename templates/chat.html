@@ -374,6 +374,19 @@
     }
     setInterval(checkSidebarUpdates, 4000);
     checkSidebarUpdates();
+
+    // --- AKTIVITÄTS-PING AN DEN SERVER ---
+async function sendHeartbeat() {
+    try {
+        await fetch('/api/ping', { method: 'POST' });
+    } catch (e) { 
+        console.error("Ping-Fehler:", e); 
+    }
+}
+// Sofort pingen und danach alle 10 Sekunden wiederholen
+sendHeartbeat();
+setInterval(sendHeartbeat, 10000);
+    
 </script>
 </body>
 </html>
