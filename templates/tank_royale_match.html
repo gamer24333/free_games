@@ -72,7 +72,7 @@
         let crate = { x: -100, y: -100, active: false };
 
         let isBotMode = false;
-        let botCalculated = false;
+        let botCalculated = false; // Verhindert mehrfaches Berechnen
 
         let moveLeftActive = false; let moveRightActive = false;
         const keys = {};
@@ -160,13 +160,20 @@
 
         // --- BOT GEGENZUG LOGIK ---
         function triggerBotTurn() {
-            if (!isBotMode || botCalculated || gameState.status !== "aktiv") return;
+            // Absolute Absicherung vor Mehrfachfeuer
+            if (!isBotMode || botCalculated || gameState.status !== "aktiv" || bullets.length > 0) return;
             botCalculated = true;
 
             document.getElementById('matchInfo').innerText = "🤖 Bot berechnet Schuss...";
             shootBtn.disabled = true;
 
             setTimeout(() => {
+                // Sicherstellen, dass der Status sich während des Wartens nicht geändert hat
+                if (gameState.turn !== "Computer-Bot 🤖" || gameState.status !== "aktiv") {
+                    botCalculated = false;
+                    return;
+                }
+
                 let p1_x = gameState.p1_x;
                 let p2_x = gameState.p2_x;
                 let startY = terrainPoints[p2_x] - 17;
@@ -177,6 +184,7 @@
 
                 let rad = (targetAngle * Math.PI) / 180;
                 
+                // Bot feuert Kugel ab
                 bullets = [{
                     x: p2_x,
                     y: startY,
@@ -186,7 +194,6 @@
                     active: true
                 }];
 
-                botCalculated = false;
             }, 1800);
         }
 
@@ -365,6 +372,7 @@
                         destroyTerrain(bullet.x, bullet.type === 'berta' ? 45 : 25);
                         bullet.active = false;
                         hitRegistered = true;
+                        finalHitType = "terrain";
                     }
                     else if (bullet.x < 0 || bullet.x > canvas.width || bullet.y > canvas.height) {
                         bullet.active = false;
@@ -427,11 +435,13 @@
                 gameState.p1_x = Math.max(20, Math.min(canvas.width - 20, gameState.p1_x + myXOffset));
                 gameState.turn = "Computer-Bot 🤖";
                 document.getElementById('matchInfo').innerText = "⏳ Bot ist dran...";
+                botCalculated = false; // Erst JETZT darf der Bot für seinen nächsten Zug planen
             } else {
                 if (hit === "p1") p1_hp = Math.max(0, p1_hp - dmg);
                 gameState.turn = me;
                 document.getElementById('matchInfo').innerText = "🔴 DU BIST DRAN!";
                 shootBtn.disabled = false;
+                botCalculated = false; // Zurücksetzen für den nächsten Bot-Turn
             }
 
             if (p1_hp <= 0) {
@@ -447,10 +457,6 @@
             st[0] = p1_hp; st[1] = p2_hp; st[4] = 100; st[5] = 100;
             gameState.raw_state = st.join(',');
             myXOffset = 0;
-
-            if (gameState.turn === "Computer-Bot 🤖" && gameState.status === "aktiv") {
-                triggerBotTurn();
-            }
         }
 
         async function sendShotResult(angle, power, hit, finalP1X, finalP2X) {
@@ -465,7 +471,7 @@
                         new_p1_x: finalP1X, new_p2_x: finalP2X,
                         new_p1_fuel: amIErsteller ? Math.round(myFuel) : null,
                         new_p2_fuel: !amIErsteller ? Math.round(myFuel) : null,
-                        updated_terrain: terrainPoints // Sendet das deformierte Gelände an die app.py hoch!
+                        updated_terrain: terrainPoints
                     })
                 });
                 myXOffset = 0;
@@ -479,7 +485,7 @@
         function gameLoop() { 
             handleInput(); 
             draw(); 
-            if (isBotMode && gameState.turn === "Computer-Bot 🤖") {
+            if (isBotMode && gameState.turn === "Computer-Bot 🤖" && !botCalculated && bullets.length === 0) {
                 triggerBotTurn();
             }
             requestAnimationFrame(gameLoop); 
