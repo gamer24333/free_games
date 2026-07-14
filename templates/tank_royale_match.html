@@ -357,6 +357,7 @@
             }
 
             // Projektile rendern
+            // Projektile rendern
             if (bullets.length > 0) {
                 let hitRegistered = false;
                 let finalHitType = "none";
@@ -369,20 +370,24 @@
                     ctx.arc(bullet.x, bullet.y, bullet.type === 'berta' ? 8 : 5, 0, Math.PI*2); 
                     ctx.fill();
 
-                    let target = (gameState.turn === me) ? p2 : p1;
+                    // Wer ist der Gegner dieses Schusses?
+                    // Wenn der Schütze 'me' (ich) ist, ist das Ziel der Gegner (target = p2 im Bot-Modus oder eben der andere Spieler)
+                    let target = (bullet.owner === me) ? p2 : p1;
                     
-                    // Hitbox-Größe für Panzer angepasst
-                    if (bullet.x > target.x - 22 && bullet.x < target.x + 22 && bullet.y > target.y - 10 && bullet.y < target.y + 15) {
+                    // Kollisionsprüfung NUR mit dem echten Gegner, niemals mit dem Schützen selbst!
+                    if (bullet.x > target.x - 22 && bullet.x < target.x + 22 && bullet.y > target.y - 12 && bullet.y < target.y + 15) {
                         bullet.active = false;
                         hitRegistered = true;
-                        finalHitType = (gameState.turn === me) ? "p2" : "p1";
+                        finalHitType = (target === p2) ? "p2" : "p1";
                     } 
+                    // Geländekollision
                     else if (bullet.x >= 0 && bullet.x <= canvas.width && bullet.y > terrainPoints[Math.floor(bullet.x)]) {
                         destroyTerrain(bullet.x, bullet.type === 'berta' ? 45 : 25);
                         bullet.active = false;
                         hitRegistered = true;
                         finalHitType = "terrain";
                     }
+                    // Out of Bounds
                     else if (bullet.x < 0 || bullet.x > canvas.width || bullet.y > canvas.height) {
                         bullet.active = false;
                     }
@@ -397,40 +402,47 @@
                     }
                 }
             }
-        }
-        
+            
         function fireTank() {
-            if (gameState.turn !== me || gameState.status !== "aktiv" || bullets.length > 0) return;
-            let amIErsteller = (me === gameState.ersteller);
-            let currentX = Math.max(20, Math.min(canvas.width - 20, (amIErsteller ? gameState.p1_x + myXOffset : gameState.p2_x + myXOffset)));
-            let startY = terrainPoints[Math.floor(currentX)] - 17;
-
-            bullets = []; 
-
-            if (selectedWeapon === 'triple') {
-                let offsets = [-6, 0, 6];
-                offsets.forEach(offset => {
-                    let rad = ((myAngle + offset) * Math.PI) / 180;
-                    bullets.push({
-                        x: currentX, y: startY,
-                        vx: Math.cos(rad) * (myPower * 1.2) * (amIErsteller ? 1 : -1),
-                        vy: -Math.sin(rad) * (myPower * 1.2),
-                        type: 'triple',
-                        active: true
-                    });
-                });
-            } else {
-                let rad = (myAngle * Math.PI) / 180;
+        if (gameState.turn !== me || gameState.status !== "aktiv" || bullets.length > 0) return;
+        let amIErsteller = (me === gameState.ersteller);
+        let currentX = Math.max(20, Math.min(canvas.width - 20, (amIErsteller ? gameState.p1_x + myXOffset : gameState.p2_x + myXOffset)));
+        let startY = terrainPoints[Math.floor(currentX)] - 15; // Etwas höher ansetzen (Panzermitte)
+    
+        bullets = []; 
+        let direction = amIErsteller ? 1 : -1;
+        let rad = (myAngle * Math.PI) / 180;
+    
+        // Wir berechnen das Rohrende, damit die Kugel nicht im Panzer startet
+        const rohrLaenge = 22; 
+        let spawnX = currentX + Math.cos(rad) * rohrLaenge * direction;
+        let spawnY = startY - 2 - Math.sin(rad) * rohrLaenge;
+    
+        if (selectedWeapon === 'triple') {
+            let offsets = [-6, 0, 6];
+            offsets.forEach(offset => {
+                let r = ((myAngle + offset) * Math.PI) / 180;
                 bullets.push({
-                    x: currentX, y: startY,
-                    vx: Math.cos(rad) * (myPower * 1.2) * (amIErsteller ? 1 : -1),
-                    vy: -Math.sin(rad) * (myPower * 1.2),
-                    type: selectedWeapon,
+                    x: spawnX, y: spawnY,
+                    vx: Math.cos(r) * (myPower * 1.2) * direction,
+                    vy: -Math.sin(r) * (myPower * 1.2),
+                    type: 'triple',
+                    owner: me, // Wir merken uns, wer geschossen hat!
                     active: true
                 });
-            }
-            shootBtn.disabled = true;
+            });
+        } else {
+            bullets.push({
+                x: spawnX, y: spawnY,
+                vx: Math.cos(rad) * (myPower * 1.2) * direction,
+                vy: -Math.sin(rad) * (myPower * 1.2),
+                type: selectedWeapon,
+                owner: me, // Wir merken uns, wer geschossen hat!
+                active: true
+            });
         }
+        shootBtn.disabled = true;
+    }
 
         function resolveBotShot(hit) {
             let st = gameState.raw_state.split(',').map(Number);
