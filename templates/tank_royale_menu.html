@@ -5,22 +5,116 @@
     <title>Gegner wählen - Tank Royale</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 50px; }
-        select, button { padding: 10px; font-size: 16px; border-radius: 6px; margin: 10px; }
-        button { background: #ff9f43; border: none; cursor: pointer; font-weight: bold; }
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1a1a; color: white; margin-top: 40px; }
+        
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: #222;
+            padding: 30px;
+            border-radius: 12px;
+            border: 2px solid #ff9f43;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        h1 { color: #ff9f43; font-size: 24px; margin-bottom: 25px; }
+        
+        .section {
+            background: #2d2d2d;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #444;
+        }
+
+        .section h2 {
+            font-size: 18px;
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #00adb5;
+        }
+
+        select, button { 
+            padding: 12px; 
+            font-size: 16px; 
+            border-radius: 6px; 
+            box-sizing: border-box;
+        }
+
+        select { 
+            width: 100%; 
+            background: #333; 
+            color: white; 
+            border: 1px solid #555; 
+            margin-bottom: 10px;
+        }
+
+        button { 
+            background: #ff9f43; 
+            color: #000;
+            border: none; 
+            cursor: pointer; 
+            font-weight: bold; 
+            width: 100%;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        button:hover {
+            background: #e08b35;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        .btn-bot {
+            background: #ff2e63;
+            color: white;
+        }
+
+        .btn-bot:hover {
+            background: #e02050;
+        }
+
+        .btn-back { 
+            display: inline-block; 
+            margin-bottom: 20px; 
+            color: #ccc; 
+            text-decoration: none; 
+        }
+        .btn-back:hover {
+            color: #ff9f43;
+        }
     </style>
 </head>
 <body>
-    <a href="/games" class="btn btn-back">⬅️ Zurück</a>
-    <h1>🚀 Wen möchtest du in Tank Royale duellieren?</h1>
-    
-    <form action="/tankroyale/invite" method="POST">
-        <select name="gegner">
-            {% for g in gegner_liste %}
-                <option value="{{ g }}">{{ g }}</option>
-            {% endfor %}
-        </select>
-        <button type="submit">Einladung senden! 💥</button>
-    </form>
+    <div class="container">
+        <a href="/games" class="btn-back">⬅️ Zurück zur Spieleliste</a>
+        <h1>🚀 Modus & Gegner wählen</h1>
+        
+        <div class="section">
+            <h2>🤖 Einzelspieler-Modus</h2>
+            <form action="/tankroyale/invite" method="POST">
+                <input type="hidden" name="gegner" value="Computer-Bot 🤖">
+                <button type="submit" class="btn-bot">Gegen Bot spielen! 🤖🔥</button>
+            </form>
+        </div>
+
+        <div class="section">
+            <h2>👥 Mehrspieler-Duell</h2>
+            <form action="/tankroyale/invite" method="POST">
+                <select name="gegner" required>
+                    <option value="" disabled selected>Wähle einen Gegner...</option>
+                    {% for g in gegner_liste %}
+                        {% if g != "Computer-Bot 🤖" %}
+                            <option value="{{ g }}">{{ g }}</option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+                <button type="submit">Einladung senden! 💥</button>
+            </form>
+        </div>
+    </div>
 </body>
 </html>
