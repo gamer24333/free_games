@@ -9,6 +9,11 @@
         body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 50px; }
         .layout { display: flex; justify-content: center; gap: 30px; max-width: 800px; margin: 0 auto; padding: 20px; flex-wrap: wrap; }
         
+        /* Wrapper für den Reflex-Test */
+        .game-wrapper {
+            position: relative;
+            display: inline-block;
+        }
         .box-test { width: 350px; height: 300px; border-radius: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; user-select: none; transition: background 0.1s; font-size: 22px; font-weight: bold; }
         .red { background: #ff2e63; }
         .green { background: #2ecc71; }
@@ -17,6 +22,42 @@
         .leaderboard { background: #333; border: 2px solid #444; border-radius: 12px; padding: 20px; width: 280px; text-align: left; }
         .leaderboard th, .leaderboard td { padding: 8px; border-bottom: 1px solid #444; }
         .leaderboard th { color: #9b59b6; }
+
+        .fullscreen-toggle-btn {
+            background: #eccc68;
+            color: #222;
+            border: none;
+            padding: 8px 15px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+
+        /* --- VOLLBILD STYLES --- */
+        .game-wrapper:fullscreen {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: #111;
+        }
+        .game-wrapper:fullscreen .box-test {
+            width: 90vw;
+            height: 70vh;
+            font-size: 32px;
+        }
+        .game-wrapper:fullscreen .fullscreen-toggle-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #ff2e63;
+            color: white;
+            padding: 12px 24px;
+            z-index: 99999;
+        }
     </style>
 </head>
 <body>
@@ -25,8 +66,11 @@
     <h1>⏱️ Reflex-Test</h1>
 
     <div class="layout">
-        <div id="testArea" class="box-test blue">
-            Klicke hier, um zu starten!
+        <div id="reflexWrapper" class="game-wrapper">
+            <button id="fullscreenBtn" class="fullscreen-toggle-btn" onclick="toggleFullscreen()">📺 Vollbildmodus</button>
+            <div id="testArea" class="box-test blue">
+                Klicke hier, um zu starten!
+            </div>
         </div>
 
         <div class="leaderboard">
@@ -50,20 +94,40 @@
 
     <script>
         const area = document.getElementById('testArea');
+        const wrapper = document.getElementById('reflexWrapper');
+        const fsBtn = document.getElementById('fullscreenBtn');
         let state = 'idle'; // idle, waiting, green
         let startTime, timerTimeout;
+
+        // --- VOLLBILD FUNKTION ---
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                wrapper.requestFullscreen().catch(err => {
+                    console.error("Vollbild fehlgeschlagen:", err.message);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        document.addEventListener("fullscreenchange", () => {
+            if (document.fullscreenElement) {
+                fsBtn.textContent = "❌ Vollbild beenden";
+            } else {
+                fsBtn.textContent = "📺 Vollbildmodus";
+            }
+        });
 
         area.addEventListener('mousedown', handleClick);
         area.addEventListener('touchstart', (e) => { e.preventDefault(); handleClick(); });
 
         function handleClick() {
             if (state === 'idle') {
-                // Warten auf Grün aktivieren
                 area.className = 'box-test red';
                 area.textContent = 'Warte auf GRÜN... 🔴';
                 state = 'waiting';
 
-                let randomTime = Math.floor(Math.random() * 4000) + 2000; // 2 bis 6 Sekunden
+                let randomTime = Math.floor(Math.random() * 4000) + 2000; 
                 timerTimeout = setTimeout(() => {
                     area.className = 'box-test green';
                     area.textContent = 'JETZT KLICKEN! 🟢';
@@ -72,14 +136,12 @@
                 }, randomTime);
 
             } else if (state === 'waiting') {
-                // Zu früh geklickt!
                 clearTimeout(timerTimeout);
                 area.className = 'box-test blue';
                 area.textContent = 'Zu früh! ❌ Erneut versuchen.';
                 state = 'idle';
 
             } else if (state === 'green') {
-                // Erfolgreich geklickt
                 let endTime = window.performance.now();
                 let reactionTime = Math.round(endTime - startTime);
                 
@@ -87,7 +149,6 @@
                 area.textContent = `Ergebnis: ${reactionTime} ms! Klicke zum Neustarten.`;
                 state = 'idle';
 
-                // Zeit an Server senden
                 sendReactionTime(reactionTime);
             }
         }
