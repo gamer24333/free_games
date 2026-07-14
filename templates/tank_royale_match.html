@@ -49,7 +49,7 @@
         // Sicheres Fallback für Jinja-Variablen
         const gameId = "{{ gameId or 'offline_bot_game' }}";
         const me = "{{ me or 'Spieler 1' }}";
-        const gegnerName = "{{ gegner }}".includes("{{") || !"{{ gegner }}" ? "Computer-Bot 🤖" : "{{ gegner }}";
+        const gegnerName = "{{ gegner or 'Computer-Bot 🤖' }}";
         
         const canvas = document.getElementById('tankCanvas');
         const ctx = canvas.getContext('2d');
