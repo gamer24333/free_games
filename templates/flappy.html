@@ -3,98 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🦘 Flappy Bird Klassen-Turnier</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>Klassen-Flappy</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 30px; }
-        .game-container { display: flex; justify-content: center; align-items: flex-start; gap: 30px; max-width: 900px; margin: 0 auto; padding: 10px; flex-wrap: wrap; }
-        
-        /* Neuer Wrapper für das Spiel */
-        .game-wrapper { 
-            position: relative; 
-            background: #70c5ce; 
-            border: 4px solid #333; 
-            border-radius: 8px; 
-            display: inline-block;
-        }
-        canvas { display: block; max-width: 100%; background: #70c5ce; }
-        
-        .leaderboard { background: #333; border: 2px solid #444; border-radius: 12px; padding: 20px; width: 280px; text-align: left; }
-        .leaderboard th, .leaderboard td { padding: 8px; text-align: left; border-bottom: 1px solid #444; }
-        .leaderboard th { color: #e67e22; }
-        .btn-pause { background: #e67e22; margin-top: 10px; padding: 10px 20px; color: white; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
-        
-        /* Neuer Vollbild-Button */
-        .fullscreen-toggle-btn {
-            background: #eccc68;
-            color: #222;
-            border: none;
-            padding: 8px 15px;
-            font-weight: bold;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-bottom: 10px;
-        }
-
-        /* --- STYLING FÜR ECHTEN VOLLBILDMODUS --- */
-        .game-wrapper:fullscreen {
-            width: 100vw;
-            height: 100vh;
+        /* Grunddesign und Kontrastbereiche oben/unten */
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: #222; /* Hintergrund für den Spielbereich */
+            font-family: Arial, sans-serif;
+            color: white;
             display: flex;
             flex-direction: column;
+            overflow: hidden; /* Verhindert Scrollbalken */
+        }
+
+        /* Oberer Header-Bereich mit leicht anderer, dunklerer Farbe */
+        .header-bar {
+            background-color: #161616;
+            padding: 15px 10px;
+            text-align: center;
+            border-bottom: 2px solid #2d2d2d;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+
+        /* Mittlerer Hauptbereich, der das Canvas und die Rangliste hält */
+        .main-content {
+            flex: 1;
+            display: flex;
             justify-content: center;
             align-items: center;
-            background: #111;
-            border: none;
+            gap: 30px;
+            padding: 20px;
+            box-sizing: border-box;
+            flex-wrap: wrap;
+            overflow-y: auto; /* Erlaubt Scrollen auf Handys, falls das Leaderboard lang ist */
         }
-        .game-wrapper:fullscreen canvas {
-            height: 85vh; /* Macht den Canvas extrem groß */
-            width: auto;
-            border: 4px solid #333;
+
+        /* Unterer Footer-Bereich mit leicht anderer Farbe */
+        .footer-bar {
+            background-color: #161616;
+            padding: 12px 10px;
+            text-align: center;
+            border-top: 2px solid #2d2d2d;
+            font-size: 14px;
+            color: #888;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+
+        h1 {
+            margin: 5px 0 0 0;
+            font-size: 24px;
+            color: #f9d423;
+        }
+
+        /* Buttons */
+        .btn { display: inline-block; padding: 10px 20px; background: #00adb5; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
+        .btn:hover { background: #007c82; }
+        .btn-back { background: #555; margin-right: 15px; }
+        
+        .btn-fullscreen { background: #ff9f43; color: black; font-size: 15px; }
+        .btn-fullscreen:hover { background: #e08b35; }
+
+        /* Das Canvas (Spielfeld) */
+        canvas {
+            border: 4px solid #f9d423;
             border-radius: 8px;
+            background: #70c5ce; /* Standard Flappy-Himmelblau, falls das Bild lädt */
+            box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+            display: block;
         }
-        .game-wrapper:fullscreen .fullscreen-toggle-btn {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: #ff2e63;
-            color: white;
-            font-size: 16px;
-            padding: 12px 24px;
-            z-index: 99999;
+
+        /* Rangliste */
+        .leaderboard-box {
+            background: #333;
+            border: 2px solid #444;
+            border-radius: 12px;
+            width: 280px;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: left;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
-        .game-wrapper:fullscreen #pauseBtn {
-            position: absolute;
-            bottom: 20px;
-            z-index: 99999;
-        }
+        .leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .leaderboard-table th, .leaderboard-table td { padding: 8px; border-bottom: 1px solid #444; text-align: left; }
+        .leaderboard-table th { color: #f9d423; }
+        .leaderboard-table tr:nth-child(1) td { color: #ffd700; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <a href="/games" class="btn" style="background: #555; margin-bottom: 20px;">⬅️ Zurück zu den Spielen</a>
-    <h1>🦘 Flappy Bird</h1>
-    <p style="color: #aaa; margin-top: 0;">Leertaste zum Springen | <b>ESC</b> oder Button zum Pausieren!</p>
+    <div class="header-bar">
+        <a href="/games" class="btn btn-back">⬅️ Zurück</a>
+        <button id="fullscreenBtn" class="btn btn-fullscreen">📺 Vollbildmodus</button>
+        <h1>🐦 Klassen-Flappy</h1>
+    </div>
 
-    <div class="game-container">
-        <div id="flappyWrapper" class="game-wrapper">
-            <button id="fullscreenBtn" class="fullscreen-toggle-btn" onclick="toggleFullscreen()">📺 Vollbildmodus</button>
-            <canvas id="flappyCanvas" width="320" height="480"></canvas>
-            <button id="pauseBtn" class="btn-pause" style="display: none;">⏸️ Pause</button>
-        </div>
+    <div class="main-content">
+        <canvas id="flappyCanvas" width="320" height="480"></canvas>
 
-        <div class="leaderboard">
-            <h3 style="margin-top:0; color:#e67e22; text-align:center;">🏆 Highscores</h3>
-            <table style="width:100%; border-collapse:collapse;">
+        <div class="leaderboard-box">
+            <h3 style="margin-top: 0; color: #f9d423; text-align: center; margin-bottom: 5px;">🏆 Flappy-Rangliste</h3>
+            <table class="leaderboard-table">
                 <thead>
-                    <tr><th>Platz</th><th>Name</th><th>Rohre</th></tr>
+                    <tr>
+                        <th>Platz</th>
+                        <th>Name</th>
+                        <th>Highscore</th>
+                    </tr>
                 </thead>
                 <tbody>
                     {% for player, score in leaderboard %}
                     <tr>
                         <td>{{ loop.index }}.</td>
                         <td>{{ player }}</td>
-                        <td><b>{{ score }}</b></td>
+                        <td>{{ score }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -102,205 +127,259 @@
         </div>
     </div>
 
+    <div class="footer-bar">
+        <span>Drücke die <b>Leertaste</b>, <b>Enter</b> oder klicke ins Feld zum Springen! 🚀</span>
+    </div>
 
-    <audio id="gdMusic" loop hidden>
-        <source src="{{ url_for('static', filename='flappy_bird.mp3') }}" type="audio/mpeg">
-    </audio>
-    
     <script>
         const canvas = document.getElementById('flappyCanvas');
         const ctx = canvas.getContext('2d');
-        const pauseBtn = document.getElementById('pauseBtn');
-        const bgMusic = document.getElementById('gdMusic');
-        const wrapper = document.getElementById('flappyWrapper');
-        const fsBtn = document.getElementById('fullscreenBtn');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
 
-        let birdY = 200, velocity = 0, gravity = 0.25, jump = -4.6;
-        let score = 0, gameOver = false, gameStarted = false;
-        let isPaused = false;
-        let isSaving = false; 
-        let pipes = [];
-
-        // --- VOLLBILD FUNKTION ---
-        function toggleFullscreen() {
+        // --- VOLLBILD STEUERUNG ---
+        fullscreenBtn.addEventListener('click', () => {
             if (!document.fullscreenElement) {
-                wrapper.requestFullscreen().catch(err => {
-                    console.error("Fehler beim Aktivieren des Vollbildmodus:", err.message);
-                });
+                const element = document.documentElement;
+                if (element.requestFullscreen) {
+                    element.requestFullscreen();
+                } else if (element.mozRequestFullScreen) {
+                    element.mozRequestFullScreen();
+                } else if (element.webkitRequestFullscreen) {
+                    element.webkitRequestFullscreen();
+                } else if (element.msRequestFullscreen) {
+                    element.msRequestFullscreen();
+                }
+                fullscreenBtn.textContent = "📺 Vollbild beenden";
             } else {
-                document.exitFullscreen();
-            }
-        }
-
-        // Überwacht Statusänderungen (z.B. wenn man mit ESC das Vollbild verlässt)
-        document.addEventListener("fullscreenchange", () => {
-            if (document.fullscreenElement) {
-                fsBtn.textContent = "❌ Vollbild beenden";
-            } else {
-                fsBtn.textContent = "📺 Vollbildmodus";
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+                fullscreenBtn.textContent = "📺 Vollbildmodus";
             }
         });
 
-        function doJump() {
-            if (isPaused) return;
-            if (gameOver) { resetGame(); return; }
-            if (!gameStarted) {
-                gameStarted = true;
-                pauseBtn.style.display = "inline-block";
-                bgMusic.currentTime = 0;
-                bgMusic.play().catch(e => console.log("Autoplay blockiert:", e));
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                fullscreenBtn.textContent = "📺 Vollbildmodus";
             }
-            velocity = jump;
-        }
-
-        function togglePause() {
-            if (!gameStarted || gameOver) return;
-            isPaused = !isPaused;
-            pauseBtn.textContent = isPaused ? "▶️ Weiter" : "⏸️ Pause";
-            
-            if (isPaused) {
-                bgMusic.pause();
-            } else {
-                bgMusic.play().catch(e => console.log(e));
-            }
-        }
-
-        window.addEventListener('keydown', (e) => { 
-            if(e.code === 'Space') { e.preventDefault(); doJump(); } 
-            if(e.code === 'Escape') { e.preventDefault(); togglePause(); }
         });
-        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); doJump(); });
-        canvas.addEventListener('mousedown', doJump);
-        pauseBtn.addEventListener('click', togglePause);
 
-        function resetGame() {
-            birdY = 200; velocity = 0; score = 0; gameOver = false; gameStarted = false; isPaused = false; isSaving = false; pipes = [];
-            pauseBtn.style.display = "none";
-            pauseBtn.textContent = "⏸️ Pause";
-            bgMusic.pause();
-        }
+        // --- SPIELVARIABLEN ---
+        let birdY = 200;
+        let birdVelocity = 0;
+        const gravity = 0.4;
+        const jump = -6.5;
+        let score = 0;
+        let gameActive = false;
+        let gameOver = false;
 
-        async function sendScore(finalScore) {
-            if (isSaving) return; 
-            isSaving = true;
-            
-            bgMusic.pause();
-            try {
-                await fetch('/api/submit-flappy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ score: finalScore })
-                });
-                setTimeout(() => { window.location.reload(); }, 800);
-            } catch(e) { 
-                console.error(e); 
-                isSaving = false; 
-            }
-        }
+        // Rohre
+        let pipes = [];
+        const pipeWidth = 52;
+        const pipeGap = 110;
+        let frameCount = 0;
 
-        function gameLoop() {
+        // Dummy-Grafiken zeichnen (Falls du Bilder hast, kannst du diese hier laden)
+        function draw() {
+            // Hintergrund-Himmel
             ctx.fillStyle = '#70c5ce';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            if (gameStarted && !gameOver && !isPaused) {
-                velocity += gravity;
-                birdY += velocity;
+            // Wolken/Boden (vereinfacht)
+            ctx.fillStyle = '#ded895';
+            ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+            ctx.fillStyle = '#73bf2e';
+            ctx.fillRect(0, canvas.height - 58, canvas.width, 8);
 
-                if (pipes.length === 0 || pipes[pipes.length - 1].x < canvas.width - 160) {
-                    let gap = 110; 
-                    let minHeight = 30;
-                    let maxHeight = canvas.height - gap - 100;
-                    let topHeight;
+            // Rohre zeichnen
+            pipes.forEach(pipe => {
+                ctx.fillStyle = '#73bf2e';
+                ctx.strokeStyle = '#55801a';
+                ctx.lineWidth = 3;
 
-                    if (pipes.length > 0) {
-                        let lastTop = pipes[pipes.length - 1].top;
-                        let maxChange = 140; 
-                        
-                        let lowestPossible = Math.max(minHeight, lastTop - maxChange);
-                        let highestPossible = Math.min(maxHeight, lastTop + maxChange);
-                        
-                        topHeight = Math.floor(Math.random() * (highestPossible - lowestPossible + 1)) + lowestPossible;
-                    } else {
-                        topHeight = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
-                    }
+                // Oberes Rohr
+                ctx.fillRect(pipe.x, 0, pipeWidth, pipe.top);
+                ctx.strokeRect(pipe.x, 0, pipeWidth, pipe.top);
 
-                    pipes.push({ 
-                        x: canvas.width, 
-                        top: topHeight, 
-                        bottom: canvas.height - topHeight - gap, 
-                        passed: false 
+                // Unteres Rohr
+                ctx.fillRect(pipe.x, canvas.height - pipe.bottom, pipeWidth, pipe.bottom);
+                ctx.strokeRect(pipe.x, canvas.height - pipe.bottom, pipeWidth, pipe.bottom);
+            });
+
+            // Vogel zeichnen
+            ctx.fillStyle = '#f9d423';
+            ctx.beginPath();
+            ctx.arc(60, birdY, 12, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Auge
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(64, birdY - 4, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(65, birdY - 4, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Schnabel
+            ctx.fillStyle = '#ff9f43';
+            ctx.beginPath();
+            ctx.moveTo(70, birdY - 2);
+            ctx.lineTo(80, birdY + 1);
+            ctx.lineTo(70, birdY + 4);
+            ctx.closePath();
+            ctx.fill();
+
+            // Score-Anzeige
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 4;
+            ctx.font = 'bold 32px Arial';
+            ctx.textAlign = 'center';
+            ctx.strokeText(score, canvas.width / 2, 50);
+            ctx.fillText(score, canvas.width / 2, 50);
+
+            if (!gameActive && !gameOver) {
+                ctx.font = 'bold 18px Arial';
+                ctx.strokeText("Klicke zum Starten!", canvas.width / 2, canvas.height / 2);
+                ctx.fillText("Klicke zum Starten!", canvas.width / 2, canvas.height / 2);
+            }
+
+            if (gameOver) {
+                ctx.font = 'bold 24px Arial';
+                ctx.fillStyle = '#ff2e63';
+                ctx.strokeText("GAME OVER", canvas.width / 2, canvas.height / 2 - 20);
+                ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 20);
+                
+                ctx.font = 'bold 16px Arial';
+                ctx.fillStyle = 'white';
+                ctx.strokeText("Klicke für Neustart", canvas.width / 2, canvas.height / 2 + 20);
+                ctx.fillText("Klicke für Neustart", canvas.width / 2, canvas.height / 2 + 20);
+            }
+        }
+
+        function update() {
+            if (gameActive && !gameOver) {
+                birdVelocity += gravity;
+                birdY += birdVelocity;
+
+                // Kollision mit Boden oder Decke
+                if (birdY + 12 >= canvas.height - 58 || birdY - 12 <= 0) {
+                    triggerGameOver();
+                }
+
+                // Rohre bewegen und erstellen
+                frameCount++;
+                if (frameCount % 100 === 0) {
+                    const topLimit = 50;
+                    const bottomLimit = canvas.height - 58 - pipeGap - 50;
+                    const topHeight = Math.floor(Math.random() * (bottomLimit - topLimit)) + topLimit;
+                    const bottomHeight = canvas.height - 58 - pipeGap - topHeight;
+
+                    pipes.push({
+                        x: canvas.width,
+                        top: topHeight,
+                        bottom: bottomHeight,
+                        passed: false
                     });
                 }
 
                 pipes.forEach(pipe => {
                     pipe.x -= 2;
 
-                    if (!pipe.passed && pipe.x < 50) {
+                    // Kollisionsprüfung mit Rohren
+                    if (60 + 12 > pipe.x && 60 - 12 < pipe.x + pipeWidth) {
+                        if (birdY - 12 < pipe.top || birdY + 12 > canvas.height - pipe.bottom) {
+                            triggerGameOver();
+                        }
+                    }
+
+                    // Score erhöhen, wenn Rohr passiert
+                    if (!pipe.passed && pipe.x + pipeWidth < 60) {
                         score++;
                         pipe.passed = true;
                     }
-
-                    if (50 + 20 > pipe.x && 50 < pipe.x + 52) {
-                        if (birdY < pipe.top || birdY + 20 > canvas.height - pipe.bottom) {
-                            if (!gameOver) { 
-                                gameOver = true;
-                                sendScore(score);
-                            }
-                        }
-                    }
                 });
-                pipes = pipes.filter(p => p.x > -60);
+
+                // Abgelaufene Rohre entfernen
+                pipes = pipes.filter(pipe => pipe.x + pipeWidth > 0);
             }
-
-            pipes.forEach(pipe => {
-                ctx.fillStyle = '#73bf2e';
-                ctx.fillRect(pipe.x, 0, 52, pipe.top);
-                ctx.fillRect(pipe.x, canvas.height - pipe.bottom, 52, pipe.bottom);
-            });
-
-            if (birdY + 20 > canvas.height || birdY < 0) {
-                if (!gameOver) { 
-                    gameOver = true; 
-                    sendScore(score); 
-                }
-            }
-
-            ctx.fillStyle = '#f1c40f';
-            ctx.fillRect(50, birdY, 20, 20);
-
-            ctx.fillStyle = 'white';
-            ctx.font = 'bold 24px Arial';
-            ctx.fillText(score, canvas.width / 2 - 10, 40);
-
-            if (!gameStarted && !gameOver) {
-                ctx.fillStyle = 'rgba(0,0,0,0.5)';
-                ctx.fillRect(0,0,canvas.width,canvas.height);
-                ctx.fillStyle = 'white';
-                ctx.font = '18px Arial';
-                ctx.fillText('Klicken zum Starten', canvas.width/2 - 75, canvas.height/2);
-            }
-            
-            if (isPaused) {
-                ctx.fillStyle = 'rgba(0,0,0,0.5)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#e67e22';
-                ctx.font = 'bold 28px Arial';
-                ctx.fillText('PAUSIERT', canvas.width / 2 - 70, canvas.height / 2);
-                ctx.fillStyle = 'white';
-                ctx.font = '14px Arial';
-                ctx.fillText('ESC oder Button zum Weiterspielen', canvas.width / 2 - 110, canvas.height / 2 + 30);
-            }
-
-            if (gameOver) {
-                ctx.fillStyle = 'rgba(255,0,0,0.3)';
-                ctx.fillRect(0,0,canvas.width,canvas.height);
-                ctx.fillStyle = 'white';
-                ctx.fillText('Game Over! Speichere...', canvas.width/2 - 100, canvas.height/2);
-            }
-
-            requestAnimationFrame(gameLoop);
         }
-        gameLoop();
+
+        function triggerGameOver() {
+            gameOver = true;
+            gameActive = false;
+            submitScore(score);
+        }
+
+        function resetGame() {
+            birdY = 200;
+            birdVelocity = 0;
+            score = 0;
+            pipes = [];
+            frameCount = 0;
+            gameOver = false;
+            gameActive = true;
+        }
+
+        function action() {
+            if (gameOver) {
+                resetGame();
+            } else if (!gameActive) {
+                gameActive = true;
+            } else {
+                birdVelocity = jump;
+            }
+        }
+
+        // --- EVENTS ---
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.code === 'Enter') {
+                e.preventDefault();
+                action();
+            }
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            action();
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            action();
+        }, { passive: false });
+
+        // API Score Übertragung
+        async function submitScore(finalScore) {
+            try {
+                const response = await fetch('/api/submit-flappy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ score: finalScore })
+                });
+                if (response.ok) {
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                }
+            } catch (e) {
+                console.error("Score-Übertragungsfehler:", e);
+            }
+        }
+
+        // Game Loop
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        loop();
     </script>
 </body>
 </html>
