@@ -175,6 +175,11 @@ def dashboard():
         return redirect(url_for('login'))
     
     me = session['username']
+    
+    # --- NEU: Spezial-Nachricht für eine bestimmte Person trigger ---
+    # Ersetze "Ben" mit dem Namen der gewünschten Person aus deiner KLASSEN_LISTE
+    zeige_spezial_nachricht = (me == "Liam") 
+    
     aktive_matches = []
     
     ttt_games = TicTacToeGame.query.filter(((TicTacToeGame.ersteller == me) | (TicTacToeGame.gegner == me)) & (TicTacToeGame.status == "aktiv")).all()
@@ -188,7 +193,12 @@ def dashboard():
     user = UserSetting.query.filter_by(username=me).first()
     is_admin = True if (me == "Till" or (user and user.is_admin)) else False
     
-    return render_template('dashboard.html', name=me, einladungen=aktive_matches, is_admin=is_admin)
+    # Übergib 'zeige_spezial_nachricht' an das Template
+    return render_template('dashboard.html', 
+                           name=me, 
+                           einladungen=aktive_matches, 
+                           is_admin=is_admin, 
+                           zeige_spezial_nachricht=zeige_spezial_nachricht)
 
 
 @app.route('/api/dashboard-stats')
