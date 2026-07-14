@@ -124,7 +124,35 @@
     <a href="/logout" style="color: #ff2e63; text-decoration: none; font-weight: bold;">Abmelden</a>
 
     <script>
-    // --- Logik für das Einmalige Overlay (Mit ID-Prüfung) ---
+    // --- NEU: SYSTEM-BENACHRICHTIGUNGEN LOGIK ---
+    let lastKnownMessageCount = 0; // Speichert die letzte bekannte Anzahl von Nachrichten
+
+    // Erlaubnis für Benachrichtigungen beim Laden abfragen
+    document.addEventListener("DOMContentLoaded", function() {
+        if ("Notification" in window) {
+            if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+                Notification.requestPermission();
+            }
+        }
+    });
+
+    // Funktion, die eine echte Desktop-Benachrichtigung absendet
+    function sendeSystemBenachrichtigung(titel, text) {
+        if ("Notification" in window && Notification.permission === "granted") {
+            const notification = new Notification(titel, {
+                body: text,
+                icon: "/static/favicon.ico" // optional: Pfad zu deinem Logo, falls vorhanden
+            });
+
+            // Wenn man auf die Benachrichtigung klickt, öffnet sich der Chat
+            notification.onclick = function() {
+                window.focus();
+                window.location.href = "/chat";
+            };
+        }
+    }
+
+    // --- Logik für das Einmalige Overlay ---
     {% if zeige_spezial_nachricht %}
     document.addEventListener("DOMContentLoaded", function() {
         const nachrichtId = "{{ spezial_nachricht_id }}" || "version_1";
@@ -145,7 +173,7 @@
     }
     {% endif %}
 
-    // --- NEU: VOLLBILD LOGIK (Button + Tasten F / F11) ---
+    // --- VOLLBILD LOGIK ---
     function toggleFullscreen() {
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen()
@@ -163,24 +191,19 @@
         }
     }
 
-    // Tastatur-Event-Listener für F und F11
     document.addEventListener("keydown", function(event) {
-        // 'f' oder 'F' drücken, wenn kein Textfeld fokussiert ist
         if (event.key === "f" || event.key === "F") {
             if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
                 event.preventDefault();
                 toggleFullscreen();
             }
         }
-        
-        // F11-Taste abfangen
         if (event.key === "F11") {
-            event.preventDefault(); // Verhindert den Browser-Standard, um den eigenen Toggle sauber auszuführen
+            event.preventDefault();
             toggleFullscreen();
         }
     });
 
-    // Passt den Button-Text an, wenn das Vollbild z. B. per ESC-Taste verlassen wird
     document.addEventListener("fullscreenchange", function() {
         const btn = document.getElementById("fullscreen-btn");
         if (btn) {
@@ -192,7 +215,7 @@
         }
     });
 
-    // --- Dein bestehendes Message-Polling-Skript ---
+    // --- Aktualisiertes Message-Polling-Skript mit Push-Trigger ---
     async function checkNewMessages() {
         try {
             const response = await fetch('/api/dashboard-stats');
@@ -215,6 +238,19 @@
                 const totalNewMessages = (newGlobal > 0 ? newGlobal : 0) + newPrivateTotal;
                 const badge = document.getElementById('chatBadge');
                 
+                // HIER STARTET DIE PUSH-LOGIK:
+                // Wenn die Anzahl der neuen Nachrichten gestiegen ist, senden wir eine echte Benachrichtigung!
+                if (totalNewMessages > lastKnownMessageCount) {
+                    const nachrichtenDifferenz = totalNewMessages - lastKnownMessageCount;
+                    sendeSystemBenachrichtigung(
+                        "Neue Nachricht erhalten! 💬",
+                        `Du hast ${nachrichtenDifferenz} neue ungelesene Nachricht(en).`
+                    );
+                }
+                
+                // Speicher den aktuellen Stand ab, damit wir beim nächsten Mal wissen, ob etwas Neues dazukam
+                lastKnownMessageCount = totalNewMessages;
+
                 if (totalNewMessages > 0) {
                     badge.textContent = totalNewMessages;
                     badge.style.display = 'inline-block';
