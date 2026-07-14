@@ -157,6 +157,7 @@ function gameLoop() {
     });
 }
 
+        // Kollisionsabfrage für Rohre
         pipes.forEach(pipe => {
             pipe.x -= 2;
 
@@ -167,8 +168,10 @@ function gameLoop() {
 
             if (50 + 20 > pipe.x && 50 < pipe.x + 52) {
                 if (birdY < pipe.top || birdY + 20 > canvas.height - pipe.bottom) {
-                    gameOver = true;
-                    sendScore(score);
+                    if (!gameOver) { // Schutz: Nur einmal ausführen!
+                        gameOver = true;
+                        sendScore(score);
+                    }
                 }
             }
         });
@@ -181,8 +184,9 @@ function gameLoop() {
         ctx.fillRect(pipe.x, canvas.height - pipe.bottom, 52, pipe.bottom);
     });
 
+    // Kollisionsabfrage für Decke/Boden
     if (birdY + 20 > canvas.height || birdY < 0) {
-        if (!gameOver && gameStarted && !isPaused) { 
+        if (!gameOver) { // Schutz: Nur einmal ausführen!
             gameOver = true; 
             sendScore(score); 
         }
