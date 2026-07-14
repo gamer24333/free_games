@@ -88,14 +88,17 @@
 
         // --- AUTOMATISCHE INITIALISIERUNG ---
         function initMatch() {
-            if (gegnerName === "Computer-Bot 🤖" || gameId.includes("bot") || gameId === "offline_bot_game") {
-                isBotMode = true;
-                initBotGame();
-            } else {
-                isBotMode = false;
-                updateStatus();
-            }
+        // Der Bot-Modus wird NUR aktiviert, wenn die Game-ID explizit "offline_bot_game" ist
+        // oder der Gegnername im Backend fest als der Bot hinterlegt wurde.
+        if (gameId === "offline_bot_game" || gegnerName.includes("Bot") && gameId.includes("bot_game")) {
+            isBotMode = true;
+            initBotGame();
+        } else {
+            isBotMode = false;
+            // Bei echten Spielern starten wir sofort die Synchronisation mit dem Server
+            updateStatus();
         }
+    }
 
         function initBotGame() {
             gameState = {
