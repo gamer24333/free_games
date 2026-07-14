@@ -2,20 +2,23 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Klassen-Clicker</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 50px; }
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 30px; }
         .btn { display: inline-block; padding: 12px 24px; background: #00adb5; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
         .btn:hover { background: #007c82; }
         .btn-back { background: #555; margin-bottom: 20px; }
+        
+        /* Neuer Button-Style für das Vollbild */
+        .btn-fullscreen { background: #ff9f43; color: black; margin-bottom: 20px; font-size: 16px; }
+        .btn-fullscreen:hover { background: #e08b35; }
         
         .game-layout { display: flex; justify-content: center; align-items: flex-start; gap: 40px; max-width: 900px; margin: 0 auto; padding: 20px; flex-wrap: wrap; }
         
         .game-box { background: #333; border: 3px solid #00adb5; border-radius: 12px; padding: 30px; width: 350px; text-align: center; box-sizing: border-box; }
         .click-btn { width: 160px; height: 160px; border-radius: 50%; background: #00adb5; color: white; font-size: 20px; font-weight: bold; border: none; cursor: pointer; box-shadow: 0 0 15px rgba(0,173,181,0.4); transition: transform 0.05s; margin: 20px 0; user-select: none; -webkit-user-select: none; }
         
-        /* .active Klasse hinzugefügt, damit das Einsinken auch via Keyboard-Events triggert */
         .click-btn:active, .click-btn.active { transform: scale(0.95); background: #008c9e; }
         .click-btn:disabled { background: #555; box-shadow: none; cursor: not-allowed; }
         .stats { font-size: 22px; margin: 10px 0; }
@@ -30,6 +33,8 @@
 <body>
 
     <a href="/games" class="btn btn-back">⬅️ Zurück zu den Spielen</a>
+    <button id="fullscreenBtn" class="btn btn-fullscreen">📺 Vollbildmodus</button>
+
     <h1>⚡ Der 10-Sekunden-Clicker-Test</h1>
 
     <div class="game-layout">
@@ -78,7 +83,42 @@
         const scoreEl = document.getElementById('score');
         const hintEl = document.getElementById('hint');
         const resetBtn = document.getElementById('resetBtn');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
 
+        // Hilfsvariable für die Tastatursteuerung (Verhindert Spam durch Gedrückthalten)
+        let isKeyPressed = false;
+
+        // --- VOLLBILD STEUERUNG ---
+        fullscreenBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                // Versuche die gesamte Seite ins Vollbild zu bringen
+                const element = document.documentElement;
+                if (element.requestFullscreen) {
+                    element.requestFullscreen();
+                } else if (element.mozRequestFullScreen) { /* Firefox */
+                    element.mozRequestFullScreen();
+                } else if (element.webkitRequestFullscreen) { /* Chrome, Safari, Opera */
+                    element.webkitRequestFullscreen();
+                } else if (element.msRequestFullscreen) { /* IE/Edge */
+                    element.msRequestFullscreen();
+                }
+                fullscreenBtn.textContent = "📺 Vollbild beenden";
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+                fullscreenBtn.textContent = "📺 Vollbildmodus";
+            }
+        });
+
+        // Falls der Nutzer mit "Esc" das Vollbild manuell verlässt
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                fullscreenBtn.textContent = "📺 Vollbildmodus";
+            }
+        });
+
+        // --- SPIELLOGIK ---
         clickBtn.addEventListener('click', () => {
             if (!hasStarted) {
                 hasStarted = true;
@@ -101,23 +141,26 @@
             }
         });
 
-        // GEÄNDERT: Unterstützt jetzt Leertaste (Space) und Enter
+        // Keyboard-Event mit Spam-Schutz (Man muss die Taste jedes Mal neu drücken)
         window.addEventListener('keydown', function(e) {
             if (e.code === 'Space' || e.code === 'Enter' || e.keyCode === 32 || e.keyCode === 13) {
-                e.preventDefault(); // Verhindert das automatische Scrollen bei Leertaste
+                e.preventDefault(); // Verhindert das lästige Scrollen im Browser
                 
+                if (isKeyPressed) return; // Blockiert, wenn die Taste bereits gehalten wird
+                isKeyPressed = true;
+
                 if (clickBtn && !clickBtn.disabled) {
-                    clickBtn.classList.add('active'); // Visueller Klick-Effekt an
+                    clickBtn.classList.add('active');
                     clickBtn.click(); 
                 }
             }
         });
 
-        // Setzt den visuellen Klick-Effekt wieder zurück, sobald man die Taste loslässt
         window.addEventListener('keyup', function(e) {
             if (e.code === 'Space' || e.code === 'Enter' || e.keyCode === 32 || e.keyCode === 13) {
+                isKeyPressed = false;
                 if (clickBtn) {
-                    clickBtn.classList.remove('active'); // Visueller Klick-Effekt aus
+                    clickBtn.classList.remove('active');
                 }
             }
         });
