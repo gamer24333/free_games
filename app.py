@@ -29,6 +29,9 @@ KLASSEN_LISTE = [
     "TestAccount"
 ]
 
+# RAM-Speicher für die Online-Erkennung (letzter Ping/Aktivität)
+last_active = {}
+
 # --- DATENBANK MODELLE (TABELLEN) ---
 
 class UserSetting(db.Model):
@@ -78,7 +81,7 @@ class TankGame(db.Model):
     turn = db.Column(db.String(50), nullable=False)
     status = db.Column(db.String(50), default="eingeladen")
     last_shot = db.Column(db.String(100), default="") 
-    terrain = db.Column(db.Text, nullable=True) # NEU: Spalte für das zerstörbare Gelände
+    terrain = db.Column(db.Text, nullable=True) # Spalte für das zerstörbare Gelände
 
 
 # --- HILFSFUNKTIONEN ---
@@ -102,15 +105,29 @@ def get_admins_list():
 @app.before_request
 def update_last_seen():
     if 'username' in session:
-        user = UserSetting.query.filter_by(username=session['username']).first()
+        current_user = session['username']
+        # 1. Update in der SQL-Datenbank
+        user = UserSetting.query.filter_by(username=current_user).first()
         if user:
             user.last_seen = datetime.utcnow()
             db.session.commit()
+        # 2. Update im RAM (für schnelle Live-Status Abfragen)
+        last_active[current_user] = datetime.now()
 
 
 @app.route('/')
 def index():
     return redirect(url_for('dashboard')) if 'username' in session else redirect(url_for('login'))
+
+
+# Herzschlag-Schnittstelle für den Live-Online-Status im Chat
+@app.route('/api/ping', methods=['POST'])
+def ping_user():
+    if 'username' in session:
+        last_active[session['username']] = datetime.now()
+        return {"status": "success"}
+    return {"error": "Unauthorized"}, 401
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -129,6 +146,7 @@ def login():
         if user and user.pin:
             if user.pin == eingabe_pin:
                 session['username'] = eingabe_name
+                last_active[eingabe_name] = datetime.now()
                 return redirect(url_for('dashboard'))
             else:
                 return render_template('login.html', fehler="Falsche PIN! 🤔", name_vorbefuellt=eingabe_name)
@@ -145,6 +163,7 @@ def login():
             db.session.commit()
             
             session['username'] = eingabe_name
+            last_active[eingabe_name] = datetime.now()
             return redirect(url_for('dashboard'))
             
     return render_template('login.html')
@@ -171,22 +190,34 @@ def dashboard():
     
     return render_template('dashboard.html', name=me, einladungen=aktive_matches, is_admin=is_admin)
 
+
 @app.route('/api/dashboard-stats')
 def dashboard_stats():
-    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
+    if 'username' not in session: 
+        return {"error": "Nicht autorisiert"}, 401
     current_user = session['username']
     
+    # 1. Globalen Chatverlauf zählen
     global_chat_len = ChatMessage.query.filter_by(room='global').count()
     
+    # 2. Direktnachrichten-Statistiken sammeln
     private_chats_stats = {}
     for schueler in KLASSEN_LISTE:
         if schueler != current_user:
             room_id = get_private_room_name(current_user, schueler)
             private_chats_stats[schueler] = ChatMessage.query.filter_by(room=room_id).count()
+            
+    # 3. Live-Online-Nutzer filtern (jeder, der in den letzten 15 Sekunden ein Lebenszeichen gesendet hat)
+    aktive_grenze = datetime.now() - timedelta(seconds=15)
+    online_users = []
+    for username, last_seen_time in last_active.items():
+        if last_seen_time > aktive_grenze:
+            online_users.append(username)
     
     return {
         "global_messages_count": global_chat_len,
-        "private_messages_stats": private_chats_stats
+        "private_messages_stats": private_chats_stats,
+        "online_users": online_users  # <- Das fehlte zuvor hier!
     }
 
 # --- ADMIN PANEL ---
@@ -275,6 +306,7 @@ def admin_clear_chat():
 def chat(room="global"):
     if 'username' not in session: return redirect(url_for('login'))
 
+    # Schnelles Fallback: Wer war laut Datenbank in den letzten 2 Minuten online?
     zwei_minuten_ago = datetime.utcnow() - timedelta(minutes=2)
     online_users = UserSetting.query.filter(UserSetting.last_seen >= zwei_minuten_ago).all()
     online_names = [u.username for u in online_users]
@@ -409,7 +441,6 @@ def submit_score():
         user_score = GameScore(username=current_user, geometry_dash=score)
         db.session.add(user_score)
     else:
-        # Falls geometry_dash in der DB None ist, fahre mit 0 fort
         current_best = user_score.geometry_dash if user_score.geometry_dash is not None else 0
         if score > current_best:
             user_score.geometry_dash = score
@@ -459,7 +490,6 @@ def submit_flappy():
         user_score = GameScore(username=user, flappy=val)
         db.session.add(user_score)
     else:
-        # Standardmäßig ist Flappy Bird bei -1 gestartet
         current_best = user_score.flappy if user_score.flappy is not None else -1
         if val > current_best:
             user_score.flappy = val
@@ -698,7 +728,7 @@ def tank_status(game_id):
         g.state = ",".join(raw_parts)
         db.session.commit()
     
-    # Fehlerhafte "NaN" Strings filtern, bevor int(float()) gecasht wird
+    # Fehlerhafte "NaN" Strings filtern, bevor int(float()) gecashed wird
     def safe_int(val, default=0):
         try:
             return int(float(val))
@@ -759,10 +789,12 @@ def tank_shoot(game_id):
         # --- EFFEKTE BERECHNEN ---
         if hit == "crate_collected":
             if me == g.ersteller:
+                st[0] += 25
                 st[4] = 100  # P1 Tank randvoll
                 st[6] += 1   # Waffennachschub
                 st[7] += 1   
             else:
+                st[1] += 25
                 st[5] = 100  # P2 Tank randvoll
                 st[8] += 1
                 st[9] += 1
@@ -826,9 +858,7 @@ def logout():
     session.pop('username', None)
     return redirect(url_for('login'))
 
-# --- ERZWINGT DAS ERSTELLEN BEIM LADEN DER DATEI ---
-with app.app_context():
-    db.create_all()
-
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)
