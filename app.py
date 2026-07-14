@@ -490,14 +490,13 @@ def submit_reaction():
         user_score = GameScore(username=user, reaction=val)
         db.session.add(user_score)
     else:
-        # WICHTIG: Beim Reaktionstest gewinnt die KLEINERE Zahl (Millisekunden).
-        # Wenn None in der DB steht, nutzen wir 9999 als Vergleichswert.
         current_best = user_score.reaction if user_score.reaction is not None else 9999
         if val < current_best:
             user_score.reaction = val
             
     db.session.commit()
     return {"status": "ok"}
+    
 # --- TIC-TAC-TOE ---
 
 @app.route('/tictactoe')
