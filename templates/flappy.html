@@ -277,6 +277,31 @@
         const pipeGap = 90; 
         let frameCount = 0;
 
+        // --- SESSION STORAGE (Temporäres Speichern) ---
+        function saveGameState() {
+            const state = {
+                birdY, birdVelocity, score, gameActive, gameOver, gamePaused, pipes, frameCount
+            };
+            sessionStorage.setItem('flappyState', JSON.stringify(state));
+
+        function loadGameState() {
+            const saved = sessionStorage.getItem('flappyState');
+            if (saved) {
+                const state = JSON.parse(saved);
+                birdY = state.birdY;
+                birdVelocity = state.birdVelocity;
+                score = state.score;
+                gameActive = state.gameActive;
+                gameOver = state.gameOver;
+                gamePaused = true; // Startet automatisch pausiert, wenn man zurückkommt!
+                pipes = state.pipes;
+                frameCount = state.frameCount;
+                sessionStorage.removeItem('flappyState'); // Einmalig laden
+            }
+        }
+
+        // Beim Laden prüfen, ob ein Spielstand da war
+        loadGameState();
         // Grafiken zeichnen
         function draw() {
             // Hintergrund-Himmel
@@ -445,6 +470,7 @@
             gamePaused = !gamePaused;
             if (gamePaused) {
                 bgMusic.pause();
+                saveGameState();
             } else {
                 bgMusic.play().catch(e => console.log(e));
             }
@@ -457,6 +483,7 @@
                 resetGame();
             } else if (!gameActive) {
                 gameActive = true;
+                birdVelocity = jump;
                 bgMusic.play().catch(e => console.log("Audio-Autoplay verhindert:", e));
             } else {
                 birdVelocity = jump;
