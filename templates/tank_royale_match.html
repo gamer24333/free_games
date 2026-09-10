@@ -188,23 +188,22 @@
 
                 let dx = Math.abs(p1_x - p2_x);
                 
-                // Realistische Schussberechnung über Wurfparabel-Formel
-                let botPower = 13;
+                // Variierende Schussstärke und starker Zufall, damit es nie monoton wirkt
+                let botPower = 9 + Math.random() * 7; // Kraft zwischen 9 und 16
                 let val = (dx * gravity) / (botPower * botPower * 1.4);
                 let targetAngle = 45;
                 if (val <= 1) {
                     let radApprox = 0.5 * Math.asin(val);
                     targetAngle = Math.round(radApprox * (180 / Math.PI));
-                    if (targetAngle < 15) targetAngle = 15;
-                    if (targetAngle > 75) targetAngle = 75;
                 }
 
-                // Kleine menschliche Abweichung einstreuen, damit es spannend bleibt
-                targetAngle += Math.floor(Math.random() * 12) - 6;
-                botPower += (Math.random() * 3 - 1.5);
+                // Größere zufällige Abweichung (bis zu +/- 22 Grad), damit der Bot spannender variiert
+                targetAngle += Math.floor(Math.random() * 44) - 22;
+                if (targetAngle < 15) targetAngle = 15;
+                if (targetAngle > 75) targetAngle = 75;
 
                 let rad = (targetAngle * Math.PI) / 180;
-                let botWeapon = (Math.random() > 0.75) ? 'berta' : 'standard';
+                let botWeapon = (Math.random() > 0.7) ? 'berta' : 'standard';
 
                 bullets = [{
                     x: p2_x,
