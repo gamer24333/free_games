@@ -283,7 +283,7 @@
                 birdY, birdVelocity, score, gameActive, gameOver, gamePaused, pipes, frameCount
             };
             sessionStorage.setItem('flappyState', JSON.stringify(state));
-
+        }
         function loadGameState() {
             const saved = sessionStorage.getItem('flappyState');
             if (saved) {
