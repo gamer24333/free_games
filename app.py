@@ -688,14 +688,17 @@ def tankroyale_menu():
 def tankroyale_invite():
     if 'username' not in session: 
         return redirect(url_for('login'))
+    
     gegner = request.form.get('gegner')
+    # NEU: Schwierigkeitsgrad aus dem Formular holen (Standard ist 'medium')
+    bot_difficulty = request.form.get('bot_difficulty', 'medium') 
     me = session['username']
     
     game_id = f"{min(me, gegner)}_tank_{max(me, gegner)}"
     existing = TankGame.query.filter_by(game_id=game_id).first()
     if existing:
         db.session.delete(existing)
-        db.session.commit() # Direkt committen, um Konflikte zu vermeiden
+        db.session.commit() 
     
     # Gelände einmalig generieren (901 Punkte für Canvas-Breite 900)
     terrain_points = []
@@ -705,7 +708,6 @@ def tankroyale_invite():
     
     terrain_json = json.dumps(terrain_points)
 
-    # Start-State angepasst auf standardmäßig 3x Berta, 2x Triple (passend zum HTML-Fallback)
     new_game = TankGame(
         game_id=game_id, 
         ersteller=me, 
@@ -717,7 +719,9 @@ def tankroyale_invite():
     )
     db.session.add(new_game)
     db.session.commit()
-    return redirect(url_for('tankroyale_match', game_id=game_id))
+    
+    # NEU: Den difficulty-Parameter an die URL anhängen
+    return redirect(url_for('tankroyale_match', game_id=game_id, diff=bot_difficulty))
 
 @app.route('/tankroyale/accept/<game_id>', methods=['POST'])
 def tankroyale_accept(game_id):
@@ -743,7 +747,12 @@ def tankroyale_decline(game_id):
 def tankroyale_match(game_id):
     if 'username' not in session: 
         return redirect(url_for('login'))
-    return render_template('tank_royale_match.html', gameId=game_id, me=session['username'])
+    
+    # NEU: Den Schwierigkeitsgrad aus der URL auslesen
+    diff = request.args.get('diff', 'medium')
+    
+    # NEU: bot_difficulty an das HTML-Template übergeben
+    return render_template('tank_royale_match.html', gameId=game_id, me=session['username'], bot_difficulty=diff)
 
 @app.route('/api/tankroyale/status/<game_id>')
 def tank_status(game_id):
