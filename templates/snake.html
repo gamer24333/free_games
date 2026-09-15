@@ -106,7 +106,7 @@
 <body>
 
     <div class="header-bar">
-        <a href="/games" class="btn btn-back">⬅️ Zurück</a>
+        <a href="/games" class="btn btn-back" onclick="stopMusic()">⬅️ Zurück</a>
         <h1>🐍 Retro Snake</h1>
     </div>
 
@@ -152,6 +152,16 @@
         const ctx = canvas.getContext('2d');
         const scoreEl = document.getElementById('score');
 
+        // Hintergrundmusik einrichten
+        const bgMusic = new Audio('/static/snake.mp3');
+        bgMusic.loop = true;
+        bgMusic.volume = 0.4;
+
+        function stopMusic() {
+            bgMusic.pause();
+            bgMusic.currentTime = 0;
+        }
+
         const gridSize = 20;
         const tileCount = canvas.width / gridSize;
 
@@ -180,6 +190,9 @@
             isGameOver = false;
             gameStarted = false;
             spawnApple();
+            
+            bgMusic.pause();
+            bgMusic.currentTime = 0;
         }
 
         // Steuerung mit den Pfeiltasten
@@ -191,11 +204,13 @@
             if (isGameOver && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) {
                 resetGame();
                 gameStarted = true;
+                bgMusic.play().catch(err => console.log("Autoplay verhindert:", err));
                 return;
             }
 
             if (!gameStarted && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
                 gameStarted = true;
+                bgMusic.play().catch(err => console.log("Autoplay verhindert:", err));
             }
 
             switch(e.key) {
@@ -263,7 +278,7 @@
             ctx.fillStyle = '#111';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Dezent ein feines Raster zeichnen (für den Look)
+            // Raster
             ctx.strokeStyle = '#181818';
             ctx.lineWidth = 1;
             for (let i = 0; i < tileCount; i++) {
@@ -277,7 +292,7 @@
                 ctx.stroke();
             }
 
-            // Apfel zeichnen (Mit kleinem Stiel für besseres Aussehen)
+            // Apfel zeichnen
             let ax = apple.x * gridSize;
             let ay = apple.y * gridSize;
             ctx.fillStyle = '#ff2e63';
@@ -292,16 +307,14 @@
             ctx.lineTo(ax + gridSize / 2 + 3, ay + 1);
             ctx.stroke();
 
-            // Schlange zeichnen (mit abgerundeten Ecken für hochwertige Grafik)
+            // Schlange zeichnen
             snake.forEach((part, index) => {
                 let px = part.x * gridSize;
                 let py = part.y * gridSize;
                 
-                // Kopf knallig neon-grün, Körper etwas dunkleres Technik-Grün
                 ctx.fillStyle = index === 0 ? '#39ff14' : '#00adb5';
                 
                 ctx.beginPath();
-                // Abgerundete Rechtecke für den Schlangenkörper
                 if (ctx.roundRect) {
                     ctx.roundRect(px + 1, py + 1, gridSize - 2, gridSize - 2, 6);
                 } else {
@@ -356,6 +369,7 @@
 
         async function triggerGameOver() {
             isGameOver = true;
+            bgMusic.pause(); // Musik stoppen bei Game Over
 
             try {
                 await fetch('/api/submit-snake', {
@@ -369,7 +383,6 @@
         }
 
         resetGame();
-        // Etwas angenehmere Geschwindigkeit (120ms statt 100ms wirkt stabiler und flüssiger)
         setInterval(() => {
             update();
             draw();
