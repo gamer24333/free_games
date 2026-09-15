@@ -46,10 +46,12 @@
     </div>
 
     <script>
-        // Sicheres Fallback für Jinja-Variablen
         const gameId = "{{ gameId or 'offline_bot_game' }}";
         const me = "{{ me or 'Spieler 1' }}";
         const gegnerName = "{{ gegner or 'Computer-Bot 🤖' }}";
+        
+        // Versuchen, den vom Backend (via Menü) übergebenen Schwierigkeitsgrad zu holen, Fallback "medium"
+        const botDifficulty = "{{ bot_difficulty or 'medium' }}"; 
         
         const canvas = document.getElementById('tankCanvas');
         const ctx = canvas.getContext('2d');
@@ -72,14 +74,13 @@
         let crate = { x: -100, y: -100, active: false };
 
         let isBotMode = false;
-        let botCalculated = false; // Verhindert mehrfaches Berechnen
+        let botCalculated = false;
 
         let moveLeftActive = false; let moveRightActive = false;
         const keys = {};
         window.addEventListener('keydown', e => { keys[e.key] = true; });
         window.addEventListener('keyup', e => { keys[e.key] = false; });
 
-        // Backup-/Startgelände falls API lädt (901 Punkte passend zu Canvas-Breite 900)
         let terrainPoints = [];
         for (let x = 0; x <= 900; x++) {
             let y = 400 + Math.sin(x * 0.008) * 40 + Math.cos(x * 0.02) * 10;
@@ -91,32 +92,19 @@
             const gegnerNameClean = gegnerName.toLowerCase();
             const gameIdClean = gameId.toLowerCase();
             
-            // Erkennt zuverlässig, ob es sich um ein Bot-Match handelt
-            if (
-                gameIdClean === "offline_bot_game" || 
-                gameIdClean.includes("bot") || 
-                gegnerNameClean.includes("bot") || 
-                gegnerNameClean.includes("computer")
-            ) {
+            if (gameIdClean === "offline_bot_game" || gameIdClean.includes("bot") || gegnerNameClean.includes("bot") || gegnerNameClean.includes("computer")) {
                 isBotMode = true;
                 initBotGame();
             } else {
                 isBotMode = false;
-                // Sofortige Synchronisierung für echte Spieler im Multiplayer
                 updateStatus();
             }
         }
 
         function initBotGame() {
             gameState = {
-                status: "aktiv",
-                turn: me,
-                ersteller: me,
-                gegner: "Computer-Bot 🤖",
-                p1_x: 150,
-                p2_x: 750,
-                p1_hp: 100,
-                p2_hp: 100,
+                status: "aktiv", turn: me, ersteller: me, gegner: "Computer-Bot 🤖",
+                p1_x: 150, p2_x: 750, p1_hp: 100, p2_hp: 100,
                 raw_state: "100,100,150,750,100,100,3,2,3,2,-1,-1,0"
             };
             document.getElementById('matchInfo').innerText = "🔴 DU BIST DRAN! (Gegen Bot)";
@@ -152,7 +140,6 @@
             lockStatusText.innerText = `Winkel: ${myAngle}° | Kraft: ${myPower}`;
         }
 
-        // Mouse & Touch-Steuerung
         canvas.addEventListener('mousedown', (e) => { isAiming = true; calculateAim(e.clientX, e.clientY); });
         canvas.addEventListener('mousemove', (e) => { if (isAiming) calculateAim(e.clientX, e.clientY); });
         window.addEventListener('mouseup', () => { isAiming = false; });
@@ -168,57 +155,88 @@
         }, { passive: false });
         window.addEventListener('touchend', () => { isAiming = false; });
 
-        // --- BOT GEGENZUG LOGIK ---
+
+        // --- DIE NEUE BOT KI ---
         function triggerBotTurn() {
             if (!isBotMode || botCalculated || gameState.status !== "aktiv" || bullets.length > 0) return;
             botCalculated = true;
 
-            document.getElementById('matchInfo').innerText = "🤖 Bot zielt und schießt...";
+            document.getElementById('matchInfo').innerText = "🤖 Bot fährt und zielt...";
             shootBtn.disabled = true;
 
             setTimeout(() => {
                 if (gameState.turn !== "Computer-Bot 🤖" || gameState.status !== "aktiv") {
-                    botCalculated = false;
-                    return;
+                    botCalculated = false; return;
                 }
+
+                // 1. Bot bewegt sich zufällig ein wenig (maximal 40 Pixel links/rechts)
+                let moveAmount = (Math.random() * 80) - 40; 
+                gameState.p2_x = Math.max(20, Math.min(canvas.width - 20, gameState.p2_x + moveAmount));
 
                 let p1_x = gameState.p1_x;
                 let p2_x = gameState.p2_x;
                 let startY = terrainPoints[Math.floor(p2_x)] - 17;
 
-                let dx = Math.abs(p1_x - p2_x);
+                // 2. Zielberechnung basierend auf Physik
+                let dx = Math.abs(p1_x - p2_x); 
+                let targetPower = 12 + Math.random() * 2; // Konstante gute Kraft
                 
-                // Variierende Schussstärke und starker Zufall, damit es nie monoton wirkt
-                let botPower = 9 + Math.random() * 7; // Kraft zwischen 9 und 16
-                let val = (dx * gravity) / (botPower * botPower * 1.4);
-                let targetAngle = 45;
+                // Formel umgeformt nach Winkel (rad) für gegebene Distanz und Kraft
+                let val = (dx * gravity) / (targetPower * targetPower * (1.2 * 1.2));
+                let targetAngle = 45; // Standard, falls Berechnung scheitert
+                
                 if (val <= 1) {
                     let radApprox = 0.5 * Math.asin(val);
                     targetAngle = Math.round(radApprox * (180 / Math.PI));
                 }
 
-                // Größere zufällige Abweichung (bis zu +/- 22 Grad), damit der Bot spannender variiert
-                targetAngle += Math.floor(Math.random() * 44) - 22;
+                // 3. Fehlerquote je nach Schwierigkeitsgrad hinzufügen
+                let errorMargin = 0;
+                if (botDifficulty === 'easy') {
+                    errorMargin = (Math.random() * 30) - 15; // +/- 15 Grad Abweichung (trifft oft daneben)
+                } else if (botDifficulty === 'medium') {
+                    errorMargin = (Math.random() * 12) - 6;  // +/- 6 Grad (Gute Mischung)
+                } else if (botDifficulty === 'hard') {
+                    errorMargin = (Math.random() * 4) - 2;   // +/- 2 Grad (Gefährlich präzise)
+                }
+                
+                targetAngle += errorMargin;
+                
+                // Sicherstellen, dass Winkel gültig bleibt
                 if (targetAngle < 15) targetAngle = 15;
-                if (targetAngle > 75) targetAngle = 75;
+                if (targetAngle > 85) targetAngle = 85;
 
                 let rad = (targetAngle * Math.PI) / 180;
-                let botWeapon = (Math.random() > 0.7) ? 'berta' : 'standard';
+                
+                // Waffenwahl
+                let st = gameState.raw_state.split(',').map(Number);
+                let botBerta = st[8];
+                let botTriple = st[9];
+                let botWeapon = 'standard';
 
+                if (botBerta > 0 && Math.random() > 0.6) {
+                    botWeapon = 'berta';
+                    st[8]--; 
+                } else if (botTriple > 0 && Math.random() > 0.7) {
+                    botWeapon = 'triple';
+                    st[9]--;
+                }
+                gameState.raw_state = st.join(','); // Zustand updaten
+
+                // Schuss abfeuern
                 bullets = [{
-                    x: p2_x,
-                    y: startY,
-                    vx: Math.cos(rad) * (botPower * 1.2) * -1,
-                    vy: -Math.sin(rad) * (botPower * 1.2),
+                    x: p2_x - Math.cos(rad) * 22,
+                    y: startY - Math.sin(rad) * 22,
+                    vx: Math.cos(rad) * (targetPower * 1.2) * -1, // Immer nach links (negativ)
+                    vy: -Math.sin(rad) * (targetPower * 1.2),
                     type: botWeapon,
                     owner: "Computer-Bot 🤖",
                     active: true
                 }];
 
-            }, 1800);
+            }, 2000);
         }
 
-        // --- SERVER-STATUS SYNCHRONISIERUNG ---
         async function updateStatus() {
             if (isBotMode) return;
             try {
@@ -226,7 +244,6 @@
                 if (!res.ok) return;
                 gameState = await res.json();
                 
-                // Server-Terrain anwenden
                 if (gameState.terrain && gameState.terrain.length > 0) {
                     terrainPoints = gameState.terrain;
                 }
@@ -285,7 +302,6 @@
             document.getElementById('moveRightBtn').addEventListener(evt, () => moveRightActive = false);
         });
 
-        // Gelände mit Kollisionslimit deformieren
         function destroyTerrain(impactX, radius) {
             let startX = Math.max(0, Math.floor(impactX - radius));
             let endX = Math.min(canvas.width, Math.floor(impactX + radius));
@@ -301,7 +317,6 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Terrain zeichnen
             ctx.fillStyle = '#393e46'; ctx.beginPath(); ctx.moveTo(0, canvas.height);
             for (let x = 0; x <= canvas.width; x++) ctx.lineTo(x, terrainPoints[x]);
             ctx.lineTo(canvas.width, canvas.height); ctx.closePath(); ctx.fill();
@@ -319,7 +334,6 @@
             let p1 = { x: p1_x, y: terrainPoints[p1_x] - 15, hp: st[0], fuel: p1_f, color: '#00adb5', name: gameState.ersteller, dX: 1 };
             let p2 = { x: p2_x, y: terrainPoints[p2_x] - 15, hp: st[1], fuel: p2_f, color: '#ff2e63', name: gameState.gegner || "Bot 🤖", dX: -1 };
 
-            // Kisten-Logik
             if (crate.active) {
                 let groundY = terrainPoints[Math.floor(crate.x)] - 12;
                 if (crate.y < groundY) crate.y += 1.5;
@@ -337,7 +351,6 @@
                 }
             }
 
-            // Panzer zeichnen
             [p1, p2].forEach(p => {
                 ctx.save();
                 ctx.fillStyle = '#333'; ctx.fillRect(p.x - 22, p.y + 8, 44, 8);
@@ -356,7 +369,6 @@
                 ctx.fillStyle = '#76ff03'; ctx.fillRect(p.x - 20, p.y - 15, (p.fuel / 100) * 40, 5);
             });
 
-            // Ziel-Hilfslinie
             if (gameState.turn === me && bullets.length === 0 && gameState.status === "aktiv") {
                 let activeTank = amIErsteller ? p1 : p2;
                 let rad = (myAngle * Math.PI) / 180;
@@ -368,7 +380,6 @@
                 ctx.stroke(); ctx.setLineDash([]);
             }
 
-            // Projektile rendern
             if (bullets.length > 0) {
                 let hitRegistered = false;
                 let finalHitType = "none";
@@ -381,23 +392,23 @@
                     ctx.arc(bullet.x, bullet.y, bullet.type === 'berta' ? 8 : 5, 0, Math.PI*2); 
                     ctx.fill();
 
-                    // Gegner ermitteln
-                    let target = (bullet.owner === me) ? p2 : p1;
-                    
-                    // Kollisionsprüfung mit Gegner
-                    if (bullet.x > target.x - 22 && bullet.x < target.x + 22 && bullet.y > target.y - 12 && bullet.y < target.y + 15) {
+                    // Prüfen, ob das Projektil jemanden trifft
+                    if (bullet.x > p1.x - 22 && bullet.x < p1.x + 22 && bullet.y > p1.y - 12 && bullet.y < p1.y + 15) {
                         bullet.active = false;
                         hitRegistered = true;
-                        finalHitType = (target === p2) ? "p2" : "p1";
+                        finalHitType = "p1"; // Immer P1 melden, wenn P1 getroffen wird
                     } 
-                    // Geländekollision
+                    else if (bullet.x > p2.x - 22 && bullet.x < p2.x + 22 && bullet.y > p2.y - 12 && bullet.y < p2.y + 15) {
+                        bullet.active = false;
+                        hitRegistered = true;
+                        finalHitType = "p2"; // Immer P2 melden, wenn P2 getroffen wird
+                    } 
                     else if (bullet.x >= 0 && bullet.x <= canvas.width && bullet.y > terrainPoints[Math.floor(bullet.x)]) {
                         destroyTerrain(bullet.x, bullet.type === 'berta' ? 45 : 25);
                         bullet.active = false;
                         hitRegistered = true;
                         finalHitType = "terrain";
                     }
-                    // Out of Bounds
                     else if (bullet.x < 0 || bullet.x > canvas.width || bullet.y > canvas.height) {
                         bullet.active = false;
                     }
@@ -412,31 +423,24 @@
                     }
                 }
             }
-        } // <--- Hier hat die geschlossene Klammer gefehlt!
+        } 
             
         function fireTank() {
             if (gameState.turn !== me || gameState.status !== "aktiv" || bullets.length > 0) return;
             
-            // Munition prüfen und abziehen
             if (selectedWeapon === 'berta') {
                 if (ammoBerta <= 0) return;
-                ammoBerta--;
-                document.getElementById('ammo-berta').innerText = ammoBerta;
+                ammoBerta--; document.getElementById('ammo-berta').innerText = ammoBerta;
             } else if (selectedWeapon === 'triple') {
                 if (ammoTriple <= 0) return;
-                ammoTriple--;
-                document.getElementById('ammo-triple').innerText = ammoTriple;
+                ammoTriple--; document.getElementById('ammo-triple').innerText = ammoTriple;
             }
 
-            // Buttons aktualisieren, wenn Munition leer ist
             document.getElementById('wpn-berta').disabled = ammoBerta <= 0;
             document.getElementById('wpn-triple').disabled = ammoTriple <= 0;
 
-            if (selectedWeapon === 'berta' && ammoBerta <= 0) {
-                selectWeapon('standard');
-            } else if (selectedWeapon === 'triple' && ammoTriple <= 0) {
-                selectWeapon('standard');
-            }
+            if (selectedWeapon === 'berta' && ammoBerta <= 0) selectWeapon('standard');
+            else if (selectedWeapon === 'triple' && ammoTriple <= 0) selectWeapon('standard');
 
             let amIErsteller = (me === gameState.ersteller);
             let currentX = Math.max(20, Math.min(canvas.width - 20, (amIErsteller ? gameState.p1_x + myXOffset : gameState.p2_x + myXOffset)));
@@ -458,9 +462,7 @@
                         x: spawnX, y: spawnY,
                         vx: Math.cos(r) * (myPower * 1.2) * direction,
                         vy: -Math.sin(r) * (myPower * 1.2),
-                        type: 'triple',
-                        owner: me,
-                        active: true
+                        type: 'triple', owner: me, active: true
                     });
                 });
             } else {
@@ -468,9 +470,7 @@
                     x: spawnX, y: spawnY,
                     vx: Math.cos(rad) * (myPower * 1.2) * direction,
                     vy: -Math.sin(rad) * (myPower * 1.2),
-                    type: selectedWeapon,
-                    owner: me,
-                    active: true
+                    type: selectedWeapon, owner: me, active: true
                 });
             }
             shootBtn.disabled = true;
@@ -482,26 +482,35 @@
             let p2_hp = st[1];
         
             let dmg = 20; 
-            if (selectedWeapon === 'berta') {
-                dmg = 45;
-            } else if (selectedWeapon === 'triple') {
-                dmg = 15;
+            if (selectedWeapon === 'berta') dmg = 45;
+            else if (selectedWeapon === 'triple') dmg = 15;
+            
+            // Herausfinden, wessen Projektil gerade Schaden gemacht hat (um Fehler zu vermeiden)
+            let wasBotShot = (gameState.turn === "Computer-Bot 🤖");
+
+            // HP-Berechnung: Wir prüfen strikt, WER getroffen wurde (hit = "p1" oder "p2")
+            if (hit === "p1") {
+                p1_hp = Math.max(0, p1_hp - dmg);
+            } else if (hit === "p2") {
+                p2_hp = Math.max(0, p2_hp - dmg);
             }
-        
-            if (gameState.turn === me) {
-                if (hit === "p2") p2_hp = Math.max(0, p2_hp - dmg);
+
+            // Zug-Wechsel
+            if (!wasBotShot) {
+                // Ich habe geschossen, Bot ist dran
                 gameState.p1_x = Math.max(20, Math.min(canvas.width - 20, gameState.p1_x + myXOffset));
                 gameState.turn = "Computer-Bot 🤖";
                 document.getElementById('matchInfo').innerText = "⏳ Bot ist dran...";
                 botCalculated = false;
             } else {
-                if (hit === "p1") p1_hp = Math.max(0, p1_hp - dmg);
+                // Bot hat geschossen, ich bin dran
                 gameState.turn = me;
                 document.getElementById('matchInfo').innerText = "🔴 DU BIST DRAN!";
                 shootBtn.disabled = false;
                 botCalculated = false;
             }
 
+            // Siegbedingung prüfen
             if (p1_hp <= 0) {
                 gameState.status = "gewonnen_Bot";
                 document.getElementById('matchInfo').innerText = "❌ Der Bot hat dich zerstört!";
@@ -549,7 +558,6 @@
             requestAnimationFrame(gameLoop); 
         }
 
-        // Intervall-Update (Nur für Multiplayer)
         setInterval(() => {
             if (!isBotMode) updateStatus();
         }, 1500);
