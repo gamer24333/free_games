@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>Gegner wählen - Tank Royale</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1a1a; color: white; margin-top: 40px; }
         
@@ -71,6 +70,7 @@
         .btn-bot {
             background: #ff2e63;
             color: white;
+            margin-top: 10px;
         }
 
         .btn-bot:hover {
@@ -97,6 +97,11 @@
             <h2>🤖 Einzelspieler-Modus</h2>
             <form action="/tankroyale/invite" method="POST">
                 <input type="hidden" name="gegner" value="Computer-Bot 🤖">
+                <select name="bot_difficulty" required>
+                    <option value="easy">🟢 Leicht (Macht viele Fehler)</option>
+                    <option value="medium" selected>🟡 Mittel (Fordernd)</option>
+                    <option value="hard">🔴 Schwer (Tödlich präzise)</option>
+                </select>
                 <button type="submit" class="btn-bot">Gegen Bot spielen! 🤖🔥</button>
             </form>
         </div>
