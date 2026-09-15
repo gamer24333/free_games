@@ -748,11 +748,16 @@ def tankroyale_match(game_id):
     if 'username' not in session: 
         return redirect(url_for('login'))
     
-    # NEU: Den Schwierigkeitsgrad aus der URL auslesen
     diff = request.args.get('diff', 'medium')
     
-    # NEU: bot_difficulty an das HTML-Template übergeben
-    return render_template('tank_royale_match.html', gameId=game_id, me=session['username'], bot_difficulty=diff)
+    # Den echten Gegner aus der Datenbank ermitteln
+    game = TankGame.query.filter_by(game_id=game_id).first()
+    gegner_name = "Computer-Bot 🤖"
+    if game:
+        me = session['username']
+        gegner_name = game.gegner if game.ersteller == me else game.ersteller
+
+    return render_template('tank_royale_match.html', gameId=game_id, me=session['username'], gegner=gegner_name, bot_difficulty=diff)
 
 @app.route('/api/tankroyale/status/<game_id>')
 def tank_status(game_id):
