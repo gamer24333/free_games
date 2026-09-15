@@ -2,38 +2,149 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Snake - Tank Royale Portal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Retro Snake - Tank Royale Portal</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1a1a; color: white; margin: 0; padding: 20px; }
-        h1 { color: #00adb5; margin-bottom: 5px; }
-        .score-board { font-size: 22px; font-weight: bold; color: #76ff03; margin-bottom: 15px; }
-        .container { display: flex; flex-wrap: wrap; justify-content: center; gap: 30px; align-items: flex-start; }
-        canvas { background: #111; border: 4px solid #00adb5; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        .sidebar { background: #222; padding: 20px; border-radius: 8px; border: 1px solid #444; width: 250px; text-align: left; }
-        .sidebar h3 { color: #ff9f43; margin-top: 0; }
-        ol { padding-left: 20px; margin: 5px 0; }
-        li { margin-bottom: 6px; font-size: 15px; }
-        .btn-back { display: inline-block; background: #555; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-bottom: 15px; }
-        .btn-back:hover { background: #666; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: #222;
+            font-family: Arial, sans-serif;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header-bar {
+            background-color: #161616;
+            padding: 10px;
+            text-align: center;
+            border-bottom: 2px solid #2d2d2d;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 30px;
+            padding: 20px;
+            box-sizing: border-box;
+            flex-wrap: wrap;
+            overflow-y: auto;
+        }
+
+        .footer-bar {
+            background-color: #161616;
+            padding: 12px 10px;
+            text-align: center;
+            border-top: 2px solid #2d2d2d;
+            font-size: 14px;
+            color: #ccc;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 22px;
+            color: #39ff14;
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .btn { display: inline-block; padding: 8px 16px; background: #555; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; font-size: 14px; }
+        .btn:hover { background: #444; }
+        .btn-back { float: left; }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .game-controls-info {
+            display: flex;
+            justify-content: space-between;
+            width: 400px;
+            font-size: 13px;
+            color: #aaa;
+            box-sizing: border-box;
+            padding: 0 5px;
+        }
+
+        #snakeCanvas {
+            border: 4px solid #39ff14;
+            border-radius: 12px;
+            background: #111;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+            display: block;
+            box-sizing: border-box;
+        }
+
+        .leaderboard-box {
+            background: #333;
+            border: 2px solid #444;
+            border-radius: 12px;
+            width: 280px;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: left;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .leaderboard-table th, .leaderboard-table td { padding: 6px 8px; border-bottom: 1px solid #444; text-align: left; font-size: 14px; }
+        .leaderboard-table th { color: #39ff14; }
+        .leaderboard-table tr:nth-child(1) td { color: #ffd700; font-weight: bold; }
     </style>
 </head>
 <body>
-    <a href="/games" class="btn-back">⬅️ Zurück zur Spieleliste</a>
-    <h1>🐍 Retro Snake</h1>
-    <div class="score-board">Score: <span id="score">0</span></div>
 
-    <div class="container">
-        <canvas id="snakeCanvas" width="400" height="400"></canvas>
-        
-        <div class="sidebar">
-            <h3>🏆 Highscores</h3>
-            <ol>
-                {% for name, sc in leaderboard %}
-                    <li><b>{{ name }}</b>: {{ sc }} Pkt</li>
-                {% endfor %}
-            </ol>
+    <div class="header-bar">
+        <a href="/games" class="btn btn-back">⬅️ Zurück</a>
+        <h1>🐍 Retro Snake</h1>
+    </div>
+
+    <div class="main-content">
+        <div class="game-container">
+            <canvas id="snakeCanvas" width="400" height="400"></canvas>
+            
+            <div class="game-controls-info">
+                <span>🎮 Steuerung: <b>Pfeiltasten</b></span>
+                <span>🍎 Punkte: <b id="score" style="color: #76ff03;">0</b></span>
+            </div>
         </div>
+
+        <div class="leaderboard-box">
+            <h3 style="margin-top: 0; color: #39ff14; text-align: center; margin-bottom: 5px;">🏆 Snake-Rangliste</h3>
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>Platz</th>
+                        <th>Name</th>
+                        <th>Highscore</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for player, score in leaderboard %}
+                    <tr>
+                        <td>{{ loop.index }}.</td>
+                        <td>{{ player }}</td>
+                        <td>{{ score }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="footer-bar">
+        <span>Drücke eine <b>Pfeiltaste</b> zum Starten oder Neustarten! 🚀</span>
     </div>
 
     <script>
@@ -44,19 +155,43 @@
         const gridSize = 20;
         const tileCount = canvas.width / gridSize;
 
-        let snake = [{ x: 10, y: 10 }];
+        let snake = [];
         let dx = 0;
         let dy = 0;
         let score = 0;
         let apple = { x: 5, y: 5 };
         let isGameOver = false;
         let gameStarted = false;
-        let gameInterval = null;
+        let nextDx = 0;
+        let nextDy = 0;
+
+        function resetGame() {
+            snake = [
+                { x: 10, y: 10 },
+                { x: 9, y: 10 },
+                { x: 8, y: 10 }
+            ];
+            dx = 1;
+            dy = 0;
+            nextDx = 1;
+            nextDy = 0;
+            score = 0;
+            scoreEl.textContent = score;
+            isGameOver = false;
+            gameStarted = false;
+            spawnApple();
+        }
 
         // Steuerung mit den Pfeiltasten
         window.addEventListener('keydown', e => {
             if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) {
-                e.preventDefault(); // Verhindert das Scrollen der Seite
+                e.preventDefault();
+            }
+
+            if (isGameOver && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) {
+                resetGame();
+                gameStarted = true;
+                return;
             }
 
             if (!gameStarted && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
@@ -65,16 +200,16 @@
 
             switch(e.key) {
                 case 'ArrowLeft':
-                    if (dx === 0) { dx = -1; dy = 0; }
+                    if (dx === 0) { nextDx = -1; nextDy = 0; }
                     break;
                 case 'ArrowRight':
-                    if (dx === 0) { dx = 1; dy = 0; }
+                    if (dx === 0) { nextDx = 1; nextDy = 0; }
                     break;
                 case 'ArrowUp':
-                    if (dy === 0) { dx = 0; dy = -1; }
+                    if (dy === 0) { nextDx = 0; nextDy = -1; }
                     break;
                 case 'ArrowDown':
-                    if (dy === 0) { dx = 0; dy = 1; }
+                    if (dy === 0) { nextDx = 0; nextDy = 1; }
                     break;
             }
         });
@@ -83,7 +218,6 @@
             apple.x = Math.floor(Math.random() * tileCount);
             apple.y = Math.floor(Math.random() * tileCount);
             
-            // Verhindern, dass der Apfel auf der Schlange spawnt
             snake.forEach(part => {
                 if (part.x === apple.x && part.y === apple.y) {
                     spawnApple();
@@ -91,26 +225,21 @@
             });
         }
 
-        function gameLoop() {
-            if (isGameOver) return;
-
-            update();
-            draw();
-        }
-
         function update() {
-            if (!gameStarted || (dx === 0 && dy === 0)) return;
+            if (!gameStarted || isGameOver) return;
 
-            // Kopf bewegen
+            dx = nextDx;
+            dy = nextDy;
+
             const head = { x: snake[0].x + dx, y: snake[0].y + dy };
 
-            // Kollision mit Wänden
+            // Wändekollision
             if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
                 triggerGameOver();
                 return;
             }
 
-            // Kollision mit sich selbst
+            // Selbstkollision
             for (let i = 0; i < snake.length; i++) {
                 if (head.x === snake[i].x && head.y === snake[i].y) {
                     triggerGameOver();
@@ -120,49 +249,114 @@
 
             snake.unshift(head);
 
-            // Apfel gegessen?
             if (head.x === apple.x && head.y === apple.y) {
                 score += 10;
                 scoreEl.textContent = score;
                 spawnApple();
             } else {
-                snake.pop(); // Schwanz entfernen, wenn kein Apfel gegessen wurde
+                snake.pop();
             }
         }
 
         function draw() {
-            // Hintergrund löschen
+            // Hintergrund im Retro-Grid-Look
             ctx.fillStyle = '#111';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Apfel zeichnen (Rot)
-            ctx.fillStyle = '#ff2e63';
-            ctx.fillRect(apple.x * gridSize, apple.y * gridSize, gridSize - 2, gridSize - 2);
+            // Dezent ein feines Raster zeichnen (für den Look)
+            ctx.strokeStyle = '#181818';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < tileCount; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * gridSize, 0);
+                ctx.lineTo(i * gridSize, canvas.height);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, i * gridSize);
+                ctx.lineTo(canvas.width, i * gridSize);
+                ctx.stroke();
+            }
 
-            // Schlange zeichnen (Grün/Türkis)
+            // Apfel zeichnen (Mit kleinem Stiel für besseres Aussehen)
+            let ax = apple.x * gridSize;
+            let ay = apple.y * gridSize;
+            ctx.fillStyle = '#ff2e63';
+            ctx.beginPath();
+            ctx.arc(ax + gridSize / 2, ay + gridSize / 2 + 1, gridSize / 2 - 3, 0, Math.PI * 2);
+            ctx.fill();
+            // Apfel-Stiel
+            ctx.strokeStyle = '#795548';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(ax + gridSize / 2, ay + 3);
+            ctx.lineTo(ax + gridSize / 2 + 3, ay + 1);
+            ctx.stroke();
+
+            // Schlange zeichnen (mit abgerundeten Ecken für hochwertige Grafik)
             snake.forEach((part, index) => {
-                ctx.fillStyle = index === 0 ? '#76ff03' : '#00adb5';
-                ctx.fillRect(part.x * gridSize, part.y * gridSize, gridSize - 2, gridSize - 2);
+                let px = part.x * gridSize;
+                let py = part.y * gridSize;
+                
+                // Kopf knallig neon-grün, Körper etwas dunkleres Technik-Grün
+                ctx.fillStyle = index === 0 ? '#39ff14' : '#00adb5';
+                
+                ctx.beginPath();
+                // Abgerundete Rechtecke für den Schlangenkörper
+                if (ctx.roundRect) {
+                    ctx.roundRect(px + 1, py + 1, gridSize - 2, gridSize - 2, 6);
+                } else {
+                    ctx.rect(px + 1, py + 1, gridSize - 2, gridSize - 2);
+                }
+                ctx.fill();
+
+                // Augen für den Kopf
+                if (index === 0) {
+                    ctx.fillStyle = '#000';
+                    let eye1x = px + 6, eye1y = py + 6;
+                    let eye2x = px + 12, eye2y = py + 6;
+                    if (dx === 1) { eye1x = px + 12; eye1y = py + 5; eye2x = px + 12; eye2y = py + 13; }
+                    else if (dx === -1) { eye1x = px + 6; eye1y = py + 5; eye2x = px + 6; eye2y = py + 13; }
+                    else if (dy === 1) { eye1x = px + 5; eye1y = py + 12; eye2x = px + 13; eye2y = py + 12; }
+                    
+                    ctx.fillRect(eye1x, eye1y, 3, 3);
+                    ctx.fillRect(eye2x, eye2y, 3, 3);
+                }
             });
 
-            // Start-Hinweis anzeigen
-            if (!gameStarted) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            // Start-Overlay
+            if (!gameStarted && !isGameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#fff';
-                ctx.font = 'bold 18px Arial';
+                ctx.fillStyle = '#39ff14';
+                ctx.font = 'bold 20px Arial';
                 ctx.textAlign = 'center';
                 ctx.fillText('Drücke eine Pfeiltaste', canvas.width / 2, canvas.height / 2 - 10);
-                ctx.fillText('zum Starten!', canvas.width / 2, canvas.height / 2 + 20);
+                ctx.fillStyle = '#fff';
+                ctx.font = '14px Arial';
+                ctx.fillText('zum Starten', canvas.width / 2, canvas.height / 2 + 20);
+                ctx.textAlign = 'left';
+            }
+
+            // Game-Over Overlay
+            if (isGameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#ff2e63';
+                ctx.font = 'bold 28px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 15);
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = '15px Arial';
+                ctx.fillText('Drücke eine Pfeiltaste für Neustart', canvas.width / 2, canvas.height / 2 + 25);
                 ctx.textAlign = 'left';
             }
         }
 
         async function triggerGameOver() {
             isGameOver = true;
-            clearInterval(gameInterval);
 
-            // Score an Server senden
             try {
                 await fetch('/api/submit-snake', {
                     method: 'POST',
@@ -172,24 +366,14 @@
             } catch(e) {
                 console.error("Fehler beim Speichern des Scores", e);
             }
-
-            // Game Over Bildschirm auf Canvas
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            ctx.fillStyle = '#ff2e63';
-            ctx.font = 'bold 30px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 15);
-            
-            ctx.fillStyle = '#fff';
-            ctx.font = '16px Arial';
-            ctx.fillText('Seite neu laden für neuen Versuch', canvas.width / 2, canvas.height / 2 + 25);
-            ctx.textAlign = 'left';
         }
 
-        spawnApple();
-        gameInterval = setInterval(gameLoop, 100); // 100ms pro Frame (Geschwindigkeit)
+        resetGame();
+        // Etwas angenehmere Geschwindigkeit (120ms statt 100ms wirkt stabiler und flüssiger)
+        setInterval(() => {
+            update();
+            draw();
+        }, 120);
     </script>
 </body>
 </html>
