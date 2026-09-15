@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake - Tank Royale Portal</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1a1a; color: white; margin: 0; padding: 20px; }
+        h1 { color: #00adb5; margin-bottom: 5px; }
+        .score-board { font-size: 22px; font-weight: bold; color: #76ff03; margin-bottom: 15px; }
+        .container { display: flex; flex-wrap: wrap; justify-content: center; gap: 30px; align-items: flex-start; }
+        canvas { background: #111; border: 4px solid #00adb5; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .sidebar { background: #222; padding: 20px; border-radius: 8px; border: 1px solid #444; width: 250px; text-align: left; }
+        .sidebar h3 { color: #ff9f43; margin-top: 0; }
+        ol { padding-left: 20px; margin: 5px 0; }
+        li { margin-bottom: 6px; font-size: 15px; }
+        .btn-back { display: inline-block; background: #555; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-bottom: 15px; }
+        .btn-back:hover { background: #666; }
+    </style>
+</head>
+<body>
+    <a href="/games" class="btn-back">⬅️ Zurück zur Spieleliste</a>
+    <h1>🐍 Retro Snake</h1>
+    <div class="score-board">Score: <span id="score">0</span></div>
+
+    <div class="container">
+        <canvas id="snakeCanvas" width="400" height="400"></canvas>
+        
+        <div class="sidebar">
+            <h3>🏆 Highscores</h3>
+            <ol>
+                {% for name, sc in leaderboard %}
+                    <li><b>{{ name }}</b>: {{ sc }} Pkt</li>
+                {% endfor %}
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('snakeCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+
+        const gridSize = 20;
+        const tileCount = canvas.width / gridSize;
+
+        let snake = [{ x: 10, y: 10 }];
+        let dx = 0;
+        let dy = 0;
+        let score = 0;
+        let apple = { x: 5, y: 5 };
+        let isGameOver = false;
+        let gameStarted = false;
+        let gameInterval = null;
+
+        // Steuerung mit den Pfeiltasten
+        window.addEventListener('keydown', e => {
+            if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) {
+                e.preventDefault(); // Verhindert das Scrollen der Seite
+            }
+
+            if (!gameStarted && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+                gameStarted = true;
+            }
+
+            switch(e.key) {
+                case 'ArrowLeft':
+                    if (dx === 0) { dx = -1; dy = 0; }
+                    break;
+                case 'ArrowRight':
+                    if (dx === 0) { dx = 1; dy = 0; }
+                    break;
+                case 'ArrowUp':
+                    if (dy === 0) { dx = 0; dy = -1; }
+                    break;
+                case 'ArrowDown':
+                    if (dy === 0) { dx = 0; dy = 1; }
+                    break;
+            }
+        });
+
+        function spawnApple() {
+            apple.x = Math.floor(Math.random() * tileCount);
+            apple.y = Math.floor(Math.random() * tileCount);
+            
+            // Verhindern, dass der Apfel auf der Schlange spawnt
+            snake.forEach(part => {
+                if (part.x === apple.x && part.y === apple.y) {
+                    spawnApple();
+                }
+            });
+        }
+
+        function gameLoop() {
+            if (isGameOver) return;
+
+            update();
+            draw();
+        }
+
+        function update() {
+            if (!gameStarted || (dx === 0 && dy === 0)) return;
+
+            // Kopf bewegen
+            const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+
+            // Kollision mit Wänden
+            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+                triggerGameOver();
+                return;
+            }
+
+            // Kollision mit sich selbst
+            for (let i = 0; i < snake.length; i++) {
+                if (head.x === snake[i].x && head.y === snake[i].y) {
+                    triggerGameOver();
+                    return;
+                }
+            }
+
+            snake.unshift(head);
+
+            // Apfel gegessen?
+            if (head.x === apple.x && head.y === apple.y) {
+                score += 10;
+                scoreEl.textContent = score;
+                spawnApple();
+            } else {
+                snake.pop(); // Schwanz entfernen, wenn kein Apfel gegessen wurde
+            }
+        }
+
+        function draw() {
+            // Hintergrund löschen
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Apfel zeichnen (Rot)
+            ctx.fillStyle = '#ff2e63';
+            ctx.fillRect(apple.x * gridSize, apple.y * gridSize, gridSize - 2, gridSize - 2);
+
+            // Schlange zeichnen (Grün/Türkis)
+            snake.forEach((part, index) => {
+                ctx.fillStyle = index === 0 ? '#76ff03' : '#00adb5';
+                ctx.fillRect(part.x * gridSize, part.y * gridSize, gridSize - 2, gridSize - 2);
+            });
+
+            // Start-Hinweis anzeigen
+            if (!gameStarted) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 18px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Drücke eine Pfeiltaste', canvas.width / 2, canvas.height / 2 - 10);
+                ctx.fillText('zum Starten!', canvas.width / 2, canvas.height / 2 + 20);
+                ctx.textAlign = 'left';
+            }
+        }
+
+        async function triggerGameOver() {
+            isGameOver = true;
+            clearInterval(gameInterval);
+
+            // Score an Server senden
+            try {
+                await fetch('/api/submit-snake', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ score: score })
+                });
+            } catch(e) {
+                console.error("Fehler beim Speichern des Scores", e);
+            }
+
+            // Game Over Bildschirm auf Canvas
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#ff2e63';
+            ctx.font = 'bold 30px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 15);
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = '16px Arial';
+            ctx.fillText('Seite neu laden für neuen Versuch', canvas.width / 2, canvas.height / 2 + 25);
+            ctx.textAlign = 'left';
+        }
+
+        spawnApple();
+        gameInterval = setInterval(gameLoop, 100); // 100ms pro Frame (Geschwindigkeit)
+    </script>
+</body>
+</html>
