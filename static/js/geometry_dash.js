@@ -1,7 +1,7 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const pauseBtn = document.getElementById('pauseBtn');
-const bgMusic = document.getElementById('gdMusic'); // Musik-Element holen
+const bgMusic = document.getElementById('gdMusic');
 
 let gameSpeed = 5;
 let score = 0;
@@ -10,18 +10,19 @@ let isGameOver = false;
 let isPaused = false;      
 let gameStarted = false;   
 const floorY = 340;
-const ceilingY = 60; // Decke für den Ball-Modus
+const ceilingY = 60; 
 
 const player = {
     x: 80, y: 300, size: 35, vy: 0,
     gravity: 0.6, jumpForce: -11.5, isGrounded: false, rotation: 0,
-    mode: 'cube' // Kann 'cube' oder 'ball' sein
+    mode: 'cube' 
 };
 
 let obstacles = [];
 let spawnTimeout;
+let reloadTimeout = null;
+let runId = 0;
 
-// Lautstärke-Einstellung (0.2 = 20%, damit es angenehm im Hintergrund läuft)
 if (bgMusic) {
     bgMusic.volume = 0.2;
 }
@@ -29,36 +30,36 @@ if (bgMusic) {
 function doJump() {
     if (isPaused) return; 
     
-    if (!gameStarted && !isGameOver) {
+    if (isGameOver) {
+        resetGame();
+        return; // Nach Game Over führt der erste Klick nur zum Neustart
+    }
+
+    if (!gameStarted) {
         gameStarted = true;
         if (pauseBtn) pauseBtn.style.display = "inline-block"; 
         
-        // MUSIK-START: Sobald das Spiel beim ersten Klick beginnt
         if (bgMusic && bgMusic.paused) {
             bgMusic.play().catch(e => console.log("Musik-Autoplay blockiert:", e));
         }
     }
 
-    if (!isGameOver) {
-        if (player.mode === 'cube') {
-            if (player.isGrounded) {
-                player.vy = player.jumpForce;
-                player.isGrounded = false;
-            }
-        } else if (player.mode === 'ball') {
-            player.gravity = -player.gravity;
+    // Sprung direkt ausführen!
+    if (player.mode === 'cube') {
+        if (player.isGrounded) {
+            player.vy = player.jumpForce;
             player.isGrounded = false;
         }
+    } else if (player.mode === 'ball') {
+        player.gravity = -player.gravity;
+        player.isGrounded = false;
     }
-    
-    if (isGameOver) resetGame();
 }
 
 function togglePause() {
     if (!gameStarted || isGameOver) return; 
     isPaused = !isPaused;
     
-    // MUSIK PAUSIEREN / WEITERSPIELEN
     if (bgMusic) {
         if (isPaused) {
             bgMusic.pause();
@@ -74,29 +75,25 @@ function togglePause() {
 
 // Controls
 window.addEventListener('keydown', (e) => { 
-    if (e.code === 'Space') { e.preventDefault(); doJump(); } 
-    if (e.code === 'Escape') { e.preventDefault(); togglePause(); }
+    if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); doJump(); } 
+    if (e.code === 'Escape' || e.key === 'p' || e.key === 'P') { e.preventDefault(); togglePause(); }
 });
-canvas.addEventListener('touchstart', (e) => { e.preventDefault(); doJump(); });
-canvas.addEventListener('mousedown', doJump);
+canvas.addEventListener('touchstart', (e) => { e.preventDefault(); doJump(); }, { passive: false });
+canvas.addEventListener('mousedown', (e) => { e.preventDefault(); doJump(); });
 
 if (pauseBtn) pauseBtn.addEventListener('click', togglePause);
 
 function spawnObstacle() {
     if (isGameOver) return;
-    if (isPaused) {
+    if (isPaused || !gameStarted) {
         spawnTimeout = setTimeout(spawnObstacle, 200);
         return;
     }
 
     let rand = Math.random();
     
-    // ----------------------------------------------------
-    // 1. KUGEL-MODUS (Seltener und purer Hindernis-Flug)
-    // ----------------------------------------------------
     if (player.mode === 'ball') {
         if (rand < 0.50) {
-            // Decken- oder Bodenstachel
             let onCeiling = Math.random() > 0.5;
             obstacles.push({ 
                 x: canvas.width, 
@@ -106,7 +103,6 @@ function spawnObstacle() {
                 ceil: onCeiling
             });
         } else {
-            // Gelbe Blöcke als Hindernis im Weg
             let onCeiling = Math.random() > 0.5;
             obstacles.push({
                 x: canvas.width,
@@ -116,64 +112,86 @@ function spawnObstacle() {
             });
         }
     } 
-    // ----------------------------------------------------
-    // 2. WÜRFEL-MODUS (Jetzt mit der neuen Plattform-Herausforderung!)
-    // ----------------------------------------------------
     else {
         if (rand < 0.30) {
-            // Normaler Stachel am Boden
             obstacles.push({ x: canvas.width, y: floorY, width: 30, height: 35, type: 'spike', ceil: false });
         } 
         else if (rand < 0.65) {
-            // NEU: Die "Doppel-Plattform-Challange" über Stacheln!
-            // Wir spawnen sofort ZWEI Plattformen hintereinander weg
             let height1 = floorY - 65;
-            let height2 = floorY - 110; // Die zweite ist etwas höher für einen Doppel-Sprung
+            let height2 = floorY - 110; 
             
-            // Erste Plattform
             obstacles.push({ x: canvas.width, y: height1, width: 90, height: 20, type: 'platform', mustTouch: false });
-            
-            // Zweite Plattform kurz dahinter versetzt
             obstacles.push({ x: canvas.width + 140, y: height2, width: 90, height: 20, type: 'platform', mustTouch: false });
             
-            // Ein Teppich aus Stacheln DARUNTER am Boden, damit man sterben MUSS, wenn man runterfällt
             obstacles.push({ x: canvas.width + 30, y: floorY, width: 30, height: 35, type: 'spike', ceil: false });
             obstacles.push({ x: canvas.width + 90, y: floorY, width: 30, height: 35, type: 'spike', ceil: false });
             obstacles.push({ x: canvas.width + 150, y: floorY, width: 30, height: 35, type: 'spike', ceil: false });
         } 
         else if (rand < 0.85) {
-            // Normaler gelber Block zum Drüberspringen
             obstacles.push({ x: canvas.width, y: floorY, width: 35, height: 35, type: 'block' });
         } 
         else {
-            // PORTAL: Die Chance auf das Ball-Portal wurde verringert (nur noch bei den restlichen 15%)
             let nextMode = 'ball';
             obstacles.push({ x: canvas.width, y: floorY - 100, width: 30, height: 100, type: 'portal', targetMode: nextMode });
         }
     }
 
-    // Spawn-Zeit anpassen (etwas mehr Abstand, falls eine Doppel-Plattform kam)
     let nextSpawn = (rand >= 0.30 && rand < 0.65 && player.mode === 'cube') ? 2200 : (1000 + Math.random() * 1200);
     spawnTimeout = setTimeout(spawnObstacle, nextSpawn / (gameSpeed / 5));
 }
-async function sendScoreToServer(finalScore) {
+
+async function sendScoreToServer(finalScore, currentRunId) {
     try {
-        await fetch('/api/submit-score', {
+        const response = await fetch('/api/submit-score', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ score: finalScore })
         });
+        if (response.ok) {
+            if (runId === currentRunId && isGameOver) {
+                reloadTimeout = setTimeout(() => {
+                    if (runId === currentRunId && isGameOver) {
+                        window.location.reload();
+                    }
+                }, 1500);
+            }
+        }
     } catch (e) { console.error("Score-Übertragungsfehler", e); }
 }
 
+function triggerGameOver() {
+    if (isGameOver) return;
+    isGameOver = true;
+    gameStarted = false;
+    
+    if (pauseBtn) pauseBtn.style.display = "none";
+    if (bgMusic) {
+        bgMusic.pause();
+        bgMusic.currentTime = 0;
+    }
+    
+    runId++;
+    sendScoreToServer(score, runId);
+}
+
 function resetGame() {
+    runId++; 
+    if (reloadTimeout) {
+        clearTimeout(reloadTimeout);
+        reloadTimeout = null;
+    }
+
     clearTimeout(spawnTimeout);
     obstacles = [];
     score = 0; level = 1; gameSpeed = 5;
     player.mode = 'cube';
     player.gravity = 0.6;
     player.y = floorY - player.size; player.vy = 0; player.rotation = 0;
-    isGameOver = false; isPaused = false; gameStarted = false;
+    
+    isGameOver = false; 
+    isPaused = false; 
+    gameStarted = false; // Zurück zum Klicke-zum-Starten-Screen
+    
     if (pauseBtn) { pauseBtn.style.display = "none"; pauseBtn.textContent = "⏸️ Pause"; }
     
     if (bgMusic) {
@@ -208,7 +226,7 @@ function update() {
     if (!isPaused && gameStarted && !isGameOver) {
         player.vy += player.gravity;
         player.y += player.vy;
-        gameSpeed += 0.0018; // Speed zieht minimal schneller an
+        gameSpeed += 0.0018; 
 
         if (player.y >= floorY - player.size) {
             player.y = floorY - player.size; player.vy = 0; player.isGrounded = true;
@@ -248,9 +266,8 @@ function update() {
 
     for (let i = obstacles.length - 1; i >= 0; i--) {
         let obs = obstacles[i];
-        if (!isGameOver && !isPaused) obs.x -= gameSpeed;
+        if (!isGameOver && !isPaused && gameStarted) obs.x -= gameSpeed;
 
-        // --- ZEICHNEN ---
         if (obs.type === 'spike') {
             ctx.fillStyle = '#ff2e63';
             ctx.beginPath();
@@ -266,12 +283,10 @@ function update() {
             ctx.closePath(); ctx.fill();
         } 
         else if (obs.type === 'platform') {
-            // Zeige Pflicht-Plattformen in hellem Neongrün, normale in Standardgrün
             ctx.fillStyle = obs.mustTouch ? '#2ecc71' : '#4ee54e'; 
             ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
             
-            // Kleiner optischer Indikator für Pflicht-Inseln
             if (obs.mustTouch) {
                 ctx.fillStyle = '#fff'; ctx.font = '9px Arial';
                 ctx.fillText("HIER DRAUF!", obs.x + 18, obs.y + 13);
@@ -279,7 +294,6 @@ function update() {
         } 
         else if (obs.type === 'block') {
             ctx.fillStyle = '#f9d423';
-            let blockY = obs.ceil ? obs.y - obs.height : obs.y - obs.height;
             if (obs.ceil) {
                 ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
@@ -298,43 +312,34 @@ function update() {
             ctx.fillText(obs.targetMode.toUpperCase(), obs.x - 5, obs.y - 10);
         }
         
-        // --- LOGIK & BERÜHRUNGEN DER PLATTFORMEN ---
         if (obs.type === 'platform') {
             if (player.x + player.size > obs.x && player.x < obs.x + obs.width) {
-                // Landung von oben (Gravitation normal)
                 if (player.y + player.size >= obs.y && player.y + player.size - player.vy <= obs.y + 12) {
                     player.y = obs.y - player.size; player.vy = 0; player.isGrounded = true;
                     onAnyPlatform = true;
-                    if (obs.mustTouch) obs.touched = true; // Pflicht erfüllt!
+                    if (obs.mustTouch) obs.touched = true; 
                 }
-                // Landung von unten (Ball an Decke/Plattform-Unterseite kleben)
                 if (player.y <= obs.y + obs.height && player.y - player.vy >= obs.y + obs.height - 12) {
                     player.y = obs.y + obs.height; player.vy = 0; player.isGrounded = true;
                     onAnyPlatform = true;
-                    if (obs.mustTouch) obs.touched = true; // Pflicht erfüllt!
+                    if (obs.mustTouch) obs.touched = true; 
                 }
             }
         }
 
-        // --- SCHWERE PFLICHT-REGEL: Verpasst man die grüne Plattform im Ball-Modus -> Tod! ---
         if (obs.type === 'platform' && obs.mustTouch && !isGameOver) {
-            // Sobald die Plattform am Spieler vorbei gezogen ist
             if (obs.x + obs.width < player.x && !obs.touched) {
-                isGameOver = true;
-                if (pauseBtn) pauseBtn.style.display = "none";
-                if (bgMusic) bgMusic.pause();
-                sendScoreToServer(score);
+                triggerGameOver();
             }
         }
 
-        // --- STANDARD KOLLISIONEN (STACHELN & BLÖCKE) ---
         if (obs.type === 'spike' || obs.type === 'block') {
             let collisionMinY, collisionMaxY;
             
             if (obs.type === 'spike') {
                 collisionMinY = obs.ceil ? obs.y : obs.y - obs.height;
                 collisionMaxY = obs.ceil ? obs.y + obs.height : obs.y;
-            } else { // Block
+            } else { 
                 collisionMinY = obs.ceil ? obs.y : obs.y - obs.height;
                 collisionMaxY = obs.ceil ? obs.y + obs.height : obs.y;
             }
@@ -345,16 +350,10 @@ function update() {
                 player.y + player.size > collisionMinY &&
                 player.y < collisionMaxY
             ) {
-                if (!isGameOver) {
-                    isGameOver = true;
-                    if (pauseBtn) pauseBtn.style.display = "none";
-                    if (bgMusic) bgMusic.pause();
-                    sendScoreToServer(score);
-                }
+                triggerGameOver();
             }
         }
 
-        // --- PORTAL WECHSEL ---
         if (obs.type === 'portal') {
             if (player.x < obs.x + obs.width && player.x + player.size > obs.x && player.y + player.size > obs.y && player.y < obs.y + obs.height) {
                 if (player.mode !== obs.targetMode) {
@@ -364,8 +363,7 @@ function update() {
             }
         }
 
-        // --- SCORE-ZÄHLUNG & LEVEL UP ---
-        if (!isPaused && obs.x + obs.width < player.x && !obs.passed) {
+        if (!isPaused && gameStarted && obs.x + obs.width < player.x && !obs.passed) {
             obs.passed = true;
             score++;
             if (score % 5 === 0) {
@@ -384,7 +382,13 @@ function update() {
     ctx.fillStyle = '#ff2e63';
     ctx.fillText(`Speed: ${(gameSpeed * 10).toFixed(0)} km/h`, canvas.width - 180, 35);
 
-    if (isPaused) {
+    if (!gameStarted && !isGameOver) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#00adb5'; ctx.font = 'bold 28px Arial'; ctx.textAlign = 'center';
+        ctx.fillText('KLICKE ODER LEERTASTE ZUM STARTEN', canvas.width / 2, canvas.height / 2);
+        ctx.textAlign = 'left';
+    }
+    else if (isPaused) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#e67e22'; ctx.font = 'bold 36px Arial'; ctx.textAlign = 'center';
         ctx.fillText('PAUSIERT ⏸️', canvas.width / 2, canvas.height / 2 - 10);
@@ -392,8 +396,7 @@ function update() {
         ctx.fillText('Drücke ESC oder den Button zum Weiterspielen', canvas.width / 2, canvas.height / 2 + 25);
         ctx.textAlign = 'left';
     }
-
-    if (isGameOver) {
+    else if (isGameOver) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#ff2e63'; ctx.font = 'bold 36px Arial'; ctx.textAlign = 'center';
         ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
