@@ -202,10 +202,16 @@
 
             const response = await fetch(`/api/chat-messages/${currentRoom}`);
             if (response.ok) {
-                const nachrichten = await response.json();
+                
+                const rawNachrichten = await response.json();
+                // Nur die letzten 100 Nachrichten behalten
+                const nachrichten = rawNachrichten.slice(-150); 
+                
                 const wasAtBottom = chatBox.scrollHeight - chatBox.clientHeight <= chatBox.scrollTop + 50;
                 
                 chatBox.innerHTML = '';
+                
+                
                 nachrichten.forEach((msg, index) => {
                     let deleteButton = '';
                     let statusHook = '';
