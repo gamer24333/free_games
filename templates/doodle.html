@@ -52,7 +52,7 @@
 <body>
 
     <div class="header-bar">
-        <a href="/games" class="btn btn-back">⬅️ Zurück</a>
+        <a href="/games" class="btn btn-back" onclick="stopMusic()">⬅️ Zurück</a>
         <h1>🚀 Neon Jump</h1>
     </div>
 
@@ -92,6 +92,16 @@
         const scoreEl = document.getElementById('scoreText');
         const gameContainer = document.querySelector('.game-container');
         const fullscreenLink = document.getElementById('fullscreenLink');
+        
+        // --- MUSIK EINBINDEN ---
+        const bgMusic = new Audio('/static/doodle.mp3');
+        bgMusic.loop = true;
+        bgMusic.volume = 0.4;
+        
+        function stopMusic() {
+            bgMusic.pause();
+            bgMusic.currentTime = 0;
+        }
 
         let player, platforms, springs, monsters;
         let score, highestScore, isGameOver, gameStarted, isPaused;
@@ -103,6 +113,8 @@
         const SPRING_POWER = -15;
 
         function resetGame() {
+            bgMusic.pause();
+            bgMusic.currentTime = 0;
             player = { x: 200, y: 400, w: 30, h: 30, dx: 0, dy: 0 };
             platforms = [];
             springs = [];
@@ -116,7 +128,10 @@
             isPaused = false;
             
             // Start-Plattform generieren
-            platforms.push({ x: 170, y: 580, w: 60, h: 12, type: 'normal' });
+            platforms.push({ x: 165, y: 580, w: 70, h: 12, type: 'normal' });
+            for (let i = 0; i < 9; i++) {
+                spawnPlatform(550 - (i * 65));
+            }
             
             // Erste Plattformen verteilen
             for (let i = 0; i < 8; i++) {
@@ -128,29 +143,28 @@
             let r = Math.random();
             let type = 'normal'; // Grün
             
-            // Je höher man kommt, desto weniger normale Plattformen
-            if (score > 1000 && r < 0.2) type = 'moving'; // Blau
-            else if (score > 2000 && r < 0.35) type = 'breakable'; // Orange
-            else if (score > 3000 && r < 0.3) type = 'moving';
-
+            // Spezial-Plattformen erst ab höherem Score und viel seltener, damit es fair bleibt
+            if (score > 1500 && r < 0.12) type = 'moving'; 
+            else if (score > 2500 && r < 0.20) type = 'breakable'; 
+        
             let p = { 
-                x: Math.random() * (canvas.width - 60), 
+                x: Math.random() * (canvas.width - 70), 
                 y: y, 
-                w: 60, 
+                w: 70, // Etwas breiter gemacht (vorher 60), damit man sie besser trifft!
                 h: 12, 
                 type: type, 
-                dx: (Math.random() > 0.5 ? 1.5 : -1.5) 
+                dx: (Math.random() > 0.5 ? 1.2 : -1.2) 
             };
             platforms.push(p);
-
-            // Feder spawnen? (Nur auf normalen Plattformen)
-            if (type === 'normal' && Math.random() < 0.15) {
-                springs.push({ x: p.x + 20, y: p.y - 12, w: 20, h: 12, platform: p });
+        
+            // Feder (hilft beim Hochkommen)
+            if (type === 'normal' && Math.random() < 0.18) {
+                springs.push({ x: p.x + 25, y: p.y - 12, w: 20, h: 12, platform: p });
             }
             
-            // Monster spawnen? (Nur wenn keine Feder da ist und selten)
-            if (type === 'normal' && score > 1500 && Math.random() < 0.08 && !springs.find(s => s.platform === p)) {
-                monsters.push({ x: p.x + 10, y: p.y - 30, w: 40, h: 30, platform: p, dx: (Math.random() > 0.5 ? 1 : -1) });
+            // Monster sehr selten und nur auf sicheren Plattformen
+            if (type === 'normal' && score > 2500 && Math.random() < 0.05 && !springs.find(s => s.platform === p)) {
+                monsters.push({ x: p.x + 15, y: p.y - 30, w: 35, h: 25, platform: p, dx: 1 });
             }
         }
 
@@ -159,14 +173,24 @@
             const k = e.key.toLowerCase();
             if (['a', 'arrowleft'].includes(k)) { leftPressed = true; gameStarted = true; }
             if (['d', 'arrowright'].includes(k)) { rightPressed = true; gameStarted = true; }
-            if ([' '].includes(k)) gameStarted = true;
+            if ([' '].includes(k)) { 
+                gameStarted = true;
+                bgMusic.play().catch(err => console.log("Autoplay:", err));
+            }
             
             if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); return; }
             if (e.key === 'p' || e.key === 'Escape') {
                 if (gameStarted && !isGameOver) isPaused = !isPaused;
             }
             
+            if (isPaused) { 
+                bgMusic.pause(); 
+            } else { 
+                bgMusic.play().catch(err => console.log(err)); 
+            }
+            
             if (isGameOver && ['a','d','arrowleft','arrowright',' '].includes(k)) {
+                bgMusic.play().catch(err => console.log("Autoplay:", err));
                 resetGame();
                 gameStarted = true;
             }
@@ -219,7 +243,7 @@
             monsters = monsters.filter(m => m.y < canvas.height + 50);
 
             while (platforms.length > 0 && platforms[platforms.length - 1].y > 50) {
-                spawnPlatform(platforms[platforms.length - 1].y - (Math.random() * 30 + 60));
+                spawnPlatform(platforms[platforms.length - 1].y - (Math.random() * 20 + 50));
             }
 
             // Kollisionen (Nur beim Fallen!)
@@ -379,6 +403,7 @@
         }
 
         async function triggerGameOver() {
+            bgMusic.pause();
             isGameOver = true;
             try {
                 await fetch('/api/submit-doodle', {
