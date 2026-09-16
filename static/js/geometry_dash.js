@@ -32,7 +32,7 @@ function doJump() {
     
     if (isGameOver) {
         resetGame();
-        return; // Nach Game Over führt der erste Klick nur zum Neustart
+        return; 
     }
 
     if (!gameStarted) {
@@ -51,6 +51,7 @@ function doJump() {
             player.isGrounded = false;
         }
     } else if (player.mode === 'ball') {
+        // Beim Ball dreht sich die Schwerkraft um
         player.gravity = -player.gravity;
         player.isGrounded = false;
     }
@@ -83,6 +84,13 @@ canvas.addEventListener('mousedown', (e) => { e.preventDefault(); doJump(); });
 
 if (pauseBtn) pauseBtn.addEventListener('click', togglePause);
 
+// Musik stoppen, wenn man die Seite verlässt
+document.querySelectorAll('.btn-back').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if (bgMusic) bgMusic.pause();
+    });
+});
+
 function spawnObstacle() {
     if (isGameOver) return;
     if (isPaused || !gameStarted) {
@@ -92,8 +100,13 @@ function spawnObstacle() {
 
     let rand = Math.random();
     
+    // --- PORTAL-LOGIK & HINDERNISSE ---
     if (player.mode === 'ball') {
-        if (rand < 0.50) {
+        // Wenn man ein Ball ist, gibt es eine Chance von 30%, dass ein Würfel-Portal kommt
+        if (rand < 0.30) {
+            obstacles.push({ x: canvas.width, y: floorY - 100, width: 30, height: 100, type: 'portal', targetMode: 'cube' });
+        } 
+        else if (rand < 0.65) {
             let onCeiling = Math.random() > 0.5;
             obstacles.push({ 
                 x: canvas.width, 
@@ -102,7 +115,8 @@ function spawnObstacle() {
                 type: 'spike',
                 ceil: onCeiling
             });
-        } else {
+        } 
+        else {
             let onCeiling = Math.random() > 0.5;
             obstacles.push({
                 x: canvas.width,
@@ -113,29 +127,35 @@ function spawnObstacle() {
         }
     } 
     else {
-        if (rand < 0.30) {
+        // Als WÜRFEL (Cube)
+        if (rand < 0.15 && score > 5) {
+            // Ball-Portal (Orange) - kommt erst ab Score 5
+            obstacles.push({ x: canvas.width, y: floorY - 100, width: 30, height: 100, type: 'portal', targetMode: 'ball' });
+        }
+        else if (rand < 0.40) {
+            // Einzelner Stachel auf dem Boden
             obstacles.push({ x: canvas.width, y: floorY, width: 30, height: 35, type: 'spike', ceil: false });
         } 
         else if (rand < 0.65) {
+            // Treppen-Plattformen
             let height1 = floorY - 65;
             let height2 = floorY - 110; 
             
             obstacles.push({ x: canvas.width, y: height1, width: 90, height: 20, type: 'platform', mustTouch: false });
             obstacles.push({ x: canvas.width + 140, y: height2, width: 90, height: 20, type: 'platform', mustTouch: false });
             
+            // Stacheln darunter (nur auf dem Boden)
             obstacles.push({ x: canvas.width + 30, y: floorY, width: 30, height: 35, type: 'spike', ceil: false });
             obstacles.push({ x: canvas.width + 90, y: floorY, width: 30, height: 35, type: 'spike', ceil: false });
             obstacles.push({ x: canvas.width + 150, y: floorY, width: 30, height: 35, type: 'spike', ceil: false });
         } 
-        else if (rand < 0.85) {
-            obstacles.push({ x: canvas.width, y: floorY, width: 35, height: 35, type: 'block' });
-        } 
         else {
-            let nextMode = 'ball';
-            obstacles.push({ x: canvas.width, y: floorY - 100, width: 30, height: 100, type: 'portal', targetMode: nextMode });
+            // Einzelner Block auf dem Boden
+            obstacles.push({ x: canvas.width, y: floorY, width: 35, height: 35, type: 'block', ceil: false });
         }
     }
 
+    // Wenn ein Cube-Portal spawnt, längere Pause machen, damit man sich vorbereiten kann
     let nextSpawn = (rand >= 0.30 && rand < 0.65 && player.mode === 'cube') ? 2200 : (1000 + Math.random() * 1200);
     spawnTimeout = setTimeout(spawnObstacle, nextSpawn / (gameSpeed / 5));
 }
@@ -185,12 +205,12 @@ function resetGame() {
     obstacles = [];
     score = 0; level = 1; gameSpeed = 5;
     player.mode = 'cube';
-    player.gravity = 0.6;
+    player.gravity = 0.6; // Normale Gravitation
     player.y = floorY - player.size; player.vy = 0; player.rotation = 0;
     
     isGameOver = false; 
     isPaused = false; 
-    gameStarted = false; // Zurück zum Klicke-zum-Starten-Screen
+    gameStarted = false; 
     
     if (pauseBtn) { pauseBtn.style.display = "none"; pauseBtn.textContent = "⏸️ Pause"; }
     
@@ -303,23 +323,27 @@ function update() {
             }
         } 
         else if (obs.type === 'portal') {
-            let portalColor = obs.targetMode === 'ball' ? '#ff9f43' : '#00adb5';
+            // Grünes Portal = Cube, Oranges Portal = Ball
+            let portalColor = obs.targetMode === 'ball' ? '#ff9f43' : '#39ff14';
             ctx.fillStyle = portalColor; ctx.globalAlpha = 0.3;
             ctx.fillRect(obs.x, obs.y, obs.width, obs.height); ctx.globalAlpha = 1.0;
             ctx.strokeStyle = portalColor; ctx.lineWidth = 4; ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
             
-            ctx.fillStyle = '#fff'; ctx.font = '12px Arial';
-            ctx.fillText(obs.targetMode.toUpperCase(), obs.x - 5, obs.y - 10);
+            ctx.fillStyle = '#fff'; ctx.font = '14px Arial';
+            ctx.fillText(obs.targetMode.toUpperCase(), obs.x - 6, obs.y - 10);
         }
         
+        // Plattform Kollision (Verbessert: Man prallt seltener unfair ab)
         if (obs.type === 'platform') {
-            if (player.x + player.size > obs.x && player.x < obs.x + obs.width) {
-                if (player.y + player.size >= obs.y && player.y + player.size - player.vy <= obs.y + 12) {
+            if (player.x + player.size > obs.x + 5 && player.x < obs.x + obs.width - 5) {
+                // Landung von oben
+                if (player.y + player.size >= obs.y && player.y + player.size - player.vy <= obs.y + 15) {
                     player.y = obs.y - player.size; player.vy = 0; player.isGrounded = true;
                     onAnyPlatform = true;
                     if (obs.mustTouch) obs.touched = true; 
                 }
-                if (player.y <= obs.y + obs.height && player.y - player.vy >= obs.y + obs.height - 12) {
+                // Landung an der Decke (nur als Ball)
+                if (player.mode === 'ball' && player.y <= obs.y + obs.height && player.y - player.vy >= obs.y + obs.height - 15) {
                     player.y = obs.y + obs.height; player.vy = 0; player.isGrounded = true;
                     onAnyPlatform = true;
                     if (obs.mustTouch) obs.touched = true; 
@@ -333,20 +357,21 @@ function update() {
             }
         }
 
+        // Hitbox Kollision für Tod
         if (obs.type === 'spike' || obs.type === 'block') {
             let collisionMinY, collisionMaxY;
             
             if (obs.type === 'spike') {
-                collisionMinY = obs.ceil ? obs.y : obs.y - obs.height;
-                collisionMaxY = obs.ceil ? obs.y + obs.height : obs.y;
+                collisionMinY = obs.ceil ? obs.y : obs.y - obs.height + 5; // Hitbox verkleinert für Fairness
+                collisionMaxY = obs.ceil ? obs.y + obs.height - 5 : obs.y;
             } else { 
                 collisionMinY = obs.ceil ? obs.y : obs.y - obs.height;
                 collisionMaxY = obs.ceil ? obs.y + obs.height : obs.y;
             }
 
             if (
-                player.x < obs.x + obs.width &&
-                player.x + player.size > obs.x &&
+                player.x < obs.x + obs.width - 4 &&
+                player.x + player.size > obs.x + 4 &&
                 player.y + player.size > collisionMinY &&
                 player.y < collisionMaxY
             ) {
@@ -354,11 +379,18 @@ function update() {
             }
         }
 
+        // Durch Portal fliegen
         if (obs.type === 'portal') {
             if (player.x < obs.x + obs.width && player.x + player.size > obs.x && player.y + player.size > obs.y && player.y < obs.y + obs.height) {
                 if (player.mode !== obs.targetMode) {
                     player.mode = obs.targetMode;
-                    player.gravity = player.mode === 'ball' ? 0.5 : 0.6; 
+                    // Gravitation richtig einstellen (beim Cube immer nach unten)
+                    if (player.mode === 'cube') {
+                        player.gravity = 0.6;
+                        if (player.vy < 0) player.vy = 0; // Kein hochfliegen in die Decke nach Verwandlung
+                    } else {
+                        player.gravity = 0.5; 
+                    }
                 }
             }
         }
