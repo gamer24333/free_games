@@ -333,6 +333,24 @@
         }
     });
 
+    // --- ACTIVITY ERKENNUNG & SIDEBAR UPDATER ---
+    function getMyCurrentActivity() {
+        const path = window.location.pathname;
+        if (path.includes('/chat')) return '💬 Im Chat';
+        if (path.includes('/games')) return '🎮 Spiele-Zentrale';
+        if (path.includes('/geometry-dash')) return '🟦 Geometry Dash';
+        if (path.includes('/clicker')) return '⚡ 10s Clicker';
+        if (path.includes('/flappy')) return '🐦 Flappy Bird';
+        if (path.includes('/reaction')) return '⚡ Reflex-Test';
+        if (path.includes('/snake')) return '🐍 Snake';
+        if (path.includes('/crossy')) return '🐔 Crossy Huhn';
+        if (path.includes('/doodle')) return '🚀 Neon Jump';
+        if (path.includes('/tankroyale')) return '💥 Tank Royale';
+        if (path.includes('/tictactoe')) return '❌ Tic-Tac-Toe';
+        if (path.includes('/welcome')) return '🏠 Im Dashboard';
+        return '🌐 Im Portal';
+    }
+    
     // --- DM BADGES & ONLINE STATUS UPDATER ---
     async function checkSidebarUpdates() {
         try {
@@ -366,11 +384,17 @@
                     document.querySelectorAll('.partner-btn').forEach(btn => {
                         const partnerName = btn.getAttribute('data-partner');
                         const dot = document.getElementById(`status-${partnerName}`);
+                        const activitySpan = document.getElementById(`activity-${partnerName}`);
                         if (dot) {
                             if (stats.online_users.includes(partnerName)) {
                                 dot.classList.add('online');
+                                if (activitySpan && stats.user_activities && stats.user_activities[partnerName]) {
+                                    activitySpan.textContent = stats.user_activities[partnerName];
+                                }
                             } else {
                                 dot.classList.remove('online');
+                                if (activitySpan) {
+                                    activitySpan.textContent = "Offline";
                             }
                         }
                     });
@@ -383,11 +407,15 @@
 
     // --- AKTIVITÄTS-PING AN DEN SERVER ---
 async function sendHeartbeat() {
-    try {
-        await fetch('/api/ping', { method: 'POST' });
-    } catch (e) { 
-        console.error("Ping-Fehler:", e); 
-    }
+        try {
+            await fetch('/api/ping', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ activity: getMyCurrentActivity() })
+            });
+        } catch (e) { 
+            console.error("Ping-Fehler:", e); 
+        }
 }
 // Sofort pingen und danach alle 10 Sekunden wiederholen
 sendHeartbeat();
