@@ -31,6 +31,7 @@ KLASSEN_LISTE = [
 
 # RAM-Speicher für die Online-Erkennung (letzter Ping/Aktivität)
 last_active = {}
+user_activities = {}
 
 # --- DATENBANK MODELLE (TABELLEN) ---
 
@@ -134,9 +135,43 @@ def index():
 @app.route('/api/ping', methods=['POST'])
 def ping_user():
     if 'username' in session:
-        last_active[session['username']] = datetime.now()
+        current_user = session['username']
+        last_active[current_user] = datetime.now()
+        
+        # Aktivität aus dem JSON-Request auslesen
+        data = request.get_json(silent=True) or {}
+        activity = data.get('activity', 'Im Portal')
+        user_activities[current_user] = activity
+        
         return {"status": "success"}
     return {"error": "Unauthorized"}, 401
+
+@app.route('/api/dashboard-stats')
+def dashboard_stats():
+    if 'username' in session: 
+        current_user = session['username']
+        
+        global_chat_len = ChatMessage.query.filter_by(room='global').count()
+        
+        private_chats_stats = {}
+        for schueler in KLASSEN_LISTE:
+            if schueler != current_user:
+                room_id = get_private_room_name(current_user, schueler)
+                private_chats_stats[schueler] = ChatMessage.query.filter_by(room=room_id).count()
+                
+        aktive_grenze = datetime.now() - timedelta(seconds=15)
+        online_users = []
+        for username, last_seen_time in last_active.items():
+            if last_seen_time > aktive_grenze:
+                online_users.append(username)
+        
+        return {
+            "global_messages_count": global_chat_len,
+            "private_messages_stats": private_chats_stats,
+            "online_users": online_users,
+            "user_activities": user_activities  # <- NEU: Aktivitäten an den Client senden
+        }
+    return {"error": "Nicht autorisiert"}, 401
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -212,34 +247,6 @@ def dashboard():
                        zeige_spezial_nachricht=zeige_spezial_nachricht,
                        spezial_nachricht_id=spezial_nachricht_id) # <- NEU
 
-@app.route('/api/dashboard-stats')
-def dashboard_stats():
-    if 'username' not in session: 
-        return {"error": "Nicht autorisiert"}, 401
-    current_user = session['username']
-    
-    # 1. Globalen Chatverlauf zählen
-    global_chat_len = ChatMessage.query.filter_by(room='global').count()
-    
-    # 2. Direktnachrichten-Statistiken sammeln
-    private_chats_stats = {}
-    for schueler in KLASSEN_LISTE:
-        if schueler != current_user:
-            room_id = get_private_room_name(current_user, schueler)
-            private_chats_stats[schueler] = ChatMessage.query.filter_by(room=room_id).count()
-            
-    # 3. Live-Online-Nutzer filtern (jeder, der in den letzten 15 Sekunden ein Lebenszeichen gesendet hat)
-    aktive_grenze = datetime.now() - timedelta(seconds=15)
-    online_users = []
-    for username, last_seen_time in last_active.items():
-        if last_seen_time > aktive_grenze:
-            online_users.append(username)
-    
-    return {
-        "global_messages_count": global_chat_len,
-        "private_messages_stats": private_chats_stats,
-        "online_users": online_users  # <- Das fehlte zuvor hier!
-    }
 
 # --- ADMIN PANEL ---
 @app.route('/admin')
