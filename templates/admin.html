@@ -63,6 +63,31 @@
 
         <hr style="border: 0; border-top: 1px solid #444; margin: 25px 0;">
 
+        <hr style="border: 0; border-top: 1px solid #444; margin: 25px 0;">
+
+        <h3>📢 System-Nachricht (Pop-up) senden</h3>
+        <p style="color: #aaa; font-size: 14px;">Diese Nachricht poppt unübersehbar auf dem Dashboard der ausgewählten Person(en) auf. Sie erscheint genau einmal, bis sie weggeklickt wird. (Toll für Warnungen oder wichtige Infos, stört nicht im Spiel!)</p>
+        
+        <form action="/admin/send-message" method="POST" style="background: #222; padding: 15px; border-radius: 8px; border: 1px solid #555;">
+            <label style="display: block; font-size: 14px; margin-bottom: 5px; color: #00adb5; font-weight: bold;">An wen?</label>
+            <select name="target" style="width: 100%; margin-bottom: 15px;">
+                <option value="alle">🌍 AN ALLE SCHÜLER SENDEN</option>
+                <optgroup label="Bestimmter Schüler">
+                    {% for s in klassen_liste %}
+                        <option value="{{ s }}">{{ s }}</option>
+                    {% endfor %}
+                </optgroup>
+            </select>
+            
+            <label style="display: block; font-size: 14px; margin-bottom: 5px; color: #ff2e63; font-weight: bold;">Titel der Nachricht</label>
+            <input type="text" name="title" placeholder="z.B. Wichtige Ankündigung 📢" required style="width: 100%; padding: 8px; box-sizing: border-box; background: #333; color: white; border: 1px solid #555; border-radius: 6px; margin-bottom: 15px;">
+            
+            <label style="display: block; font-size: 14px; margin-bottom: 5px; font-weight: bold;">Nachricht (Text)</label>
+            <textarea name="message" rows="4" placeholder="Schreibe hier die Nachricht..." required style="width: 100%; padding: 8px; box-sizing: border-box; background: #333; color: white; border: 1px solid #555; border-radius: 6px; margin-bottom: 15px; resize: vertical;"></textarea>
+            
+            <button type="submit" class="btn success-btn" style="width: 100%;">🚀 Nachricht jetzt aussenden</button>
+        </form>
+        
         <h3>🧹 Chat-Verwaltung</h3>
         <form action="/admin/clear-chat" method="POST" onsubmit="return confirm('Wirklich den gesamten globalen Chat löschen?');">
             <button type="submit" class="btn danger-btn">Globalen Chat komplett leeren</button>
