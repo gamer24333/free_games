@@ -38,6 +38,38 @@
             border: 2px solid #00adb5;
             box-shadow: 0 0 20px rgba(0, 173, 181, 0.3);
         }
+        /* Feedback Modal Styling */
+        .feedback-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.7);
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        .feedback-box {
+            background: #222;
+            border: 2px solid #444;
+            padding: 25px;
+            border-radius: 12px;
+            width: 350px;
+            text-align: center;
+            color: white;
+        }
+        .feedback-box textarea {
+            width: 100%;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 6px;
+            padding: 8px;
+            box-sizing: border-box;
+            resize: none;
+            margin-top: 10px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -57,6 +89,19 @@
     </div>
     {% endif %}
 
+    <!-- Feedback Modal -->
+    <div id="feedbackModal" class="feedback-modal">
+        <div class="feedback-box">
+            <h3>💡 Feedback an die Admins</h3>
+            <p style="font-size: 13px; color: #aaa; margin-top: 5px;">Was sollen wir verbessern oder hinzufügen? (z.B. "Mach Fortnite")</p>
+            <textarea id="feedbackText" rows="4" placeholder="Dein Vorschlag..."></textarea>
+            <div style="margin-top: 15px; display: flex; justify-content: space-between;">
+                <button onclick="closeFeedbackModal()" class="btn" style="background: #555; padding: 10px 20px; font-size: 14px; margin:0;">Abbrechen</button>
+                <button onclick="sendFeedback()" class="btn" style="background: #27ae60; padding: 10px 20px; font-size: 14px; margin:0;">Absenden</button>
+            </div>
+        </div>
+    </div>
+    
     <h1>Willkommen, {{ name }}! 👋</h1>
     <p>Schön, dass du da bist. Was willst du machen?</p>
 
@@ -67,7 +112,8 @@
         </a>
         
         <a href="/games" class="btn" style="background: #2ecc71;">🎮 Spiele-Zentrale</a>
-        
+
+        <button onclick="openFeedbackModal()" class="btn" style="background: #9b59b6;">💡 Feedback / Wunsch</button>
        
     </div>
 
@@ -122,6 +168,59 @@
     <a href="/logout" style="color: #ff2e63; text-decoration: none; font-weight: bold;">Abmelden</a>
 
     <script>
+    // --- FEEDBACK MODAL STEUERUNG ---
+    function openFeedbackModal() {
+        document.getElementById('feedbackModal').style.display = 'flex';
+    }
+
+    function closeFeedbackModal() {
+        document.getElementById('feedbackModal').style.display = 'none';
+        document.getElementById('feedbackText').value = '';
+    }
+
+    async function sendFeedback() {
+        const text = document.getElementById('feedbackText').value.trim();
+        if (!text) return alert("Bitte schreibe eine Nachricht!");
+
+        try {
+            const response = await fetch('/api/submit-feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text })
+            });
+            if (response.ok) {
+                alert("Vielen Dank! Dein Feedback wurde an die Admins gesendet.");
+                closeFeedbackModal();
+            } else {
+                alert("Fehler beim Senden.");
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // Prüfen, ob der Nutzer Admin ist und ungelesenes Feedback vorliegt (Wird nur beim Laden des Dashboards ausgeführt!)
+    async function checkAdminFeedback() {
+        try {
+            const response = await fetch('/api/admin/feedback');
+            if (response.ok) {
+                const feedbacks = await response.json();
+                if (feedbacks.length > 0) {
+                    const fb = feedbacks[0];
+                    alert(`📢 Neues Admin-Feedback!\n\nVon: ${fb.sender}\nNachricht: "${fb.message}"`);
+                    
+                    // Als gelesen markieren, damit es beim nächsten Dashboard-Besuch nicht doppelt poppt
+                    await fetch(`/api/admin/feedback/read/${fb.id}`, { method: 'POST' });
+                }
+            }
+        } catch (e) {
+            // Ignorieren (schlägt fehl, wenn kein Admin)
+        }
+    }
+
+    // Direkt beim Aufrufen des Homescreens / Dashboards prüfen
+    checkAdminFeedback();
+        
     // --- NEU: SYSTEM-BENACHRICHTIGUNGEN LOGIK ---
     let lastKnownMessageCount = 0; // Speichert die letzte bekannte Anzahl von Nachrichten
 
