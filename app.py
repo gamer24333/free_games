@@ -229,10 +229,21 @@ def dashboard():
     
     me = session['username']
     
-    # --- NEU: Spezial-Nachricht für eine bestimmte Person trigger ---
-    # Ersetze "Ben" mit dem Namen der gewünschten Person aus deiner KLASSEN_LISTE
-    zeige_spezial_nachricht = (me == "Liam") 
-    spezial_nachricht_id = "nachricht_v1"  # <- Wenn du eine NEUE Nachricht senden willst, ändere das z.B. in "nachricht_v2"
+    # --- NEU: Dynamisches Admin-Nachrichten System ---
+    # Prüfe, ob es eine aktive Nachricht für "alle" oder für "me" gibt
+    admin_msg = AdminMessage.query.filter((AdminMessage.target == 'alle') | (AdminMessage.target == me)).order_by(AdminMessage.id.desc()).first()
+    
+    zeige_spezial_nachricht = False
+    spezial_titel = ""
+    spezial_text = ""
+    spezial_nachricht_id = ""
+    
+    if admin_msg:
+        zeige_spezial_nachricht = True
+        spezial_titel = admin_msg.title
+        spezial_text = admin_msg.message
+        # Die ID sorgt dafür, dass das Dashboard weiß, ob der Nutzer genau diese Nachricht schon weggedrückt hat
+        spezial_nachricht_id = f"admin_msg_{admin_msg.id}"
     
     aktive_matches = []
     
@@ -247,13 +258,14 @@ def dashboard():
     user = UserSetting.query.filter_by(username=me).first()
     is_admin = True if (me == "Till" or (user and user.is_admin)) else False
     
-    # Übergib die ID zusätzlich an das Template
     return render_template('dashboard.html', 
-                       name=me, 
-                       einladungen=aktive_matches, 
-                       is_admin=is_admin, 
-                       zeige_spezial_nachricht=zeige_spezial_nachricht,
-                       spezial_nachricht_id=spezial_nachricht_id) # <- NEU
+                           name=me, 
+                           einladungen=aktive_matches, 
+                           is_admin=is_admin, 
+                           zeige_spezial_nachricht=zeige_spezial_nachricht,
+                           spezial_nachricht_id=spezial_nachricht_id,
+                           spezial_titel=spezial_titel,
+                           spezial_text=spezial_text)
 
 
 # --- ADMIN PANEL ---
@@ -1087,6 +1099,27 @@ def submit_doodle():
 def logout():
     session.pop('username', None)
     return redirect(url_for('login'))
+
+@app.route('/admin/send-message', methods=['POST'])
+def send_admin_message():
+    if 'username' not in session: return "403", 403
+    me = session['username']
+    user = UserSetting.query.filter_by(username=me).first()
+    if not (me == "Till" or (user and user.is_admin)): return "403", 403
+    
+    target = request.form.get('target', 'alle')
+    title = request.form.get('title', 'Systemnachricht')
+    message = request.form.get('message', '').strip()
+    
+    if message:
+        # Lösche zuerst alte Systemnachrichten für dieses Ziel, damit sie sich nicht stauen
+        AdminMessage.query.filter_by(target=target).delete()
+        
+        new_msg = AdminMessage(sender=me, target=target, title=title, message=message)
+        db.session.add(new_msg)
+        db.session.commit()
+        
+    return redirect(url_for('admin_panel'))
 
 if __name__ == '__main__':
     with app.app_context():
