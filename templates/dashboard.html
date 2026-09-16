@@ -77,11 +77,8 @@
     {% if zeige_spezial_nachricht %}
     <div id="special-overlay" class="overlay-container">
         <div class="overlay-content">
-            <h1 style="font-size: 2.5rem; margin-top: 0; color: #ff2e63;">Wichtige Ankündigung! 📢</h1>
-            <p style="font-size: 1.25rem; line-height: 1.6; color: #eee; margin: 25px 0;">
-                Hallo {{ name }}! Wir haben mitbekommen, dass du in Geometry Dash einfach so einen sehr hohen Score bekommen 
-                hast. Es tut mir leid, aber wir setzen deinen Score auf 150 zurück, weil das sonst unfair wäre. Wenn du Widerrufen willst, wende dich an das Adminteam
-            </p>
+            <h1 style="font-size: 2.5rem; margin-top: 0; color: #ff2e63;">{{ spezial_titel }}</h1>
+            <p style="font-size: 1.25rem; line-height: 1.6; color: #eee; margin: 25px 0; white-space: pre-wrap;">{{ spezial_text }}</p>
             <button onclick="schliesseNachricht()" class="btn" style="background: #2ecc71; border: none; cursor: pointer; padding: 15px 40px; font-size: 18px;">
                 Verstanden & Schließen
             </button>
