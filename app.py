@@ -34,6 +34,13 @@ last_active = {}
 
 # --- DATENBANK MODELLE (TABELLEN) ---
 
+class Feedback(db.Model):
+    __tablename__ = 'feedback'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    sender = db.Column(db.String(50), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    is_read = db.Column(db.Boolean, default=False)
+
 class UserSetting(db.Model):
     __tablename__ = 'user_settings'
     username = db.Column(db.String(50), primary_key=True)
@@ -312,6 +319,40 @@ def admin_clear_chat():
     db.session.commit()
     
     return redirect(url_for('admin_panel'))
+
+# --- FEEDBACK SYSTEM ---
+@app.route('/api/submit-feedback', methods=['POST'])
+def submit_feedback():
+    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
+    msg = request.json.get('message', '').strip()
+    if not msg: return {"error": "Leere Nachricht"}, 400
+    
+    new_fb = Feedback(sender=session['username'], message=msg, is_read=False)
+    db.session.add(new_fb)
+    db.session.commit()
+    return {"status": "success"}
+
+@app.route('/api/admin/feedback', methods=['GET'])
+def get_admin_feedback():
+    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
+    me = session['username']
+    user = UserSetting.query.filter_by(username=me).first()
+    is_admin = True if (me == "Till" or (user and user.is_admin)) else False
+    if not is_admin: return {"error": "Keine Rechte"}, 403
+    
+    # Alle ungelesenen Feedbacks abrufen
+    unread = Feedback.query.filter_by(is_read=False).all()
+    result = [{"id": f.id, "sender": f.sender, "message": f.message} for f in unread]
+    return jsonify(result)
+
+@app.route('/api/admin/feedback/read/<int:fb_id>', methods=['POST'])
+def mark_feedback_read(fb_id):
+    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
+    fb = Feedback.query.get(fb_id)
+    if fb:
+        fb.is_read = True
+        db.session.commit()
+    return {"status": "success"}
 
 # --- CHAT ROUTEN ---
 
