@@ -70,15 +70,22 @@
 
         .game-controls-info {
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
             width: 400px;
             font-size: 14px;
             color: #ccc;
             box-sizing: border-box;
-            padding: 5px;
+            padding: 10px;
             background: #1a1a1a;
             border-radius: 8px;
             border: 1px solid #333;
+            gap: 8px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
         }
 
         .fruit-legend {
@@ -86,6 +93,14 @@
             gap: 15px;
             font-size: 13px;
         }
+
+        .fullscreen-link {
+            color: #ff9f43;
+            text-decoration: underline;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .fullscreen-link:hover { color: #e08b35; }
 
         #snakeCanvas {
             border: 4px solid #39ff14;
@@ -95,6 +110,24 @@
             display: block;
             box-sizing: border-box;
         }
+
+        /* --- Vollbild-Styles --- */
+        .game-container:fullscreen { background-color: #111; width: 100vw; height: 100vh; justify-content: center; }
+        .game-container:-webkit-full-screen { background-color: #111; width: 100vw; height: 100vh; justify-content: center; }
+        
+        .game-container:fullscreen #snakeCanvas {
+            height: 80vh !important; width: 80vh !important; 
+            max-width: 90vw !important; max-height: 90vw !important; 
+            aspect-ratio: 1 / 1;
+        }
+        .game-container:-webkit-full-screen #snakeCanvas {
+            height: 80vh !important; width: 80vh !important; 
+            max-width: 90vw !important; max-height: 90vw !important; 
+            aspect-ratio: 1 / 1;
+        }
+        
+        .game-container:fullscreen .game-controls-info { width: 80vh !important; max-width: 90vw !important; font-size: 16px; }
+        .game-container:-webkit-full-screen .game-controls-info { width: 80vh !important; max-width: 90vw !important; font-size: 16px; }
 
         .leaderboard-box {
             background: #333;
@@ -124,13 +157,19 @@
             <canvas id="snakeCanvas" width="400" height="400"></canvas>
             
             <div class="game-controls-info">
-                <span>🎮 <b>WASD</b> / <b>Pfeile</b></span>
-                <span class="fruit-legend">
-                    <span style="color: #ff2e63;">🍎 +10</span>
-                    <span style="color: #ffd700;">🟡 +20</span>
-                    <span style="color: #9c27b0;">🟣 Gift!</span>
-                </span>
-                <span>Punkte: <b id="score" style="color: #76ff03;">0</b></span>
+                <div class="info-row">
+                    <span>🎮 <b>WASD</b> / <b>Pfeile</b></span>
+                    <span id="fullscreenLink" class="fullscreen-link" onclick="toggleFullscreen()">📺 [F] Vollbild</span>
+                    <span>⏸️ <b>ESC</b> / <b>P</b></span>
+                </div>
+                <div class="info-row">
+                    <span class="fruit-legend">
+                        <span style="color: #ff2e63;">🍎 +10</span>
+                        <span style="color: #ffd700;">🟡 +20</span>
+                        <span style="color: #9c27b0;">🟣 Gift!</span>
+                    </span>
+                    <span>Punkte: <b id="score" style="color: #76ff03;">0</b></span>
+                </div>
             </div>
         </div>
 
@@ -165,6 +204,8 @@
         const canvas = document.getElementById('snakeCanvas');
         const ctx = canvas.getContext('2d');
         const scoreEl = document.getElementById('score');
+        const gameContainer = document.querySelector('.game-container');
+        const fullscreenLink = document.getElementById('fullscreenLink');
 
         // Hintergrundmusik einrichten
         const bgMusic = new Audio('/static/snake.mp3');
@@ -184,10 +225,14 @@
         let dy = 0;
         let score = 0;
         let fruit = { x: 5, y: 5, type: 'normal' };
+        
         let isGameOver = false;
         let gameStarted = false;
+        let isPaused = false;
+        
         let nextDx = 0;
         let nextDy = 0;
+        let fruitTimer = 0; // Zähler für despawnende Früchte
 
         function resetGame() {
             snake = [
@@ -195,27 +240,60 @@
                 { x: 9, y: 10 },
                 { x: 8, y: 10 }
             ];
-            dx = 1;
-            dy = 0;
-            nextDx = 1;
-            nextDy = 0;
+            dx = 1; dy = 0;
+            nextDx = 1; nextDy = 0;
             score = 0;
             scoreEl.textContent = score;
+            
             isGameOver = false;
             gameStarted = false;
+            isPaused = false;
+            
             spawnFruit();
             
             bgMusic.pause();
             bgMusic.currentTime = 0;
         }
 
-        // Steuerung mit den Pfeiltasten und WASD
-        window.addEventListener('keydown', e => {
-            const validKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "a", "s", "d", "W", "A", "S", "D", " "];
-            
-            if (validKeys.includes(e.key)) {
-                e.preventDefault();
+        // --- VOLLBILD LOGIK ---
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                if (gameContainer.requestFullscreen) { gameContainer.requestFullscreen(); }
+                else if (gameContainer.webkitRequestFullscreen) { gameContainer.webkitRequestFullscreen(); }
+                fullscreenLink.textContent = "📺 [F] Vollbild beenden";
+            } else {
+                if (document.exitFullscreen) { document.exitFullscreen(); }
+                fullscreenLink.textContent = "📺 [F] Vollbild";
             }
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) fullscreenLink.textContent = "📺 [F] Vollbild";
+        });
+
+        // --- STEUERUNG ---
+        window.addEventListener('keydown', e => {
+            const validKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "a", "s", "d", "W", "A", "S", "D", " ", "p", "P", "Escape", "f", "F"];
+            
+            if (validKeys.includes(e.key)) { e.preventDefault(); }
+
+            // Vollbild
+            if (e.key === 'f' || e.key === 'F') {
+                toggleFullscreen();
+                return;
+            }
+
+            // Pause
+            if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+                if (gameStarted && !isGameOver) {
+                    isPaused = !isPaused;
+                    if (isPaused) { bgMusic.pause(); } 
+                    else { bgMusic.play().catch(err => console.log(err)); }
+                }
+                return;
+            }
+
+            if (isPaused) return; // Keine Richtungseingaben im Pause-Menü
 
             if (isGameOver && validKeys.includes(e.key)) {
                 resetGame();
@@ -224,47 +302,38 @@
                 return;
             }
 
-            if (!gameStarted && validKeys.includes(e.key) && e.key !== " ") {
+            if (!gameStarted && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "a", "s", "d", "W", "A", "S", "D"].includes(e.key)) {
                 gameStarted = true;
                 bgMusic.play().catch(err => console.log("Autoplay verhindert:", err));
             }
 
             const key = e.key.toLowerCase();
             switch(key) {
-                case 'arrowleft':
-                case 'a':
+                case 'arrowleft': case 'a':
                     if (dx === 0) { nextDx = -1; nextDy = 0; }
                     break;
-                case 'arrowright':
-                case 'd':
+                case 'arrowright': case 'd':
                     if (dx === 0) { nextDx = 1; nextDy = 0; }
                     break;
-                case 'arrowup':
-                case 'w':
+                case 'arrowup': case 'w':
                     if (dy === 0) { nextDx = 0; nextDy = -1; }
                     break;
-                case 'arrowdown':
-                case 's':
+                case 'arrowdown': case 's':
                     if (dy === 0) { nextDx = 0; nextDy = 1; }
                     break;
             }
         });
 
         function spawnFruit() {
+            fruitTimer = 0; // Timer zurücksetzen
             fruit.x = Math.floor(Math.random() * tileCount);
             fruit.y = Math.floor(Math.random() * tileCount);
             
-            // Zufallsgenerator für Frucht-Typ
             let rand = Math.random();
-            if (rand < 0.70) {
-                fruit.type = 'normal'; // 70% Normaler Apfel
-            } else if (rand < 0.85) {
-                fruit.type = 'gold';   // 15% Goldener Apfel (Bonus)
-            } else {
-                fruit.type = 'poison'; // 15% Gift (Malus)
-            }
+            if (rand < 0.70) fruit.type = 'normal'; 
+            else if (rand < 0.85) fruit.type = 'gold';   
+            else fruit.type = 'poison'; 
             
-            // Sicherstellen, dass Frucht nicht auf der Schlange spawnt
             snake.forEach(part => {
                 if (part.x === fruit.x && part.y === fruit.y) {
                     spawnFruit();
@@ -273,77 +342,68 @@
         }
 
         function update() {
-            if (!gameStarted || isGameOver) return;
+            if (!gameStarted || isGameOver || isPaused) return;
+
+            // Timer für Giftfrucht (42 Ticks * 120ms = ca. 5 Sekunden)
+            if (fruit.type === 'poison') {
+                fruitTimer++;
+                if (fruitTimer >= 42) {
+                    spawnFruit(); // Gift verschwindet, neue Frucht spawnt
+                }
+            }
 
             dx = nextDx;
             dy = nextDy;
 
             const head = { x: snake[0].x + dx, y: snake[0].y + dy };
 
-            // Wändekollision
             if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
-                triggerGameOver();
-                return;
+                triggerGameOver(); return;
             }
 
-            // Selbstkollision
             for (let i = 0; i < snake.length; i++) {
                 if (head.x === snake[i].x && head.y === snake[i].y) {
-                    triggerGameOver();
-                    return;
+                    triggerGameOver(); return;
                 }
             }
 
             snake.unshift(head);
 
-            // Frucht gegessen?
             if (head.x === fruit.x && head.y === fruit.y) {
                 if (fruit.type === 'normal') {
                     score += 10;
-                    // Kein .pop(), dadurch wächst sie um 1
                 } 
                 else if (fruit.type === 'gold') {
                     score += 20;
-                    // Wächst direkt um 2 (eins durch fehlendes Pop, eins durch Push)
                     snake.push({...snake[snake.length - 1]}); 
                 } 
                 else if (fruit.type === 'poison') {
-                    score = Math.max(0, score - 10); // Punkte abziehen (min. 0)
-                    
-                    // Stirbt, wenn die Schlange zu kurz wird (4 wegen dem unshift oben = Startgröße)
+                    score = Math.max(0, score - 10);
                     if (snake.length <= 4) { 
-                        triggerGameOver();
-                        return;
+                        triggerGameOver(); return;
                     } else {
-                        // Ein Pop für normale Bewegung, ein zweites Pop für das Schrumpfen!
-                        snake.pop(); 
-                        snake.pop(); 
+                        snake.pop(); snake.pop(); 
                     }
                 }
                 scoreEl.textContent = score;
                 spawnFruit();
             } else {
-                // Normale Bewegung (letztes Glied entfernen)
                 snake.pop();
             }
         }
 
         function draw() {
-            // Hintergrund im Retro-Grid-Look
             ctx.fillStyle = '#111';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Raster
             ctx.strokeStyle = '#181818';
             ctx.lineWidth = 1;
             for (let i = 0; i < tileCount; i++) {
                 ctx.beginPath();
-                ctx.moveTo(i * gridSize, 0);
-                ctx.lineTo(i * gridSize, canvas.height);
+                ctx.moveTo(i * gridSize, 0); ctx.lineTo(i * gridSize, canvas.height);
                 ctx.stroke();
                 ctx.beginPath();
-                ctx.moveTo(0, i * gridSize);
-                ctx.lineTo(canvas.width, i * gridSize);
+                ctx.moveTo(0, i * gridSize); ctx.lineTo(canvas.width, i * gridSize);
                 ctx.stroke();
             }
 
@@ -351,28 +411,34 @@
             let fx = fruit.x * gridSize;
             let fy = fruit.y * gridSize;
             
-            if (fruit.type === 'normal') ctx.fillStyle = '#ff2e63';
-            else if (fruit.type === 'gold') ctx.fillStyle = '#ffd700';
-            else if (fruit.type === 'poison') ctx.fillStyle = '#9c27b0';
+            // Wenn der Giftapfel fast despawnt (ab Tick 30), lass ihn blinken!
+            let drawFruit = true;
+            if (fruit.type === 'poison' && fruitTimer > 30) {
+                if (fruitTimer % 2 === 0) drawFruit = false; // Blink-Effekt
+            }
 
-            ctx.beginPath();
-            ctx.arc(fx + gridSize / 2, fy + gridSize / 2 + 1, gridSize / 2 - 3, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Frucht-Stiel (Grünlich für Gift, Braun für den Rest)
-            ctx.strokeStyle = fruit.type === 'poison' ? '#76ff03' : '#795548';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(fx + gridSize / 2, fy + 3);
-            ctx.lineTo(fx + gridSize / 2 + 3, fy + 1);
-            ctx.stroke();
+            if (drawFruit) {
+                if (fruit.type === 'normal') ctx.fillStyle = '#ff2e63';
+                else if (fruit.type === 'gold') ctx.fillStyle = '#ffd700';
+                else if (fruit.type === 'poison') ctx.fillStyle = '#9c27b0';
+
+                ctx.beginPath();
+                ctx.arc(fx + gridSize / 2, fy + gridSize / 2 + 1, gridSize / 2 - 3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.strokeStyle = fruit.type === 'poison' ? '#76ff03' : '#795548';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(fx + gridSize / 2, fy + 3);
+                ctx.lineTo(fx + gridSize / 2 + 3, fy + 1);
+                ctx.stroke();
+            }
 
             // Schlange zeichnen
             snake.forEach((part, index) => {
                 let px = part.x * gridSize;
                 let py = part.y * gridSize;
                 
-                // Kopf knallig neon-grün, Körper etwas dunkler
                 ctx.fillStyle = index === 0 ? '#39ff14' : '#00adb5';
                 
                 ctx.beginPath();
@@ -383,7 +449,6 @@
                 }
                 ctx.fill();
 
-                // Augen für den Kopf
                 if (index === 0) {
                     ctx.fillStyle = '#000';
                     let eye1x = px + 6, eye1y = py + 6;
@@ -397,8 +462,22 @@
                 }
             });
 
+            // Pause Overlay
+            if (isPaused) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ff9f43';
+                ctx.font = 'bold 36px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('PAUSIERT', canvas.width / 2, canvas.height / 2 - 10);
+                ctx.fillStyle = '#fff';
+                ctx.font = '16px Arial';
+                ctx.fillText('Drücke ESC oder P zum Weiterpielen', canvas.width / 2, canvas.height / 2 + 25);
+                ctx.textAlign = 'left';
+            }
+
             // Start-Overlay
-            if (!gameStarted && !isGameOver) {
+            if (!gameStarted && !isGameOver && !isPaused) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#39ff14';
