@@ -253,10 +253,9 @@
                     if (player.x + player.w - 5 > p.x && player.x + 5 < p.x + p.w &&
                         player.y + player.h >= p.y && player.y + player.h <= p.y + p.h + 10) {
                         
+                        player.dy = JUMP_POWER; // Man kann einmal sicher abspringen
                         if (p.type === 'breakable') {
-                            p.broken = true; // Plattform kaputt!
-                        } else {
-                            player.dy = JUMP_POWER; // Normaler Sprung
+                            p.broken = true; // Und danach bricht und verschwindet sie!
                         }
                     }
                 });
