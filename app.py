@@ -63,7 +63,8 @@ class GameScore(db.Model):
     flappy = db.Column(db.Integer, default=-1)
     reaction = db.Column(db.Integer, default=9999)
     snake = db.Column(db.Integer, default=0)
-    crossy = db.Column(db.Integer, default=0)  
+    crossy = db.Column(db.Integer, default=0)
+    doodle = db.Column(db.Integer, default=0)
 
 class TicTacToeGame(db.Model):
     __tablename__ = 'tictactoe_games'
@@ -992,6 +993,36 @@ def submit_crossy():
         current_best = user_score.crossy if user_score.crossy is not None else 0
         if score > current_best:
             user_score.crossy = score
+            
+    db.session.commit()
+    return {"status": "success"}
+
+# --- NEON JUMP (Doodle) ---
+@app.route('/doodle')
+def doodle_game():
+    if 'username' not in session: return redirect(url_for('login'))
+    
+    all_scores = GameScore.query.all()
+    scores_dict = {s.username: (s.doodle if s.doodle is not None else 0) for s in all_scores}
+    
+    leaderboard_data = [(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE]
+    leaderboard = sorted(leaderboard_data, key=lambda x: x[1], reverse=True)
+    return render_template('doodle.html', leaderboard=leaderboard)
+
+@app.route('/api/submit-doodle', methods=['POST'])
+def submit_doodle():
+    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
+    score = int(request.json.get('score', 0))
+    current_user = session['username']
+    
+    user_score = GameScore.query.filter_by(username=current_user).first()
+    if not user_score:
+        user_score = GameScore(username=current_user, doodle=score)
+        db.session.add(user_score)
+    else:
+        current_best = user_score.doodle if user_score.doodle is not None else 0
+        if score > current_best:
+            user_score.doodle = score
             
     db.session.commit()
     return {"status": "success"}
