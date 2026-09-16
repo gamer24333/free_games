@@ -332,6 +332,8 @@ def chat(room="global"):
         actual_room = get_private_room_name(current_user, room)
         
     db_messages = ChatMessage.query.filter_by(room=actual_room).order_by(ChatMessage.id.asc()).all()
+    # Begrenzung auf die letzten 150 Nachrichten
+    db_messages = db_messages[-150:]
     raum_nachrichten = [{"name": m.sender, "text": m.text} for m in db_messages]
     
     admins = get_admins_list()
@@ -377,6 +379,10 @@ def api_chat_messages(room):
         
         partner_rec = ChatReadStatus.query.filter_by(room_id=actual_room, username=partner).first()
         partner_seen_count = partner_rec.seen_count if partner_rec else 0
+
+        # Nur die letzten 100 Nachrichten nehmen
+        sliced_messages = db_messages[-150:]
+        offset = total_msg_count - len(sliced_messages)
         
         nachrichten = []
         for index, m in enumerate(db_messages):
@@ -403,6 +409,9 @@ def delete_message(room, msg_index):
         actual_room = get_private_room_name(current_user, room)
         
     db_messages = ChatMessage.query.filter_by(room=actual_room).order_by(ChatMessage.id.asc()).all()
+    
+    # Auf die 100 im Browser gerenderten Nachrichten begrenzen
+    sliced_messages = db_messages[-150:]
     
     if 0 <= msg_index < len(db_messages):
         target_msg = db_messages[msg_index]
