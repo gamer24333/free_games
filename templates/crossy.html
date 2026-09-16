@@ -52,7 +52,7 @@
 <body>
 
     <div class="header-bar">
-        <a href="/games" class="btn btn-back">⬅️ Zurück</a>
+        <a href="/games" class="btn btn-back" onclick="stopMusic()">⬅️ Zurück</a>
         <h1>🐔 Crossy Huhn</h1>
     </div>
 
@@ -89,322 +89,445 @@
     <div class="footer-bar">Weiche Autos aus, springe auf Baumstämme und hüte dich vor dem ICE! 🚄</div>
 
     <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const scoreEl = document.getElementById('scoreText');
-        const gameContainer = document.querySelector('.game-container');
-        const fullscreenLink = document.getElementById('fullscreenLink');
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('scoreText');
+    const gameContainer = document.querySelector('.game-container');
+    const fullscreenLink = document.getElementById('fullscreenLink');
 
-        const TILE = 40;
-        const COLS = 10;
-        const ROWS_VISIBLE = 13;
+    // --- MUSIK EINBINDEN ---
+    const bgMusic = new Audio('/static/crossy.mp3');
+    bgMusic.loop = true;
+    bgMusic.volume = 0.4;
+
+    function stopMusic() {
+        bgMusic.pause();
+        bgMusic.currentTime = 0;
+    }
+
+    const TILE = 40;
+    const COLS = 10;
+    const ROWS_VISIBLE = 13;
+    
+    let player, rowsData, cameraY, score, isGameOver, gameStarted, isPaused, idleTime;
+    let lastTime = 0;
+
+    function resetGame() {
+        player = { x: 4 * TILE, y: 0 };
+        rowsData = [];
+        cameraY = -2;
+        score = 0;
+        scoreEl.textContent = score;
+        idleTime = 3.0;
         
-        let player, rowsData, cameraY, score, isGameOver, gameStarted, isPaused, idleTime;
-        let lastTime = 0;
+        isGameOver = false;
+        gameStarted = false;
+        isPaused = false;
+        
+        bgMusic.pause();
+        bgMusic.currentTime = 0;
+        
+        for (let i = -5; i < 20; i++) generateRow(i, i <= 3);
+    }
 
-        function resetGame() {
-            player = { x: 4 * TILE, y: 0 }; // y = Reihe (logisch, beginnt bei 0)
-            rowsData = [];
-            cameraY = -2; // Kamera startet etwas drunter
-            score = 0;
-            scoreEl.textContent = score;
-            idleTime = 3.0; // 3 Sekunden Timer
+    function generateRow(index, forceGrass = false) {
+        let type = 'grass';
+        if (!forceGrass) {
+            let r = Math.random();
+            if (r < 0.45) type = 'road';
+            else if (r < 0.78) type = 'river';
+            else if (r < 0.92) type = 'track';
+            else type = 'grass';
+        }
+
+        let speed = (Math.random() * 1.5 + 0.9) * (1 + index / 120); 
+        let dir = Math.random() < 0.5 ? 1 : -1;
+        let obstacles = [];
+
+        if (type === 'road') {
+            let carColors = ['#e53935', '#1e88e5', '#8e24aa', '#fb8c00', '#00b0ff', '#43a047'];
+            let numCars = Math.floor(Math.random() * 2) + 1;
+            for (let i = 0; i < numCars; i++) {
+                obstacles.push({ x: i * 210, w: 50 + Math.random() * 20, color: carColors[Math.floor(Math.random()*carColors.length)] });
+            }
+        } else if (type === 'river') {
+            let numLogs = Math.floor(Math.random() * 2) + 2;
+            speed = speed * 0.75;
+            for (let i = 0; i < numLogs; i++) {
+                obstacles.push({ x: i * 160, w: 90 + Math.random() * 50, color: '#5d4037' });
+            }
+        } else if (type === 'track') {
+            obstacles.push({ x: dir === 1 ? -450 : canvas.width, w: 320, color: '#d32f2f' });
+        }
+
+        // Dekorationen für Gras (Blumen/Büsche)
+        let deco = [];
+        if (type === 'grass' && !forceGrass) {
+            for(let c = 0; c < COLS; c++) {
+                if (Math.random() < 0.2) deco.push({ x: c * TILE, type: Math.random() < 0.5 ? 'flower' : 'bush' });
+            }
+        }
+
+        rowsData[index] = { type, speed, dir, obstacles, deco, trainTimer: Math.random() * 2.5 + 1.5, trainWarning: false };
+    }
+
+    // --- STEUERUNG & PAUSE LOGIK ---
+    window.addEventListener('keydown', e => {
+        const validKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "a", "s", "d", "W", "A", "S", "D", " ", "p", "P", "Escape", "f", "F"];
+        if (validKeys.includes(e.key)) e.preventDefault();
+
+        if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); return; }
+
+        // Pause umschalten mit P oder ESC
+        if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+            if (gameStarted && !isGameOver) {
+                isPaused = !isPaused;
+                if (isPaused) {
+                    bgMusic.pause();
+                } else {
+                    bgMusic.play().catch(err => console.log(err));
+                }
+            }
+            return;
+        }
+
+        if (isPaused) return;
+
+        if (isGameOver && validKeys.includes(e.key)) {
+            resetGame(); 
+            gameStarted = true;
+            bgMusic.play().catch(err => console.log("Autoplay:", err));
+            return;
+        }
+
+        if (!gameStarted && ["ArrowUp", "w", "W", "ArrowLeft", "a", "A", "ArrowRight", "d", "D"].includes(e.key)) {
+            gameStarted = true;
+            bgMusic.play().catch(err => console.log("Autoplay:", err));
+        }
+
+        if (!gameStarted || isGameOver) return;
+
+        const key = e.key.toLowerCase();
+        let moved = false;
+
+        if ((key === 'arrowleft' || key === 'a') && player.x > 0) { player.x -= TILE; moved = true; }
+        if ((key === 'arrowright' || key === 'd') && player.x < canvas.width - TILE) { player.x += TILE; moved = true; }
+        if ((key === 'arrowup' || key === 'w')) { player.y++; moved = true; }
+        if ((key === 'arrowdown' || key === 's') && player.y > cameraY + 1) { player.y--; moved = true; }
+
+        if (moved) {
+            idleTime = 3.0; 
+            if (!rowsData[player.y + 15]) generateRow(player.y + 15);
+            if (player.y > cameraY + 7) cameraY = player.y - 7;
             
-            isGameOver = false;
-            gameStarted = false;
-            isPaused = false;
-            
-            // Startbereich generieren (Sicheres Gras)
-            for (let i = -5; i < 20; i++) generateRow(i, i <= 3);
+            if (player.y > score) {
+                score = player.y;
+                scoreEl.textContent = score;
+            }
         }
+    });
 
-        function generateRow(index, forceGrass = false) {
-            let type = 'grass';
-            if (!forceGrass) {
-                let r = Math.random();
-                if (r < 0.45) type = 'road';
-                else if (r < 0.8) type = 'river';
-                else if (r < 0.95) type = 'track';
-                else type = 'grass';
-            }
+    function overlap(px, ox, pw, ow) {
+        return px < ox + ow && px + pw > ox;
+    }
 
-            let speed = (Math.random() * 1.5 + 0.8) * (1 + index / 100); 
-            let dir = Math.random() < 0.5 ? 1 : -1;
-            let obstacles = [];
+    function update(dt) {
+        if (!gameStarted || isGameOver || isPaused) return;
 
-            if (type === 'road') {
-                let carColors = ['#e53935', '#1e88e5', '#8e24aa', '#fb8c00', '#ffffff'];
-                let numCars = Math.floor(Math.random() * 2) + 1;
-                for (let i = 0; i < numCars; i++) {
-                    obstacles.push({ x: i * 200, w: 40 + Math.random() * 30, color: carColors[Math.floor(Math.random()*carColors.length)] });
+        idleTime -= dt;
+        if (idleTime <= 0) { triggerGameOver(); return; }
+
+        let currentRow = rowsData[player.y];
+        let onLog = false;
+
+        for (let i = Math.floor(cameraY) - 2; i < cameraY + ROWS_VISIBLE + 2; i++) {
+            let row = rowsData[i];
+            if (!row) continue;
+
+            if (row.type === 'track') {
+                row.trainTimer -= dt;
+                if (row.trainTimer <= 1.5 && row.trainTimer > 0) {
+                    row.trainWarning = true;
                 }
-            } else if (type === 'river') {
-                let numLogs = Math.floor(Math.random() * 2) + 2;
-                speed = speed * 0.8; // Baumstämme etwas langsamer
-                for (let i = 0; i < numLogs; i++) {
-                    obstacles.push({ x: i * 150, w: 80 + Math.random() * 60, color: '#795548' });
-                }
-            } else if (type === 'track') {
-                obstacles.push({ x: dir === 1 ? -400 : canvas.width, w: 300, color: '#f44336' });
-            }
-
-            rowsData[index] = { type, speed, dir, obstacles, trainTimer: Math.random() * 2 + 1, trainWarning: false };
-        }
-
-        // --- STEUERUNG ---
-        window.addEventListener('keydown', e => {
-            const validKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "a", "s", "d", "W", "A", "S", "D", " ", "p", "P", "Escape", "f", "F"];
-            if (validKeys.includes(e.key)) e.preventDefault();
-
-            if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); return; }
-
-            if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
-                if (gameStarted && !isGameOver) isPaused = !isPaused;
-                return;
-            }
-
-            if (isPaused) return;
-
-            if (isGameOver && validKeys.includes(e.key)) {
-                resetGame(); gameStarted = true; return;
-            }
-
-            if (!gameStarted && ["ArrowUp", "w", "W"].includes(e.key)) {
-                gameStarted = true;
-            }
-
-            if (!gameStarted || isGameOver) return;
-
-            const key = e.key.toLowerCase();
-            let moved = false;
-
-            if ((key === 'arrowleft' || key === 'a') && player.x > 0) { player.x -= TILE; moved = true; }
-            if ((key === 'arrowright' || key === 'd') && player.x < canvas.width - TILE) { player.x += TILE; moved = true; }
-            if ((key === 'arrowup' || key === 'w')) { player.y++; moved = true; }
-            if ((key === 'arrowdown' || key === 's') && player.y > cameraY + 1) { player.y--; moved = true; }
-
-            if (moved) {
-                idleTime = 3.0; // TIMER RESET BEI JEDER BEWEGUNG
-                // Zeilen nach vorne laden
-                if (!rowsData[player.y + 15]) generateRow(player.y + 15);
-                
-                // Kamera folgen lassen
-                if (player.y > cameraY + 7) cameraY = player.y - 7;
-                
-                // Score updaten
-                if (player.y > score) {
-                    score = player.y;
-                    scoreEl.textContent = score;
-                }
-            }
-        });
-
-        function overlap(px, ox, pw, ow) {
-            return px < ox + ow && px + pw > ox;
-        }
-
-        function update(dt) {
-            if (!gameStarted || isGameOver || isPaused) return;
-
-            idleTime -= dt;
-            if (idleTime <= 0) { triggerGameOver(); return; }
-
-            // Kamera zieht langsam hoch (Auto-Scroll), um Druck zu machen (Optional, hier aus, da Timer reicht)
-            // cameraY += dt * 0.5;
-            // if (player.y < cameraY) { triggerGameOver(); return; }
-
-            let currentRow = rowsData[player.y];
-            let onLog = false;
-
-            // Objekte aktualisieren
-            for (let i = Math.floor(cameraY) - 2; i < cameraY + ROWS_VISIBLE + 2; i++) {
-                let row = rowsData[i];
-                if (!row) continue;
-
-                if (row.type === 'track') {
-                    row.trainTimer -= dt;
-                    if (row.trainTimer <= 1.5 && row.trainTimer > 0) {
-                        row.trainWarning = true; // Rotes Blinken vor Zug
+                if (row.trainTimer <= 0) {
+                    row.trainWarning = false;
+                    let train = row.obstacles[0];
+                    train.x += 38 * TILE * row.dir * dt; 
+                    
+                    if (i === player.y && overlap(player.x + 5, train.x, TILE - 10, train.w)) {
+                        triggerGameOver(); return;
                     }
-                    if (row.trainTimer <= 0) {
-                        row.trainWarning = false;
-                        let train = row.obstacles[0];
-                        train.x += 35 * TILE * row.dir * dt; // Zug ist extrem schnell
-                        
-                        if (i === player.y && overlap(player.x + 5, train.x, TILE - 10, train.w)) {
+
+                    if ((row.dir === 1 && train.x > canvas.width) || (row.dir === -1 && train.x < -train.w)) {
+                        row.trainTimer = Math.random() * 4 + 2.5;
+                        train.x = row.dir === 1 ? -train.w - 100 : canvas.width + 100;
+                    }
+                }
+            } else if (row.type === 'road' || row.type === 'river') {
+                row.obstacles.forEach(obs => {
+                    obs.x += row.speed * row.dir * dt * TILE;
+                    
+                    if (row.dir === 1 && obs.x > canvas.width) obs.x = -obs.w - Math.random() * 60;
+                    if (row.dir === -1 && obs.x < -obs.w) obs.x = canvas.width + Math.random() * 60;
+
+                    if (i === player.y) {
+                        if (row.type === 'road' && overlap(player.x + 6, obs.x + 4, TILE - 12, obs.w - 8)) {
                             triggerGameOver(); return;
                         }
-
-                        if ((row.dir === 1 && train.x > canvas.width) || (row.dir === -1 && train.x < -train.w)) {
-                            row.trainTimer = Math.random() * 4 + 2;
-                            train.x = row.dir === 1 ? -train.w - 100 : canvas.width + 100;
+                        if (row.type === 'river' && overlap(player.x + 10, obs.x, TILE - 20, obs.w)) {
+                            onLog = true;
+                            player.x += row.speed * row.dir * dt * TILE;
                         }
                     }
-                } else if (row.type === 'road' || row.type === 'river') {
-                    row.obstacles.forEach(obs => {
-                        obs.x += row.speed * row.dir * dt * TILE;
-                        
-                        if (row.dir === 1 && obs.x > canvas.width) obs.x = -obs.w - Math.random() * 50;
-                        if (row.dir === -1 && obs.x < -obs.w) obs.x = canvas.width + Math.random() * 50;
-
-                        if (i === player.y) {
-                            if (row.type === 'road' && overlap(player.x + 5, obs.x + 2, TILE - 10, obs.w - 4)) {
-                                triggerGameOver(); return;
-                            }
-                            if (row.type === 'river' && overlap(player.x + 10, obs.x, TILE - 20, obs.w)) {
-                                onLog = true;
-                                player.x += row.speed * row.dir * dt * TILE; // Spieler fährt auf Baumstamm mit
-                            }
-                        }
-                    });
-                }
-            }
-
-            if (currentRow.type === 'river' && !onLog) {
-                triggerGameOver(); return; // Ins Wasser gefallen
-            }
-            if (player.x < -TILE/2 || player.x > canvas.width - TILE/2) {
-                triggerGameOver(); return; // Vom Baumstamm aus dem Bild gefahren
-            }
-        }
-
-        function draw() {
-            ctx.fillStyle = '#111';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Reihen zeichnen
-            for (let i = Math.floor(cameraY) - 2; i < cameraY + ROWS_VISIBLE + 2; i++) {
-                let row = rowsData[i];
-                if (!row) continue;
-
-                let renderY = canvas.height - (i - cameraY + 1) * TILE;
-
-                if (row.type === 'grass') {
-                    ctx.fillStyle = '#7cb342'; ctx.fillRect(0, renderY, canvas.width, TILE);
-                } else if (row.type === 'road') {
-                    ctx.fillStyle = '#757575'; ctx.fillRect(0, renderY, canvas.width, TILE);
-                    ctx.strokeStyle = '#9e9e9e'; ctx.lineWidth = 2; ctx.setLineDash([15, 15]);
-                    ctx.beginPath(); ctx.moveTo(0, renderY + TILE/2); ctx.lineTo(canvas.width, renderY + TILE/2); ctx.stroke(); ctx.setLineDash([]);
-                } else if (row.type === 'river') {
-                    ctx.fillStyle = '#03a9f4'; ctx.fillRect(0, renderY, canvas.width, TILE);
-                    // Leichte Wellen
-                    ctx.fillStyle = '#4fc3f7'; ctx.fillRect(10 + (Date.now()%2000)/20, renderY + 5, 20, 2);
-                    ctx.fillRect(80 - (Date.now()%2000)/20, renderY + 30, 30, 2);
-                } else if (row.type === 'track') {
-                    ctx.fillStyle = '#5d4037'; ctx.fillRect(0, renderY + 5, canvas.width, TILE - 10); // Schotter
-                    ctx.fillStyle = '#9e9e9e'; ctx.fillRect(0, renderY + 10, canvas.width, 3); // Schiene 1
-                    ctx.fillRect(0, renderY + 27, canvas.width, 3); // Schiene 2
-                    
-                    if (row.trainWarning && Math.floor(Date.now() / 150) % 2 === 0) {
-                        ctx.fillStyle = 'rgba(255, 0, 0, 0.4)';
-                        ctx.fillRect(0, renderY, canvas.width, TILE);
-                    }
-                }
-
-                // Hindernisse zeichnen
-                if (row.obstacles) {
-                    row.obstacles.forEach(obs => {
-                        ctx.fillStyle = obs.color;
-                        if (row.type === 'river') { // Baumstamm (abgerundet)
-                            if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(obs.x, renderY + 4, obs.w, TILE - 8, 8); ctx.fill(); }
-                            else ctx.fillRect(obs.x, renderY + 4, obs.w, TILE - 8);
-                        } else if (row.type === 'track') { // Zug
-                            ctx.fillRect(obs.x, renderY + 2, obs.w, TILE - 4);
-                            ctx.fillStyle = '#b71c1c'; ctx.fillRect(obs.x + (row.dir===1?0:10), renderY + 8, obs.w - 10, TILE - 16);
-                        } else { // Auto
-                            ctx.fillRect(obs.x, renderY + 6, obs.w, TILE - 12);
-                            // Fensterscheiben
-                            ctx.fillStyle = '#e0e0e0'; 
-                            if (row.dir === 1) ctx.fillRect(obs.x + obs.w - 10, renderY + 8, 6, TILE - 16);
-                            else ctx.fillRect(obs.x + 4, renderY + 8, 6, TILE - 16);
-                        }
-                    });
-                }
-            }
-
-            // Spieler (Huhn 🐔)
-            let pRenderY = canvas.height - (player.y - cameraY + 1) * TILE;
-            ctx.font = "28px Arial";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            
-            // Wenn der Spieler sich im Fluss aufhält, wackelt er leicht auf dem Holz
-            let driftY = rowsData[player.y]?.type === 'river' ? Math.sin(Date.now()/150)*2 : 0;
-            
-            ctx.fillText("🐔", player.x + TILE/2, pRenderY + TILE/2 + driftY);
-            ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-
-            // Timer (3 Sekunden-Regel) - Balken über dem Kopf
-            if (gameStarted && !isGameOver && !isPaused) {
-                let barWidth = (idleTime / 3.0) * 30;
-                ctx.fillStyle = idleTime < 1.0 ? (Math.floor(Date.now()/100)%2===0 ? '#ff5252' : '#ffffff') : '#ff5252';
-                ctx.fillRect(player.x + 5, pRenderY - 5, barWidth, 4);
-            }
-
-            // Overlays
-            if (isPaused) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#ffeb3b'; ctx.font = 'bold 36px Arial'; ctx.textAlign = 'center';
-                ctx.fillText('PAUSIERT', canvas.width / 2, canvas.height / 2);
-                ctx.fillStyle = '#fff'; ctx.font = '16px Arial';
-                ctx.fillText('ESC oder P zum Weiterspielen', canvas.width / 2, canvas.height / 2 + 30);
-                ctx.textAlign = 'left';
-            }
-
-            if (!gameStarted && !isGameOver && !isPaused) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#ffeb3b'; ctx.font = 'bold 24px Arial'; ctx.textAlign = 'center';
-                ctx.fillText('Drücke "W" oder "Pfeil Hoch"', canvas.width / 2, canvas.height / 2 - 10);
-                ctx.fillStyle = '#fff'; ctx.font = '16px Arial';
-                ctx.fillText('um die Straße zu überqueren!', canvas.width / 2, canvas.height / 2 + 20);
-                ctx.textAlign = 'left';
-            }
-
-            if (isGameOver) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#ff5252'; ctx.font = 'bold 32px Arial'; ctx.textAlign = 'center';
-                ctx.fillText('PLATSCH! 🍗', canvas.width / 2, canvas.height / 2 - 15);
-                ctx.fillStyle = '#fff'; ctx.font = '16px Arial';
-                ctx.fillText('Drücke eine Taste für Neustart', canvas.width / 2, canvas.height / 2 + 25);
-                ctx.textAlign = 'left';
-            }
-        }
-
-        async function triggerGameOver() {
-            isGameOver = true;
-            try {
-                await fetch('/api/submit-crossy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ score: score })
                 });
-            } catch(e) { console.error("Fehler beim Speichern des Scores", e); }
-        }
-
-        function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                if (gameContainer.requestFullscreen) { gameContainer.requestFullscreen(); }
-                else if (gameContainer.webkitRequestFullscreen) { gameContainer.webkitRequestFullscreen(); }
-                fullscreenLink.textContent = "📺 [F] Vollbild beenden";
-            } else {
-                if (document.exitFullscreen) { document.exitFullscreen(); }
-                fullscreenLink.textContent = "📺 [F] Vollbild";
             }
         }
-        document.addEventListener('fullscreenchange', () => {
-            if (!document.fullscreenElement) fullscreenLink.textContent = "📺 [F] Vollbild";
-        });
 
-        resetGame();
-        function loop(timestamp) {
-            let dt = (timestamp - lastTime) / 1000;
-            if (dt > 0.1) dt = 0.1; // Verhindert Bug nach Tab-Wechsel
-            lastTime = timestamp;
-            update(dt);
-            draw();
-            requestAnimationFrame(loop);
+        if (currentRow.type === 'river' && !onLog) { triggerGameOver(); return; }
+        if (player.x < -TILE/2 || player.x > canvas.width - TILE/2) { triggerGameOver(); return; }
+    }
+
+    // --- DETAILS & ZEICHNEN ---
+    function drawChicken(x, y) {
+        ctx.save();
+        ctx.translate(x + TILE/2, y + TILE/2);
+
+        // Schatten
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath();
+        ctx.ellipse(0, 14, 12, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Körper (Weiß)
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(0, 2, 13, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Kamm (Rot)
+        ctx.fillStyle = '#ff2e63';
+        ctx.beginPath();
+        ctx.arc(-3, -13, 3.5, 0, Math.PI * 2);
+        ctx.arc(1, -14, 4, 0, Math.PI * 2);
+        ctx.arc(5, -12, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Schnabel (Gelb/Orange)
+        ctx.fillStyle = '#ff9f43';
+        ctx.beginPath();
+        ctx.moveTo(8, -1);
+        ctx.lineTo(15, 2);
+        ctx.lineTo(8, 5);
+        ctx.closePath();
+        ctx.fill();
+
+        // Latz unter Schnabel
+        ctx.fillStyle = '#ff2e63';
+        ctx.beginPath();
+        ctx.arc(7, 6, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Auge
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(4, -3, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(4.5, -3.5, 0.7, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Flügel
+        ctx.fillStyle = '#f5f5f5';
+        ctx.beginPath();
+        ctx.ellipse(-4, 3, 6, 4, 0.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    function draw() {
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Reihen zeichnen
+        for (let i = Math.floor(cameraY) - 2; i < cameraY + ROWS_VISIBLE + 2; i++) {
+            let row = rowsData[i];
+            if (!row) continue;
+
+            let renderY = canvas.height - (i - cameraY + 1) * TILE;
+
+            if (row.type === 'grass') {
+                ctx.fillStyle = '#7cb342'; 
+                ctx.fillRect(0, renderY, canvas.width, TILE);
+                ctx.fillStyle = '#689f38'; 
+                ctx.fillRect(0, renderY + TILE - 4, canvas.width, 4); // Gras-Kante Schatten
+
+                // Dekorationen (Blumen/Büsche)
+                if (row.deco) {
+                    row.deco.forEach(d => {
+                        if (d.type === 'flower') {
+                            ctx.fillStyle = '#ffeb3b'; ctx.beginPath(); ctx.arc(d.x + 20, renderY + 20, 3, 0, Math.PI*2); ctx.fill();
+                            ctx.fillStyle = '#e91e63'; ctx.beginPath(); ctx.arc(d.x + 17, renderY + 20, 2, 0, Math.PI*2); ctx.fill();
+                        } else {
+                            ctx.fillStyle = '#558b2f'; ctx.beginPath(); ctx.arc(d.x + 20, renderY + 20, 6, 0, Math.PI*2); ctx.fill();
+                        }
+                    });
+                }
+            } else if (row.type === 'road') {
+                ctx.fillStyle = '#424242'; ctx.fillRect(0, renderY, canvas.width, TILE);
+                ctx.strokeStyle = '#bdbdbd'; ctx.lineWidth = 2; ctx.setLineDash([12, 12]);
+                ctx.beginPath(); ctx.moveTo(0, renderY + TILE/2); ctx.lineTo(canvas.width, renderY + TILE/2); ctx.stroke(); ctx.setLineDash([]);
+            } else if (row.type === 'river') {
+                ctx.fillStyle = '#0288d1'; ctx.fillRect(0, renderY, canvas.width, TILE);
+                // Dynamische Fluss-Wellen
+                ctx.fillStyle = '#29b6f6';
+                let waveOffset = (Date.now() / 30) % 40;
+                for (let w = -40; w < canvas.width + 40; w += 60) {
+                    ctx.fillRect(w + waveOffset, renderY + 12, 15, 2);
+                    ctx.fillRect(w - waveOffset * 0.5, renderY + 28, 20, 2);
+                }
+            } else if (row.type === 'track') {
+                ctx.fillStyle = '#4e342e'; ctx.fillRect(0, renderY, canvas.width, TILE); // Schotter
+                // Holzschwellen
+                ctx.fillStyle = '#3e2723';
+                for (let s = 10; s < canvas.width; s += 25) { ctx.fillRect(s, renderY + 4, 8, TILE - 8); }
+                // Stahlschienen
+                ctx.fillStyle = '#b0bec5'; ctx.fillRect(0, renderY + 8, canvas.width, 3); ctx.fillRect(0, renderY + 28, canvas.width, 3);
+                
+                // Warn-Signallicht an der Seite
+                let lightColor = '#2e7d32'; // Grün (Normal)
+                if (row.trainWarning) {
+                    lightColor = Math.floor(Date.now() / 150) % 2 === 0 ? '#ff1744' : '#212121'; // Blinken
+                }
+                ctx.fillStyle = '#212121'; ctx.fillRect(5, renderY + 2, 10, TILE - 4);
+                ctx.fillStyle = lightColor; ctx.beginPath(); ctx.arc(10, renderY + TILE/2, 4, 0, Math.PI*2); ctx.fill();
+            }
+
+            // Hindernisse (Autos, Baumstämme, Züge)
+            if (row.obstacles) {
+                row.obstacles.forEach(obs => {
+                    if (row.type === 'river') { 
+                        // Detailreicher Baumstamm
+                        ctx.fillStyle = '#4e342e';
+                        ctx.beginPath(); ctx.roundRect(obs.x, renderY + 4, obs.w, TILE - 8, 6); ctx.fill();
+                        ctx.fillStyle = '#6d4c41'; ctx.fillRect(obs.x + 8, renderY + 8, obs.w - 16, 3); ctx.fillRect(obs.x + 12, renderY + 22, obs.w - 24, 3);
+                        // Jahresringe an den Enden
+                        ctx.fillStyle = '#8d6e63'; ctx.beginPath(); ctx.arc(obs.x + 6, renderY + TILE/2, 5, 0, Math.PI*2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(obs.x + obs.w - 6, renderY + TILE/2, 5, 0, Math.PI*2); ctx.fill();
+                    } else if (row.type === 'track') { 
+                        // Detailreicher Express-Zug
+                        ctx.fillStyle = obs.color; ctx.fillRect(obs.x, renderY + 2, obs.w, TILE - 4);
+                        ctx.fillStyle = '#111'; ctx.fillRect(obs.x, renderY + 6, obs.w, 4); // Dunkler Streifen
+                        // Frontscheinwerfer
+                        ctx.fillStyle = '#ffeb3b';
+                        if (row.dir === 1) ctx.fillRect(obs.x + obs.w - 4, renderY + 8, 4, TILE - 16);
+                        else ctx.fillRect(obs.x, renderY + 8, 4, TILE - 16);
+                    } else { 
+                        // Detailreiches Auto mit Rädern & Lichter
+                        let carY = renderY + 6;
+                        let carH = TILE - 12;
+                        // Räder
+                        ctx.fillStyle = '#111';
+                        ctx.fillRect(obs.x + 6, carY - 2, 10, 3); ctx.fillRect(obs.x + obs.w - 16, carY - 2, 10, 3);
+                        ctx.fillRect(obs.x + 6, carY + carH - 1, 10, 3); ctx.fillRect(obs.x + obs.w - 16, carY + carH - 1, 10, 3);
+                        // Karosserie
+                        ctx.fillStyle = obs.color;
+                        ctx.beginPath(); ctx.roundRect(obs.x, carY, obs.w, carH, 4); ctx.fill();
+                        // Windschutzscheibe / Dach
+                        ctx.fillStyle = '#81d4fa';
+                        let glassX = row.dir === 1 ? obs.x + obs.w - 16 : obs.x + 6;
+                        ctx.fillRect(glassX, carY + 3, 10, carH - 6);
+                        // Scheinwerfer
+                        ctx.fillStyle = '#ffff8d';
+                        let lightX = row.dir === 1 ? obs.x + obs.w - 2 : obs.x;
+                        ctx.fillRect(lightX, carY + 2, 2, 4); ctx.fillRect(lightX, carY + carH - 6, 2, 4);
+                    }
+                });
+            }
         }
+
+        // Spieler (Detailliertes Huhn)
+        let pRenderY = canvas.height - (player.y - cameraY + 1) * TILE;
+        drawChicken(player.x, pRenderY);
+
+        // Timer-Ladebalken über dem Huhn (3 Sek. Regel)
+        if (gameStarted && !isGameOver && !isPaused) {
+            let barWidth = (idleTime / 3.0) * 32;
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(player.x + 4, pRenderY - 8, 32, 5);
+            ctx.fillStyle = idleTime < 1.0 ? (Math.floor(Date.now()/100)%2===0 ? '#ff1744' : '#ffffff') : '#76ff03';
+            ctx.fillRect(player.x + 4, pRenderY - 8, barWidth, 5);
+        }
+
+        // Overlays
+        if (isPaused) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.65)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#ffeb3b'; ctx.font = 'bold 36px Arial'; ctx.textAlign = 'center';
+            ctx.fillText('PAUSIERT', canvas.width / 2, canvas.height / 2);
+            ctx.fillStyle = '#fff'; ctx.font = '16px Arial';
+            ctx.fillText('Drücke ESC oder P zum Weiterspielen', canvas.width / 2, canvas.height / 2 + 30);
+            ctx.textAlign = 'left';
+        }
+
+        if (!gameStarted && !isGameOver && !isPaused) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#ffeb3b'; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'center';
+            ctx.fillText('Drücke "W" oder "Pfeil Hoch"', canvas.width / 2, canvas.height / 2 - 10);
+            ctx.fillStyle = '#fff'; ctx.font = '15px Arial';
+            ctx.fillText('um die Straße zu überqueren!', canvas.width / 2, canvas.height / 2 + 20);
+            ctx.textAlign = 'left';
+        }
+
+        if (isGameOver) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#ff5252'; ctx.font = 'bold 32px Arial'; ctx.textAlign = 'center';
+            ctx.fillText('PLATSCH! 🍗', canvas.width / 2, canvas.height / 2 - 15);
+            ctx.fillStyle = '#fff'; ctx.font = '16px Arial';
+            ctx.fillText('Drücke eine Taste für Neustart', canvas.width / 2, canvas.height / 2 + 25);
+            ctx.textAlign = 'left';
+        }
+    }
+
+    async function triggerGameOver() {
+        isGameOver = true;
+        bgMusic.pause();
+        try {
+            await fetch('/api/submit-crossy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ score: score })
+            });
+        } catch(e) { console.error("Score Error:", e); }
+    }
+
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            if (gameContainer.requestFullscreen) { gameContainer.requestFullscreen(); }
+            else if (gameContainer.webkitRequestFullscreen) { gameContainer.webkitRequestFullscreen(); }
+            fullscreenLink.textContent = "📺 [F] Vollbild beenden";
+        } else {
+            if (document.exitFullscreen) { document.exitFullscreen(); }
+            fullscreenLink.textContent = "📺 [F] Vollbild";
+        }
+    }
+    document.addEventListener('fullscreenchange', () => {
+        if (!document.fullscreenElement) fullscreenLink.textContent = "📺 [F] Vollbild";
+    });
+
+    resetGame();
+    function loop(timestamp) {
+        let dt = (timestamp - lastTime) / 1000;
+        if (dt > 0.1) dt = 0.1;
+        lastTime = timestamp;
+        update(dt);
+        draw();
         requestAnimationFrame(loop);
-    </script>
+    }
+    requestAnimationFrame(loop);
+</script>
 </body>
 </html>
