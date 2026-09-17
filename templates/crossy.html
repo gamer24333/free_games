@@ -485,9 +485,22 @@
         }
 
         if (isGameOver) {
+            // Abdunkeln
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; 
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Große, rote, zentrierte Schrift für den Todes-Spruch
+            ctx.fillStyle = '#ff5252'; 
+            ctx.font = 'bold 32px Arial'; 
+            ctx.textAlign = 'center';
             ctx.fillText(currentDeathMsg, canvas.width / 2, canvas.height / 2 - 15);
-            ctx.fillStyle = '#fff'; ctx.font = '16px Arial';
+            
+            // Kleinerer Text darunter
+            ctx.fillStyle = '#fff'; 
+            ctx.font = '16px Arial';
             ctx.fillText('Drücke eine Taste für Neustart', canvas.width / 2, canvas.height / 2 + 25);
+            
+            // Text-Ausrichtung wieder zurücksetzen
             ctx.textAlign = 'left';
         }
     }
