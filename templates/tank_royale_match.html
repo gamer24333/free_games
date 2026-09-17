@@ -46,6 +46,8 @@
     </div>
 
     <script>
+        // Zwingt den Browser, sofort auf Tasteneingaben zu hören!
+        window.focus();
         const gameId = "{{ gameId or 'offline_bot_game' }}";
         const me = "{{ me or 'Spieler 1' }}";
         const gegnerName = "{{ gegner or 'Computer-Bot 🤖' }}";
@@ -636,6 +638,13 @@
 
         initMatch();
         gameLoop();
+        // Fokus-Fix: Hört sofort auf die Tastatur
+        window.onload = function() {
+            window.focus();
+        };
+        document.addEventListener('click', function() {
+            window.focus();
+        });
     </script>
 </body>
 </html>
