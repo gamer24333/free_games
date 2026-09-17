@@ -205,6 +205,8 @@
     </div>
 
     <script>
+        // Zwingt den Browser, sofort auf Tasteneingaben zu hören!
+        window.focus();
         const canvas = document.getElementById('flappyCanvas');
         const ctx = canvas.getContext('2d');
         const fullscreenLink = document.getElementById('fullscreenLink');
@@ -526,6 +528,13 @@
         }
 
         loop();
+        // Fokus-Fix: Hört sofort auf die Tastatur
+        window.onload = function() {
+            window.focus();
+        };
+        document.addEventListener('click', function() {
+            window.focus();
+        });
     </script>
 </body>
 </html>
