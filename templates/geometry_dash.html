@@ -499,6 +499,7 @@
             ctx.restore();
 
             let onAnyPlatform = false;
+            let modeChanged = false; // NEU: Damit wir wissen, ob sich der Modus in diesem Frame geändert hat
 
             // --- HINDERNISSE UPDATE & ZEICHNEN ---
             for (let i = obstacles.length - 1; i >= 0; i--) {
@@ -600,6 +601,9 @@
                             } else if (player.mode === 'ball') {
                                 player.gravity = 0.5; 
                             }
+                            
+                            // NEU: Wenn ein Wechsel stattfand, den 'modeChanged' Status setzen
+                            modeChanged = true;
                         }
                     }
                 }
@@ -611,6 +615,12 @@
                 }
 
                 if (obs.x < -obs.width) obstacles.splice(i, 1);
+            }
+            
+            // NEU: Bildschirm-Aufräumer bei Portalwechsel
+            if (modeChanged) {
+                // Löscht alle unpassenden Hindernisse (z.B. fliegende Wände), die vor dem Spieler liegen, lässt aber weitere Portale bestehen.
+                obstacles = obstacles.filter(obs => obs.x < player.x + 50 || obs.type === 'portal');
             }
 
             if (onAnyPlatform) player.isGrounded = true;
