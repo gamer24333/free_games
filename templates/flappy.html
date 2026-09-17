@@ -500,21 +500,28 @@
         }, { passive: false });
 
         async function submitScore(finalScore, currentRunId) {
+            // Wenn man direkt am Anfang stirbt (Score 0), senden wir nichts. (Spart Server-Leistung)
+            if (finalScore === 0) return;
+
             try {
                 const response = await fetch('/api/submit-flappy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ score: finalScore })
                 });
+                
                 if (response.ok) {
-                    // Nur neuladen, wenn der Spieler nicht schon wieder neu gestartet hat
-                    if (runId === currentRunId && gameOver) {
-                        reloadTimeout = setTimeout(() => {
-                            if (runId === currentRunId && gameOver) {
-                                window.location.reload();
-                            }
-                        }, 1500);
-                    }
+                    // GENIALER TRICK: Wir holen uns im Hintergrund die aktuelle Webseite 
+                    // und tauschen NUR den Inhalt der Ranglisten-Tabelle aus!
+                    // Kein Neuladen der Seite mehr nötig, Spielfluss wird nie unterbrochen.
+                    fetch(window.location.href)
+                        .then(res => res.text())
+                        .then(html => {
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(html, 'text/html');
+                            const newLeaderboard = doc.querySelector('.leaderboard-table').innerHTML;
+                            document.querySelector('.leaderboard-table').innerHTML = newLeaderboard;
+                        });
                 }
             } catch (e) {
                 console.error("Score-Übertragungsfehler:", e);
