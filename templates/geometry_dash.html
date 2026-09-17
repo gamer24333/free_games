@@ -578,15 +578,19 @@
                         collisionMaxY = obs.ceil ? obs.y + obs.height : obs.y;
                     }
 
-                    if (
-                        player.x < obs.x + obs.width - 4 &&
-                        player.x + player.size > obs.x + 4 &&
-                        player.y + player.size > collisionMinY &&
-                        player.y < collisionMaxY
-                    ) {
-                        triggerGameOver();
-                    }
+                    // Hitbox-Toleranz: Für das Ship ziehen wir extra Pixel ab (ist fehlerverzeihender)
+                let hitPadX = player.mode === 'ship' ? 10 : 4;
+                let hitPadY = player.mode === 'ship' ? 8 : 0;
+
+                if (
+                    player.x + hitPadX < obs.x + obs.width &&
+                    player.x + player.size - hitPadX > obs.x &&
+                    player.y + player.size - hitPadY > collisionMinY &&
+                    player.y + hitPadY < collisionMaxY
+                ) {
+                    triggerGameOver();
                 }
+            }
 
                 // Durch Portal fliegen (Verwandlung)
                 if (obs.type === 'portal') {
