@@ -29,9 +29,10 @@
         .fullscreen-link { color: #ff9f43; text-decoration: underline; cursor: pointer; font-weight: bold; }
         .fullscreen-link:hover { color: #e08b35; }
 
+        /* WICHTIG: outline: none verhindert, dass das fokussierte Canvas blau umrandet wird */
         #gameCanvas {
             border: 4px solid #ffeb3b; border-radius: 12px; background: #7cb342;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.6); display: block;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.6); display: block; outline: none;
         }
 
         /* Vollbild */
@@ -58,10 +59,10 @@
 
     <div class="main-content">
         <div class="game-container" style="position: relative;">
-            <canvas id="gameCanvas" width="400" height="520"></canvas>
+            <!-- WICHTIG: tabindex="0" hinzugefügt, damit das iPad weiß, wo die Tasten hin sollen -->
+            <canvas id="gameCanvas" width="400" height="520" tabindex="0"></canvas>
             
-            <div class="game-c
-            ontrols-info">
+            <div class="game-controls-info">
                 <div class="info-row">
                     <span>🎮 <b>WASD</b> / <b>Pfeile</b></span>
                     <span id="fullscreenLink" class="fullscreen-link" onclick="toggleFullscreen()">📺 [F] Vollbild</span>
@@ -91,7 +92,6 @@
 
     
     <script>
-    window.focus();
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const scoreEl = document.getElementById('scoreText');
@@ -163,7 +163,6 @@
             obstacles.push({ x: dir === 1 ? -450 : canvas.width, w: 320, color: '#d32f2f' });
         }
 
-        // Dekorationen für Gras (Blumen/Büsche)
         let deco = [];
         if (type === 'grass' && !forceGrass) {
             for(let c = 0; c < COLS; c++) {
@@ -176,13 +175,30 @@
 
     // --- STEUERUNG & PAUSE LOGIK ---
     window.addEventListener('keydown', e => {
-        const validKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "a", "s", "d", "W", "A", "S", "D", " ", "p", "P", "Escape", "f", "F"];
-        if (validKeys.includes(e.key)) e.preventDefault();
+        let keyName = e.key;
+        let keyCodeStr = e.code; // iPadOS Hardware-Bypass (liest das rohe Signal, ignoriert Textfilter!)
+        
+        // Verhindern von Scrollen
+        const validCodes = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD", "Space", "Escape", "KeyP", "KeyF"];
+        if (validCodes.includes(keyCodeStr)) e.preventDefault();
 
-        if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); return; }
+        // Hardware-Taste in sicheren String umwandeln
+        let key = (keyName || '').toLowerCase();
+        if (keyCodeStr === 'KeyW') key = 'w';
+        if (keyCodeStr === 'KeyA') key = 'a';
+        if (keyCodeStr === 'KeyS') key = 's';
+        if (keyCodeStr === 'KeyD') key = 'd';
+        if (keyCodeStr === 'ArrowUp') key = 'arrowup';
+        if (keyCodeStr === 'ArrowDown') key = 'arrowdown';
+        if (keyCodeStr === 'ArrowLeft') key = 'arrowleft';
+        if (keyCodeStr === 'ArrowRight') key = 'arrowright';
+        if (keyCodeStr === 'KeyP') key = 'p';
+        if (keyCodeStr === 'Escape') key = 'escape';
+        if (keyCodeStr === 'KeyF') key = 'f';
 
-        // Pause umschalten mit P oder ESC
-        if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+        if (key === 'f') { toggleFullscreen(); return; }
+
+        if (key === 'p' || key === 'escape') {
             if (gameStarted && !isGameOver) {
                 isPaused = !isPaused;
                 if (isPaused) {
@@ -196,7 +212,7 @@
 
         if (isPaused) return;
 
-        if (isGameOver && validKeys.includes(e.key)) {
+        if (isGameOver && validCodes.includes(keyCodeStr)) {
             resetGame();
             gameStarted = true;
             bgMusic.play().catch(err => console.log("Autoplay:", err));
@@ -204,7 +220,7 @@
         }
 
         // START DES SPIELS BEIM ERSTEN TASTENDRUCK
-        if (!gameStarted && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "a", "s", "d", "W", "A", "S", "D"].includes(e.key)) {
+        if (!gameStarted && ["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(key)) {
             gameStarted = true;
             idleTime = 3.0; // Timer wird exakt jetzt auf 3 Sekunden gesetzt
             bgMusic.play().catch(err => console.log("Autoplay:", err));
@@ -212,7 +228,6 @@
 
         if (!gameStarted || isGameOver) return;
 
-        const key = e.key.toLowerCase();
         let moved = false;
 
         if ((key === 'arrowleft' || key === 'a') && player.x > 0) { player.x -= TILE; moved = true; }
@@ -298,13 +313,11 @@
         ctx.save();
         ctx.translate(x + TILE/2, y + TILE/2);
 
-        // Schatten
         ctx.fillStyle = 'rgba(0,0,0,0.25)';
         ctx.beginPath();
         ctx.ellipse(0, 14, 12, 5, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Körper (Weiß)
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.arc(0, 2, 13, 0, Math.PI * 2);
@@ -313,7 +326,6 @@
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // Kamm (Rot)
         ctx.fillStyle = '#ff2e63';
         ctx.beginPath();
         ctx.arc(-3, -13, 3.5, 0, Math.PI * 2);
@@ -321,7 +333,6 @@
         ctx.arc(5, -12, 3, 0, Math.PI * 2);
         ctx.fill();
 
-        // Schnabel (Gelb/Orange)
         ctx.fillStyle = '#ff9f43';
         ctx.beginPath();
         ctx.moveTo(8, -1);
@@ -330,13 +341,11 @@
         ctx.closePath();
         ctx.fill();
 
-        // Latz unter Schnabel
         ctx.fillStyle = '#ff2e63';
         ctx.beginPath();
         ctx.arc(7, 6, 2.5, 0, Math.PI * 2);
         ctx.fill();
 
-        // Auge
         ctx.fillStyle = '#000000';
         ctx.beginPath();
         ctx.arc(4, -3, 2, 0, Math.PI * 2);
@@ -346,7 +355,6 @@
         ctx.arc(4.5, -3.5, 0.7, 0, Math.PI * 2);
         ctx.fill();
 
-        // Flügel
         ctx.fillStyle = '#f5f5f5';
         ctx.beginPath();
         ctx.ellipse(-4, 3, 6, 4, 0.2, 0, Math.PI * 2);
@@ -359,7 +367,6 @@
         ctx.fillStyle = '#111';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Reihen zeichnen
         for (let i = Math.floor(cameraY) - 2; i < cameraY + ROWS_VISIBLE + 2; i++) {
             let row = rowsData[i];
             if (!row) continue;
@@ -370,9 +377,8 @@
                 ctx.fillStyle = '#7cb342'; 
                 ctx.fillRect(0, renderY, canvas.width, TILE);
                 ctx.fillStyle = '#689f38'; 
-                ctx.fillRect(0, renderY + TILE - 4, canvas.width, 4); // Gras-Kante Schatten
+                ctx.fillRect(0, renderY + TILE - 4, canvas.width, 4); 
 
-                // Dekorationen (Blumen/Büsche)
                 if (row.deco) {
                     row.deco.forEach(d => {
                         if (d.type === 'flower') {
@@ -389,7 +395,6 @@
                 ctx.beginPath(); ctx.moveTo(0, renderY + TILE/2); ctx.lineTo(canvas.width, renderY + TILE/2); ctx.stroke(); ctx.setLineDash([]);
             } else if (row.type === 'river') {
                 ctx.fillStyle = '#0288d1'; ctx.fillRect(0, renderY, canvas.width, TILE);
-                // Dynamische Fluss-Wellen
                 ctx.fillStyle = '#29b6f6';
                 let waveOffset = (Date.now() / 30) % 40;
                 for (let w = -40; w < canvas.width + 40; w += 60) {
@@ -397,57 +402,44 @@
                     ctx.fillRect(w - waveOffset * 0.5, renderY + 28, 20, 2);
                 }
             } else if (row.type === 'track') {
-                ctx.fillStyle = '#4e342e'; ctx.fillRect(0, renderY, canvas.width, TILE); // Schotter
-                // Holzschwellen
+                ctx.fillStyle = '#4e342e'; ctx.fillRect(0, renderY, canvas.width, TILE); 
                 ctx.fillStyle = '#3e2723';
                 for (let s = 10; s < canvas.width; s += 25) { ctx.fillRect(s, renderY + 4, 8, TILE - 8); }
-                // Stahlschienen
                 ctx.fillStyle = '#b0bec5'; ctx.fillRect(0, renderY + 8, canvas.width, 3); ctx.fillRect(0, renderY + 28, canvas.width, 3);
                 
-                // Warn-Signallicht an der Seite
-                let lightColor = '#2e7d32'; // Grün (Normal)
+                let lightColor = '#2e7d32'; 
                 if (row.trainWarning) {
-                    lightColor = Math.floor(Date.now() / 150) % 2 === 0 ? '#ff1744' : '#212121'; // Blinken
+                    lightColor = Math.floor(Date.now() / 150) % 2 === 0 ? '#ff1744' : '#212121'; 
                 }
                 ctx.fillStyle = '#212121'; ctx.fillRect(5, renderY + 2, 10, TILE - 4);
                 ctx.fillStyle = lightColor; ctx.beginPath(); ctx.arc(10, renderY + TILE/2, 4, 0, Math.PI*2); ctx.fill();
             }
 
-            // Hindernisse (Autos, Baumstämme, Züge)
             if (row.obstacles) {
                 row.obstacles.forEach(obs => {
                     if (row.type === 'river') { 
-                        // Detailreicher Baumstamm
                         ctx.fillStyle = '#4e342e';
                         ctx.beginPath(); ctx.roundRect(obs.x, renderY + 4, obs.w, TILE - 8, 6); ctx.fill();
                         ctx.fillStyle = '#6d4c41'; ctx.fillRect(obs.x + 8, renderY + 8, obs.w - 16, 3); ctx.fillRect(obs.x + 12, renderY + 22, obs.w - 24, 3);
-                        // Jahresringe an den Enden
                         ctx.fillStyle = '#8d6e63'; ctx.beginPath(); ctx.arc(obs.x + 6, renderY + TILE/2, 5, 0, Math.PI*2); ctx.fill();
                         ctx.beginPath(); ctx.arc(obs.x + obs.w - 6, renderY + TILE/2, 5, 0, Math.PI*2); ctx.fill();
                     } else if (row.type === 'track') { 
-                        // Detailreicher Express-Zug
                         ctx.fillStyle = obs.color; ctx.fillRect(obs.x, renderY + 2, obs.w, TILE - 4);
-                        ctx.fillStyle = '#111'; ctx.fillRect(obs.x, renderY + 6, obs.w, 4); // Dunkler Streifen
-                        // Frontscheinwerfer
+                        ctx.fillStyle = '#111'; ctx.fillRect(obs.x, renderY + 6, obs.w, 4); 
                         ctx.fillStyle = '#ffeb3b';
                         if (row.dir === 1) ctx.fillRect(obs.x + obs.w - 4, renderY + 8, 4, TILE - 16);
                         else ctx.fillRect(obs.x, renderY + 8, 4, TILE - 16);
                     } else { 
-                        // Detailreiches Auto mit Rädern & Lichter
                         let carY = renderY + 6;
                         let carH = TILE - 12;
-                        // Räder
                         ctx.fillStyle = '#111';
                         ctx.fillRect(obs.x + 6, carY - 2, 10, 3); ctx.fillRect(obs.x + obs.w - 16, carY - 2, 10, 3);
                         ctx.fillRect(obs.x + 6, carY + carH - 1, 10, 3); ctx.fillRect(obs.x + obs.w - 16, carY + carH - 1, 10, 3);
-                        // Karosserie
                         ctx.fillStyle = obs.color;
                         ctx.beginPath(); ctx.roundRect(obs.x, carY, obs.w, carH, 4); ctx.fill();
-                        // Windschutzscheibe / Dach
                         ctx.fillStyle = '#81d4fa';
                         let glassX = row.dir === 1 ? obs.x + obs.w - 16 : obs.x + 6;
                         ctx.fillRect(glassX, carY + 3, 10, carH - 6);
-                        // Scheinwerfer
                         ctx.fillStyle = '#ffff8d';
                         let lightX = row.dir === 1 ? obs.x + obs.w - 2 : obs.x;
                         ctx.fillRect(lightX, carY + 2, 2, 4); ctx.fillRect(lightX, carY + carH - 6, 2, 4);
@@ -456,11 +448,9 @@
             }
         }
 
-        // Spieler (Detailliertes Huhn)
         let pRenderY = canvas.height - (player.y - cameraY + 1) * TILE;
         drawChicken(player.x, pRenderY);
 
-        // Timer-Ladebalken über dem Huhn (3 Sek. Regel)
         if (gameStarted && !isGameOver && !isPaused) {
             let barWidth = (idleTime / 3.0) * 32;
             ctx.fillStyle = 'rgba(0,0,0,0.5)';
@@ -469,7 +459,6 @@
             ctx.fillRect(player.x + 4, pRenderY - 8, barWidth, 5);
         }
 
-        // Startbildschirm-Text (NEU EINGEFÜGT)
         if (!gameStarted && !isGameOver && !isPaused) {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#ffeb3b'; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'center';
@@ -477,7 +466,6 @@
             ctx.textAlign = 'left';
         }
 
-        // Overlays
         if (isPaused) {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.65)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#ffeb3b'; ctx.font = 'bold 36px Arial'; ctx.textAlign = 'center';
@@ -488,33 +476,28 @@
         }
 
         if (isGameOver) {
-            // Abdunkeln
             ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Große, rote, zentrierte Schrift für den Todes-Spruch
             ctx.fillStyle = '#ff5252'; 
             ctx.font = 'bold 32px Arial'; 
             ctx.textAlign = 'center';
             ctx.fillText(currentDeathMsg, canvas.width / 2, canvas.height / 2 - 15);
             
-            // Kleinerer Text darunter
             ctx.fillStyle = '#fff'; 
             ctx.font = '16px Arial';
             ctx.fillText('Drücke eine Taste für Neustart', canvas.width / 2, canvas.height / 2 + 25);
             
-            // Text-Ausrichtung wieder zurücksetzen
             ctx.textAlign = 'left';
         }
     }
 
-    let currentDeathMsg = "PLATSCH! 🍗"; // Speichert den aktuellen Spruch
+    let currentDeathMsg = "PLATSCH! 🍗"; 
 
     async function triggerGameOver() {
         isGameOver = true;
         bgMusic.pause();
         
-        // Liste mit verschiedenen Todesnachrichten (kannst du beliebig anpassen/erweitern)
         const messages = ["PLATSCH! 🍗", "Matsch! 🚗", "Blubb blubb... 💧", "Vom ICE erfasst! 🚄", "Zu langsam! ⏱️", "Chicken Nuggets! 🍟"];
         currentDeathMsg = messages[Math.floor(Math.random() * messages.length)];
         try {
@@ -550,12 +533,13 @@
         requestAnimationFrame(loop);
     }
     requestAnimationFrame(loop);
-    // Fokus-Fix: Hört sofort auf die Tastatur
+    
+    // Fokussiert das Canvas sofort beim Laden und bei jedem Klick
     window.onload = function() {
-        window.focus();
+        canvas.focus();
     };
     document.addEventListener('click', function() {
-        window.focus();
+        canvas.focus();
     });
 </script>
 </body>
