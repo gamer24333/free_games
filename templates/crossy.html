@@ -210,7 +210,7 @@
         if (isPaused) return;
 
         if (isGameOver && validKeys.includes(e.key)) {
-            resetGame(); 
+            resetGame();
             gameStarted = true;
             bgMusic.play().catch(err => console.log("Autoplay:", err));
             return;
@@ -218,6 +218,7 @@
 
         if (!gameStarted && ["ArrowUp", "w", "W", "ArrowLeft", "a", "A", "ArrowRight", "d", "D"].includes(e.key)) {
             gameStarted = true;
+            startBtn.style.display = 'none';
             bgMusic.play().catch(err => console.log("Autoplay:", err));
         }
 
@@ -490,7 +491,7 @@
         }
 
        
-        }
+        
 
         if (isGameOver) {
             // Abdunkeln
