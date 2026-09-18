@@ -57,10 +57,11 @@
     </div>
 
     <div class="main-content">
-        <div class="game-container">
+        <div class="game-container" style="position: relative;">
             <canvas id="gameCanvas" width="400" height="520"></canvas>
             
-            <div class="game-controls-info">
+            <div class="game-c
+            ontrols-info">
                 <div class="info-row">
                     <span>🎮 <b>WASD</b> / <b>Pfeile</b></span>
                     <span id="fullscreenLink" class="fullscreen-link" onclick="toggleFullscreen()">📺 [F] Vollbild</span>
@@ -93,12 +94,9 @@
     window.focus();
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    
     const scoreEl = document.getElementById('scoreText');
     const gameContainer = document.querySelector('.game-container');
     const fullscreenLink = document.getElementById('fullscreenLink');
-
-    
 
     // --- MUSIK EINBINDEN ---
     const bgMusic = new Audio('/static/crossy.mp3');
@@ -126,7 +124,7 @@
         idleTime = 3.0;
         
         isGameOver = false;
-        gameStarted = false;
+        gameStarted = false; // Spiel ist geladen, aber noch nicht gestartet
         isPaused = false;
         
         bgMusic.pause();
@@ -205,9 +203,10 @@
             return;
         }
 
-        if (!gameStarted && ["ArrowUp", "w", "W", "ArrowLeft", "a", "A", "ArrowRight", "d", "D"].includes(e.key)) {
+        // START DES SPIELS BEIM ERSTEN TASTENDRUCK
+        if (!gameStarted && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "a", "s", "d", "W", "A", "S", "D"].includes(e.key)) {
             gameStarted = true;
-            startBtn.style.display = 'none';
+            idleTime = 3.0; // Timer wird exakt jetzt auf 3 Sekunden gesetzt
             bgMusic.play().catch(err => console.log("Autoplay:", err));
         }
 
@@ -238,6 +237,7 @@
     }
 
     function update(dt) {
+        // HIER IST DER SCHUTZ: Wenn das Spiel nicht gestartet ist, wird die Zeit nicht abgezogen!
         if (!gameStarted || isGameOver || isPaused) return;
 
         idleTime -= dt;
@@ -469,6 +469,14 @@
             ctx.fillRect(player.x + 4, pRenderY - 8, barWidth, 5);
         }
 
+        // Startbildschirm-Text (NEU EINGEFÜGT)
+        if (!gameStarted && !isGameOver && !isPaused) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#ffeb3b'; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'center';
+            ctx.fillText('Drücke W, A, S, D zum Starten', canvas.width / 2, canvas.height / 2 - 10);
+            ctx.textAlign = 'left';
+        }
+
         // Overlays
         if (isPaused) {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.65)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -478,15 +486,6 @@
             ctx.fillText('Drücke ESC oder P zum Weiterspielen', canvas.width / 2, canvas.height / 2 + 30);
             ctx.textAlign = 'left';
         }
-
-       // Startbildschirm-Text (NEU EINGEFÜGT)
-        if (!gameStarted && !isGameOver && !isPaused) {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#ffeb3b'; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'center';
-            ctx.fillText('Drücke W, A, S, D zum Starten', canvas.width / 2, canvas.height / 2 - 10);
-            ctx.textAlign = 'left';
-        }
-        
 
         if (isGameOver) {
             // Abdunkeln
