@@ -129,7 +129,7 @@
         isPaused = false;
         
         //bgMusic.pause();
-        bgMusic.currentTime = 0;
+        //bgMusic.currentTime = 0;
         
         for (let i = -5; i < 20; i++) generateRow(i, i <= 3);
     }
@@ -205,7 +205,7 @@
                 if (isPaused) {
                     //bgMusic.pause();
                 } else {
-                    bgMusic.play().catch(err => console.log(err));
+                    //bgMusic.play().catch(err => console.log(err));
                 }
             }
             return;
@@ -216,7 +216,7 @@
         if (isGameOver && validCodes.includes(keyCodeStr)) {
             resetGame();
             gameStarted = true;
-            bgMusic.play().catch(err => console.log("Autoplay:", err));
+            //bgMusic.play().catch(err => console.log("Autoplay:", err));
             return;
         }
 
@@ -224,7 +224,7 @@
         if (!gameStarted && ["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(key)) {
             gameStarted = true;
             idleTime = 3.0; // Timer wird exakt jetzt auf 3 Sekunden gesetzt
-            bgMusic.play().catch(err => console.log("Autoplay:", err));
+            //bgMusic.play().catch(err => console.log("Autoplay:", err));
         }
 
         if (!gameStarted || isGameOver) return;
