@@ -210,13 +210,41 @@
         const fullscreenLink = document.getElementById('fullscreenLink');
 
         // Hintergrundmusik einrichten
-        const bgMusic = new Audio('/static/snake.mp3');
-        bgMusic.loop = true;
-        bgMusic.volume = 0.4;
+       // Hintergrundmusik einrichten (Web Audio API)
+        let audioCtx = null;
+        let audioBuffer = null;
+        let audioSource = null;
+
+        async function playMusic() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+            if (!audioBuffer) {
+                try {
+                    let response = await fetch('/static/snake.mp3');
+                    let arrayBuffer = await response.arrayBuffer();
+                    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                } catch (e) { console.error("Audio Fehler:", e); return; }
+            }
+
+            if (!audioSource && gameStarted && !isPaused && !isGameOver) {
+                audioSource = audioCtx.createBufferSource();
+                audioSource.buffer = audioBuffer;
+                audioSource.loop = true;
+                let gainNode = audioCtx.createGain();
+                gainNode.gain.value = 0.4;
+                audioSource.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                audioSource.start();
+            }
+        }
 
         function stopMusic() {
-            bgMusic.pause();
-            bgMusic.currentTime = 0;
+            if (audioSource) {
+                try { audioSource.stop(); } catch(e){}
+                audioSource.disconnect();
+                audioSource = null;
+            }
         }
 
         const gridSize = 20;
@@ -253,8 +281,7 @@
             
             spawnFruit();
             
-            bgMusic.pause();
-            bgMusic.currentTime = 0;
+            stopMusic();
         }
 
         // --- VOLLBILD LOGIK ---
@@ -289,8 +316,8 @@
             if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
                 if (gameStarted && !isGameOver) {
                     isPaused = !isPaused;
-                    if (isPaused) { bgMusic.pause(); } 
-                    else { bgMusic.play().catch(err => console.log(err)); }
+                    if (isPaused) { stopMusic(); } 
+                    else { playMusic(); }
                 }
                 return;
             }
@@ -298,15 +325,15 @@
             if (isPaused) return; // Keine Richtungseingaben im Pause-Menü
 
             if (isGameOver && validKeys.includes(e.key)) {
-                resetGame();
-                gameStarted = true;
-                bgMusic.play().catch(err => console.log("Autoplay verhindert:", err));
-                return;
+            resetGame();
+            gameStarted = true;
+            playMusic();
+            return;
             }
 
             if (!gameStarted && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "a", "s", "d", "W", "A", "S", "D"].includes(e.key)) {
                 gameStarted = true;
-                bgMusic.play().catch(err => console.log("Autoplay verhindert:", err));
+                playMusic();
             }
 
             const key = e.key.toLowerCase();
@@ -511,7 +538,7 @@
 
         async function triggerGameOver() {
             isGameOver = true;
-            bgMusic.pause(); 
+            stopMusic(); 
 
             try {
                 await fetch('/api/submit-snake', {
