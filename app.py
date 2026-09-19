@@ -1236,6 +1236,39 @@ def submit_brickbreaker():
     db.session.commit()
     return {"status": "success"}
 
+# --- SPEED TYPING ---
+@app.route('/speedtyping')
+def speedtyping_game():
+    if 'username' not in session: return redirect(url_for('login'))
+    
+    all_scores = GameScore.query.all()
+    # Sicherstellen, dass kein Fehler geworfen wird, falls die Spalte mal leer ist
+    scores_dict = {s.username: (getattr(s, 'speedtyping', 0) or 0) for s in all_scores}
+    
+    leaderboard_data = [(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE]
+    leaderboard = sorted(leaderboard_data, key=lambda x: x[1], reverse=True)
+    return render_template('speedtyping.html', leaderboard=leaderboard)
+
+@app.route('/api/submit-speedtyping', methods=['POST'])
+def submit_speedtyping():
+    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
+    score = int(request.json.get('score', 0))
+    current_user = session['username']
+    
+    user_score = GameScore.query.filter_by(username=current_user).first()
+    if not user_score:
+        user_score = GameScore(username=current_user, speedtyping=score)
+        db.session.add(user_score)
+    else:
+        current_best = getattr(user_score, 'speedtyping', 0)
+        if current_best is None: current_best = 0
+            
+        if score > current_best:
+            user_score.speedtyping = score
+            
+    db.session.commit()
+    return {"status": "success"}
+
 @app.route('/logout')
 def logout():
     session.pop('username', None)
