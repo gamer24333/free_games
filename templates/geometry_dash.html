@@ -109,16 +109,14 @@
         </div>
     </div>
 
-    <audio id="gdMusic" loop hidden>
-        <source src="{{ url_for('static', filename='geometry-dash.mp3') }}" type="audio/mpeg">
-    </audio>
+    
 
     <script>
         // Zwingt den Browser, sofort auf Tasteneingaben zu hören!
         window.focus();
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const bgMusic = document.getElementById('gdMusic');
+        
         const wrapper = document.getElementById('gdWrapper');
         const fsBtn = document.getElementById('fullscreenBtn');
 
@@ -144,8 +142,41 @@
         let reloadTimeout = null;
         let runId = 0;
 
-        if (bgMusic) {
-            bgMusic.volume = 0.2;
+        // --- MUSIK EINBINDEN (WEB AUDIO API) ---
+        let audioCtx = null;
+        let audioBuffer = null;
+        let audioSource = null;
+
+        async function playMusic() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+            if (!audioBuffer) {
+                try {
+                    let response = await fetch('/static/geometry-dash.mp3');
+                    let arrayBuffer = await response.arrayBuffer();
+                    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                } catch (e) { console.error("Audio Fehler:", e); return; }
+            }
+
+            if (!audioSource && gameStarted && !isPaused && !isGameOver) {
+                audioSource = audioCtx.createBufferSource();
+                audioSource.buffer = audioBuffer;
+                audioSource.loop = true;
+                let gainNode = audioCtx.createGain();
+                gainNode.gain.value = 0.2; // Lautstärke 20%
+                audioSource.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                audioSource.start();
+            }
+        }
+
+        function stopMusic() {
+            if (audioSource) {
+                try { audioSource.stop(); } catch(e){}
+                audioSource.disconnect();
+                audioSource = null;
+            }
         }
 
         // Vollbild Steuerung
@@ -182,11 +213,9 @@
                 return; 
             }
             if (!gameStarted) {
-                gameStarted = true;
-                if (bgMusic && bgMusic.paused) {
-                    bgMusic.play().catch(e => console.log("Musik blockiert:", e));
-                }
-            }
+              gameStarted = true;
+              playMusic();
+          }
 
             // Cube und Ball springen bei Klick einmalig
             if (player.mode === 'cube') {
@@ -201,13 +230,14 @@
         }
 
         function togglePause() {
-            if (!gameStarted || isGameOver) return; 
-            isPaused = !isPaused;
-            if (bgMusic) {
-                if (isPaused) bgMusic.pause();
-                else bgMusic.play().catch(e => console.log(e));
-            }
-        }
+          if (!gameStarted || isGameOver) return; 
+          isPaused = !isPaused;
+          if (isPaused) {
+              stopMusic();
+          } else {
+              playMusic();
+          }
+      }
 
         // --- Event Listener für HOLDING (Gedrückt halten) ---
         function handleInputStart(e) {
@@ -238,10 +268,10 @@
 
         // Musik aus, wenn Seite verlassen wird
         document.querySelectorAll('.btn-back').forEach(btn => {
-            btn.addEventListener('click', () => {
-                if (bgMusic) bgMusic.pause();
-            });
-        });
+          btn.addEventListener('click', () => {
+              stopMusic();
+          });
+      });
 
         // Funktion zum Generieren eines Random-Portals
         function createPortal() {
@@ -348,9 +378,7 @@
             isGameOver = true;
             gameStarted = false;
             
-            if (bgMusic) {
-                bgMusic.pause();
-                bgMusic.currentTime = 0;
+            stopMusic();
             }
             
             runId++;
@@ -376,10 +404,7 @@
             isPaused = false; 
             gameStarted = false; 
             
-            if (bgMusic) {
-                bgMusic.pause();
-                bgMusic.currentTime = 0;
-            }
+            stopMusic();
 
             spawnObstacle();
         }
