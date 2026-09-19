@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speed Typing</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #222; color: white; text-align: center; margin: 0; padding: 20px; }
+        h1 { color: #00adb5; }
+        .game-container { background: #333; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); max-width: 800px; margin: 20px auto; border: 2px solid #00adb5; }
+        
+        #timer { font-size: 48px; font-weight: bold; color: #ff2e63; margin-bottom: 20px; }
+        
+        #word-display {
+            background: #222; border-radius: 8px; padding: 20px; font-size: 24px;
+            display: flex; flex-wrap: wrap; gap: 10px; height: 120px; overflow: hidden;
+            border: 1px solid #555; text-align: left; align-items: flex-start; align-content: flex-start;
+        }
+        
+        .word { padding: 2px 5px; border-radius: 4px; color: #aaa; }
+        .word.active { background: #555; color: white; border-bottom: 3px solid #00adb5; }
+        .word.correct { color: #2ecc71; }
+        .word.incorrect { color: #ff2e63; text-decoration: line-through; }
+
+        #input-field {
+            width: 100%; max-width: 400px; font-size: 24px; padding: 15px; margin-top: 30px;
+            border-radius: 8px; border: 2px solid #00adb5; background: #222; color: white;
+            text-align: center; outline: none;
+        }
+        #input-field:focus { box-shadow: 0 0 10px #00adb5; }
+        #input-field:disabled { background: #444; border-color: #555; }
+
+        .btn { display: inline-block; padding: 10px 20px; margin: 15px 5px; background: #00adb5; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; border: none; cursor: pointer; font-size: 16px; }
+        .btn:hover { background: #007c82; }
+        
+        /* Leaderboard */
+        .leaderboard { max-width: 800px; margin: 30px auto; background: #333; padding: 20px; border-radius: 12px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; border-bottom: 1px solid #444; }
+        th { background: #00adb5; color: white; }
+        tr:hover { background: #444; }
+    </style>
+</head>
+<body>
+
+    <a href="/games" class="btn" style="background: #555; float: left;">Zurück</a>
+    <h1>⌨️ Speed Typing (WPM)</h1>
+    
+    <div class="game-container">
+        <div id="timer">60s</div>
+        <div id="word-display"></div>
+        <input type="text" id="input-field" placeholder="Tippe hier, um zu starten..." autocomplete="off">
+        <br>
+        <button class="btn" id="restart-btn" style="display: none;" onclick="initGame()">Nochmal spielen</button>
+    </div>
+
+    <div class="leaderboard">
+        <h2 style="color: #2ecc71;">🏆 Top 10 (Wörter pro Minute)</h2>
+        <table>
+            <tr><th>Rang</th><th>Spieler</th><th>WPM</th></tr>
+            {% for player, score in leaderboard[:10] %}
+            <tr>
+                <td>#{{ loop.index }}</td>
+                <td>{{ player }}</td>
+                <td><b>{{ score }}</b></td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <script>
+        const wordPool = [
+            "haus", "schule", "lernen", "freunde", "computer", "spielen", "laufen", "wasser", "sonne", "mond",
+            "klasse", "lehrer", "pause", "essen", "trinken", "auto", "fahrrad", "musik", "film", "buch",
+            "schreiben", "lesen", "schnell", "langsam", "heute", "morgen", "gestern", "immer", "nie", "oft",
+            "katze", "hund", "vogel", "baum", "blume", "wald", "wiese", "berg", "fluss", "meer",
+            "apfel", "banane", "kuchen", "pizza", "burger", "nase", "auge", "ohr", "hand", "fuß",
+            "lustig", "traurig", "schön", "hässlich", "groß", "klein", "kalt", "warm", "heiß", "cool",
+            "frage", "antwort", "wissen", "denken", "glauben", "hoffen", "lieben", "lachen", "weinen", "schreien",
+            "woche", "monat", "jahr", "stunde", "minute", "sekunde", "zeit", "uhr", "tag", "nacht",
+            "rot", "blau", "gelb", "grün", "schwarz", "weiß", "grau", "braun", "lila", "rosa"
+        ];
+
+        let words = [];
+        let currentWordIndex = 0;
+        let correctWords = 0;
+        let timeLeft = 60;
+        let timerInterval;
+        let isPlaying = false;
+
+        const display = document.getElementById('word-display');
+        const input = document.getElementById('input-field');
+        const timerDisplay = document.getElementById('timer');
+        const restartBtn = document.getElementById('restart-btn');
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function initGame() {
+            words = shuffleArray([...wordPool]).slice(0, 80); // 80 zufällige Wörter
+            currentWordIndex = 0;
+            correctWords = 0;
+            timeLeft = 60;
+            isPlaying = false;
+            
+            clearInterval(timerInterval);
+            timerDisplay.textContent = timeLeft + "s";
+            input.value = "";
+            input.disabled = false;
+            restartBtn.style.display = "none";
+            
+            renderWords();
+            input.focus();
+        }
+
+        function renderWords() {
+            display.innerHTML = "";
+            words.forEach((word, index) => {
+                const span = document.createElement('span');
+                span.textContent = word;
+                span.className = 'word';
+                if (index === currentWordIndex) span.classList.add('active');
+                display.appendChild(span);
+            });
+        }
+
+        function startGame() {
+            if (isPlaying) return;
+            isPlaying = true;
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerDisplay.textContent = timeLeft + "s";
+                if (timeLeft <= 0) endGame();
+            }, 1000);
+        }
+
+        function endGame() {
+            clearInterval(timerInterval);
+            isPlaying = false;
+            input.disabled = true;
+            
+            const wpm = correctWords; // 60 Sekunden = WPM ist genau die Anzahl der richtigen Wörter
+            timerDisplay.innerHTML = `Vorbei! Dein Score: <span style="color:#2ecc71;">${wpm} WPM</span>`;
+            restartBtn.style.display = "inline-block";
+
+            // Highscore an Server senden
+            if (wpm > 0) {
+                fetch('/api/submit-speedtyping', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ score: wpm })
+                }).then(() => {
+                    setTimeout(() => location.reload(), 2000); // Neuladen für Leaderboard-Update
+                });
+            }
+        }
+
+        input.addEventListener('input', (e) => {
+            if (!isPlaying && input.value.trim().length > 0) startGame();
+            
+            const typedValue = input.value;
+            const wordSpans = display.querySelectorAll('.word');
+            const currentSpan = wordSpans[currentWordIndex];
+            
+            // Leertaste drückt -> Wort abschließen
+            if (typedValue.endsWith(' ')) {
+                const typedWord = typedValue.trim();
+                const targetWord = words[currentWordIndex];
+                
+                if (typedWord === targetWord) {
+                    currentSpan.classList.replace('active', 'correct');
+                    correctWords++;
+                } else {
+                    currentSpan.classList.replace('active', 'incorrect');
+                }
+                
+                input.value = "";
+                currentWordIndex++;
+                
+                // Nächstes Wort aktivieren oder Spiel beenden
+                if (currentWordIndex < words.length) {
+                    wordSpans[currentWordIndex].classList.add('active');
+                    // Scroll-Logik, damit das aktive Wort immer sichtbar bleibt
+                    if (wordSpans[currentWordIndex].offsetTop > display.scrollTop + 60) {
+                        display.scrollTop += 40;
+                    }
+                } else {
+                    endGame(); // Alle Wörter aufgebraucht
+                }
+            } else {
+                // Rote Hervorhebung, wenn man sich mittendrin vertippt hat
+                if (!words[currentWordIndex].startsWith(typedValue.trim())) {
+                    currentSpan.style.backgroundColor = "rgba(255, 46, 99, 0.3)";
+                } else {
+                    currentSpan.style.backgroundColor = "";
+                }
+            }
+        });
+
+        // Verhindere, dass Leertaste die Seite scrollt
+        window.addEventListener('keydown', function(e) {
+            if(e.keyCode == 32 && e.target == document.body) {
+                e.preventDefault();
+            }
+        });
+
+        initGame();
+    </script>
+</body>
+</html>
