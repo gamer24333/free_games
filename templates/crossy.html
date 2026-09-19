@@ -101,12 +101,43 @@
 
     // --- MUSIK EINBINDEN ---
    
-    let bgMusic = null; 
+    // --- MUSIK EINBINDEN (WEB AUDIO API) ---
+    let audioCtx = null;
+    let audioBuffer = null;
+    let audioSource = null;
+
+    async function playMusic() {
+        // Erstellt das moderne Audio-System (falls noch nicht passiert)
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+        // Lädt die MP3 komplett im Hintergrund, OHNE das Spiel einzufrieren
+        if (!audioBuffer) {
+            try {
+                let response = await fetch('/static/crossy.mp3');
+                let arrayBuffer = await response.arrayBuffer();
+                audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+            } catch (e) { console.error("Audio Fehler:", e); return; }
+        }
+
+        // Startet die Musik
+        if (!audioSource && gameStarted && !isPaused && !isGameOver) {
+            audioSource = audioCtx.createBufferSource();
+            audioSource.buffer = audioBuffer;
+            audioSource.loop = true;
+            let gainNode = audioCtx.createGain();
+            gainNode.gain.value = 0.4;
+            audioSource.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            audioSource.start();
+        }
+    }
 
     function stopMusic() {
-        if (bgMusic) {
-            bgMusic.pause();
-            bgMusic.currentTime = 0;
+        if (audioSource) {
+            try { audioSource.stop(); } catch(e){}
+            audioSource.disconnect();
+            audioSource = null;
         }
     }
 
@@ -129,10 +160,7 @@
         gameStarted = false; // Spiel ist geladen, aber noch nicht gestartet
         isPaused = false;
         
-        if (bgMusic) {
-            bgMusic.pause();
-            bgMusic.currentTime = 0;
-        }
+        stopMusic();
         
         for (let i = -5; i < 20; i++) generateRow(i, i <= 3);
     }
@@ -206,9 +234,9 @@
             if (gameStarted && !isGameOver) {
                 isPaused = !isPaused;
                 if (isPaused) {
-                    if (bgMusic) bgMusic.pause();
+                    stopMusic();
                 } else {
-                    if (bgMusic) bgMusic.play().catch(err => console.log(err));
+                    playMusic();
                 }
             }
             return;
@@ -219,7 +247,7 @@
         if (isGameOver && validCodes.includes(keyCodeStr)) {
             resetGame();
             gameStarted = true;
-            if (bgMusic) bgMusic.play().catch(err => console.log("Autoplay:", err));
+            playMusic();
             return;
         }
 
@@ -228,14 +256,7 @@
             gameStarted = true;
             idleTime = 3.0; // Timer wird exakt jetzt auf 3 Sekunden gesetzt
             // Erst 200ms nach dem Start laden und abspielen, um den Hänger zu umgehen
-            setTimeout(() => {
-                if (!bgMusic) {
-                    bgMusic = new Audio('/static/crossy.mp3');
-                    bgMusic.loop = true;
-                    bgMusic.volume = 0.4;
-                }
-                bgMusic.play().catch(err => console.log("Autoplay:", err));
-            }, 200);
+            playMusic();
         }
         
 
@@ -509,7 +530,7 @@
 
     async function triggerGameOver() {
         isGameOver = true;
-        if (bgMusic) bgMusic.pause();
+        stopMusic();
         
         const messages = ["PLATSCH! 🍗", "Matsch! 🚗", "Blubb blubb... 💧", "Vom ICE erfasst! 🚄", "Zu langsam! ⏱️", "Chicken Nuggets! 🍟"];
         currentDeathMsg = messages[Math.floor(Math.random() * messages.length)];
