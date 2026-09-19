@@ -12,6 +12,58 @@
         .invite-box { background: #333; padding: 15px; border-radius: 8px; max-width: 500px; margin: 25px auto; border: 2px solid #ff2e63; text-align: left; }
         .invite-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; }
         .admin-box { margin-top: 40px; border-top: 2px dashed #555; padding-top: 20px; }
+
+        /* Zahnrad Einstellungen Icon oben rechts */
+        .settings-gear {
+            position: fixed;
+            top: 20px;
+            right: 25px;
+            font-size: 28px;
+            cursor: pointer;
+            color: #aaa;
+            background: none;
+            border: none;
+            transition: color 0.2s, transform 0.2s;
+            z-index: 1000;
+        }
+        .settings-gear:hover {
+            color: #00adb5;
+            transform: rotate(45deg);
+        }
+
+        /* Settings Modal Styling */
+        .settings-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.8);
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        .settings-box {
+            background: #2a2a2a;
+            border: 2px solid #00adb5;
+            padding: 30px;
+            border-radius: 12px;
+            width: 380px;
+            text-align: center;
+            color: white;
+            box-shadow: 0 0 20px rgba(0, 173, 181, 0.3);
+        }
+        .settings-box input {
+            width: 100%;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 6px;
+            padding: 10px;
+            box-sizing: border-box;
+            margin-top: 10px;
+            font-size: 16px;
+            text-align: center;
+        }
         
         /* Overlay-Styling */
         .overlay-container {
@@ -74,6 +126,25 @@
 </head>
 <body>
 
+    <!-- Einstellungen Zahnrad oben rechts -->
+    <button class="settings-gear" onclick="openSettingsModal()" title="Einstellungen">⚙️</button>
+
+    <!-- PIN Reset / Einstellungen Modal -->
+    <div id="settingsModal" class="settings-modal">
+        <div class="settings-box">
+            <h3 style="color: #ff2e63; margin-top: 0;">⚠️ PIN zurücksetzen</h3>
+            <p style="font-size: 14px; color: #ccc; margin: 15px 0; line-height: 1.4;">
+                Willst du das wirklich machen? Hier kannst du deinen Anmelde-PIN ändern. Bitte merke dir deinen neuen PIN gut!
+            </p>
+            <input type="password" id="newPin" placeholder="Neuer PIN (mind. 4 Zeichen)" maxlength="20">
+            <input type="password" id="confirmPin" placeholder="Neuer PIN bestätigen" maxlength="20">
+            <div style="margin-top: 20px; display: flex; justify-content: space-between; gap: 10px;">
+                <button onclick="closeSettingsModal()" class="btn" style="background: #555; padding: 10px 15px; font-size: 14px; margin:0; flex: 1;">Abbrechen</button>
+                <button onclick="submitPinChange()" class="btn" style="background: #27ae60; padding: 10px 15px; font-size: 14px; margin:0; flex: 1;">PIN ändern</button>
+            </div>
+        </div>
+    </div>
+    
     {% if zeige_spezial_nachricht %}
     <div id="special-overlay" class="overlay-container">
         <div class="overlay-content">
@@ -165,6 +236,50 @@
     <a href="/logout" style="color: #ff2e63; text-decoration: none; font-weight: bold;">Abmelden</a>
 
     <script>
+
+    // --- SETTINGS & PIN RESET MODAL STEUERUNG ---
+    function openSettingsModal() {
+        document.getElementById('settingsModal').style.display = 'flex';
+    }
+
+    function closeSettingsModal() {
+        document.getElementById('settingsModal').style.display = 'none';
+        document.getElementById('newPin').value = '';
+        document.getElementById('confirmPin').value = '';
+    }
+
+    async function submitPinChange() {
+        const newPin = document.getElementById('newPin').value.trim();
+        const confirmPin = document.getElementById('confirmPin').value.trim();
+
+        if (!newPin || newPin.length < 4) {
+            alert("Der neue PIN muss mindestens 4 Zeichen lang sein!");
+            return;
+        }
+        if (newPin !== confirmPin) {
+            alert("Die beiden PINs stimmen nicht überein!");
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/change-pin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ new_pin: newPin, confirm_pin: confirmPin })
+            });
+            const data = await response.json();
+            if (response.ok) {
+                alert("Dein PIN wurde erfolgreich geändert!");
+                closeSettingsModal();
+            } else {
+                alert(data.error || "Fehler beim Ändern des PINs.");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Verbindungsfehler.");
+        }
+    }
+        
     // --- FEEDBACK MODAL STEUERUNG ---
     function openFeedbackModal() {
         document.getElementById('feedbackModal').style.display = 'flex';
