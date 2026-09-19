@@ -212,9 +212,42 @@
         const fullscreenLink = document.getElementById('fullscreenLink');
         const gameContainer = document.querySelector('.game-container');
 
-        const bgMusic = new Audio('/static/flappy_bird.mp3');
-        bgMusic.loop = true;
-        bgMusic.volume = 0.4;
+       // Hintergrundmusik einrichten (WEB AUDIO API)
+        let audioCtx = null;
+        let audioBuffer = null;
+        let audioSource = null;
+
+        async function playMusic() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+            if (!audioBuffer) {
+                try {
+                    let response = await fetch('/static/flappy_bird.mp3');
+                    let arrayBuffer = await response.arrayBuffer();
+                    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                } catch (e) { console.error("Audio Fehler:", e); return; }
+            }
+
+            if (!audioSource && gameActive && !gamePaused && !gameOver) {
+                audioSource = audioCtx.createBufferSource();
+                audioSource.buffer = audioBuffer;
+                audioSource.loop = true;
+                let gainNode = audioCtx.createGain();
+                gainNode.gain.value = 0.4;
+                audioSource.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                audioSource.start();
+            }
+        }
+
+        function stopMusic() {
+            if (audioSource) {
+                try { audioSource.stop(); } catch(e){}
+                audioSource.disconnect();
+                audioSource = null;
+            }
+        }
 
         let reloadTimeout = null;
         let runId = 0; // WICHTIG: Verhindert verspätetes Neuladen, wenn der Spieler schon neu gestartet hat
@@ -419,8 +452,7 @@
         function triggerGameOver() {
             gameOver = true;
             gameActive = false;
-            bgMusic.pause();
-            bgMusic.currentTime = 0;
+            stopMusic();
             sessionStorage.removeItem('flappyState');
             
             runId++; // Erhöht die ID, um alte Timeouts zu ignorieren
@@ -428,6 +460,7 @@
         }
 
         function resetGame() {
+            stopMusic();
             runId++; // Falls noch ein Neuladen aussteht, wird es hiermit entwertet
             if (reloadTimeout) {
                 clearTimeout(reloadTimeout);
@@ -452,10 +485,10 @@
             }
             gamePaused = !gamePaused;
             if (gamePaused) {
-                bgMusic.pause();
+                stopMusic();
                 saveGameState();
             } else {
-                bgMusic.play().catch(e => console.log(e));
+                playMusic();
             }
         }
 
@@ -464,11 +497,11 @@
                 resetGame(); // Nach dem Tod führt der erste Klick nur zum "Bereit"-Bildschirm
             } else if (gamePaused) {
                 gamePaused = false;
-                bgMusic.play().catch(e => console.log(e));
+                playMusic();
             } else if (!gameActive) {
                 gameActive = true;
                 birdVelocity = jump; // Jetzt springt er direkt los!
-                bgMusic.play().catch(e => console.log("Audio-Autoplay verhindert:", e));
+                playMusic();
             } else {
                 birdVelocity = jump;
             }
