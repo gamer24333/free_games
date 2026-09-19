@@ -85,6 +85,7 @@ class GameScore(db.Model):
     crossy = db.Column(db.Integer, default=0)
     doodle = db.Column(db.Integer, default=0)
     brickbreaker = db.Column(db.Integer, default=0)
+    speedtyping = db.Column(db.Integer, default=0)
 
 class TicTacToeGame(db.Model):
     __tablename__ = 'tictactoe_games'
