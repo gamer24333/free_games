@@ -95,13 +95,41 @@
         const fullscreenLink = document.getElementById('fullscreenLink');
         
         // --- MUSIK EINBINDEN ---
-        const bgMusic = new Audio('/static/doodle.mp3');
-        bgMusic.loop = true;
-        bgMusic.volume = 0.4;
-        
+        // --- MUSIK EINBINDEN (WEB AUDIO API) ---
+        let audioCtx = null;
+        let audioBuffer = null;
+        let audioSource = null;
+
+        async function playMusic() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+            if (!audioBuffer) {
+                try {
+                    let response = await fetch('/static/doodle.mp3');
+                    let arrayBuffer = await response.arrayBuffer();
+                    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                } catch (e) { console.error("Audio Fehler:", e); return; }
+            }
+
+            if (!audioSource && gameStarted && !isPaused && !isGameOver) {
+                audioSource = audioCtx.createBufferSource();
+                audioSource.buffer = audioBuffer;
+                audioSource.loop = true;
+                let gainNode = audioCtx.createGain();
+                gainNode.gain.value = 0.4;
+                audioSource.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                audioSource.start();
+            }
+        }
+
         function stopMusic() {
-            bgMusic.pause();
-            bgMusic.currentTime = 0;
+            if (audioSource) {
+                try { audioSource.stop(); } catch(e){}
+                audioSource.disconnect();
+                audioSource = null;
+            }
         }
 
         let player, platforms, springs, monsters;
@@ -114,8 +142,7 @@
         const SPRING_POWER = -15;
 
         function resetGame() {
-            bgMusic.pause();
-            bgMusic.currentTime = 0;
+            stopMusic();
             player = { x: 200, y: 400, w: 30, h: 30, dx: 0, dy: 0 };
             platforms = [];
             springs = [];
@@ -172,11 +199,11 @@
         // Steuerung
         window.addEventListener('keydown', e => {
             const k = e.key.toLowerCase();
-            if (['a', 'arrowleft'].includes(k)) { leftPressed = true; gameStarted = true; }
-            if (['d', 'arrowright'].includes(k)) { rightPressed = true; gameStarted = true; }
+            if (['a', 'arrowleft'].includes(k)) { leftPressed = true; gameStarted = true; playMusic(); }
+            if (['d', 'arrowright'].includes(k)) { rightPressed = true; gameStarted = true; playMusic(); }
             if ([' '].includes(k)) { 
                 gameStarted = true;
-                bgMusic.play().catch(err => console.log("Autoplay:", err));
+                playMusic();
             }
             
             if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); return; }
@@ -185,18 +212,18 @@
             }
             
             if (isPaused) { 
-                bgMusic.pause(); 
-            } else { 
-                bgMusic.play().catch(err => console.log(err)); 
+                stopMusic(); 
+            } else if (gameStarted && !isGameOver) { 
+                playMusic(); 
             }
             
             if (isGameOver && ['a','d','arrowleft','arrowright',' '].includes(k)) {
-                bgMusic.play().catch(err => console.log("Autoplay:", err));
                 resetGame();
                 gameStarted = true;
+                playMusic();
             }
         });
-
+        
         window.addEventListener('keyup', e => {
             const k = e.key.toLowerCase();
             if (['a', 'arrowleft'].includes(k)) leftPressed = false;
@@ -403,7 +430,7 @@
         }
 
         async function triggerGameOver() {
-            bgMusic.pause();
+            stopMusic();
             isGameOver = true;
             try {
                 await fetch('/api/submit-doodle', {
