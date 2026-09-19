@@ -49,7 +49,7 @@ class AdminMessage(db.Model):
     target = db.Column(db.String(50), nullable=False) # 'alle' oder einzelner Name
     title = db.Column(db.String(100), nullable=False)
     message = db.Column(db.Text, nullable=False)
-    banned_until = db.Column(db.DateTime, nullable=True)
+    
 
 class UserSetting(db.Model):
     __tablename__ = 'user_settings'
@@ -57,6 +57,7 @@ class UserSetting(db.Model):
     pin = db.Column(db.String(20), nullable=True)
     is_admin = db.Column(db.Boolean, default=False)
     last_seen = db.Column(db.DateTime, nullable=True)
+    banned_until = db.Column(db.DateTime, nullable=True)
     
 
 class ChatMessage(db.Model):
