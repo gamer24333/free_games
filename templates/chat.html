@@ -382,21 +382,22 @@
 
                 if (stats.online_users) {
                     document.querySelectorAll('.partner-btn').forEach(btn => {
-                        const partnerName = btn.getAttribute('data-partner');
-                        const dot = document.getElementById(`status-${partnerName}`);
-                        const activitySpan = document.getElementById(`activity-${partnerName}`);
-                        if (dot) {
-                            if (stats.online_users.includes(partnerName)) {
-                                dot.classList.add('online');
-                                if (activitySpan && stats.user_activities && stats.user_activities[partnerName]) {
-                                    activitySpan.textContent = stats.user_activities[partnerName];
+                            const partnerName = btn.getAttribute('data-partner');
+                            const dot = document.getElementById(`status-${partnerName}`);
+                            const activitySpan = document.getElementById(`activity-${partnerName}`);
+                            if (dot) {
+                                if (stats.online_users.includes(partnerName)) {
+                                    dot.classList.add('online');
+                                    if (activitySpan && stats.user_activities && stats.user_activities[partnerName]) {
+                                        activitySpan.textContent = stats.user_activities[partnerName];
+                                    }
+                                } else {
+                                    dot.classList.remove('online');
+                                    if (activitySpan) {
+                                        activitySpan.textContent = "Offline";
                                 }
-                            } else {
-                                dot.classList.remove('online');
-                                if (activitySpan) {
-                                    activitySpan.textContent = "Offline";
                             }
-                        }
+                        }                   
                     });
                 }
             }
