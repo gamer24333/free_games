@@ -81,6 +81,7 @@ class GameScore(db.Model):
     snake = db.Column(db.Integer, default=0)
     crossy = db.Column(db.Integer, default=0)
     doodle = db.Column(db.Integer, default=0)
+    brickbreaker = db.Column(db.Integer, default=0)
 
 class TicTacToeGame(db.Model):
     __tablename__ = 'tictactoe_games'
@@ -1091,6 +1092,40 @@ def submit_doodle():
         current_best = user_score.doodle if user_score.doodle is not None else 0
         if score > current_best:
             user_score.doodle = score
+            
+    db.session.commit()
+    return {"status": "success"}
+
+# --- BRICK BREAKER ---
+@app.route('/brickbreaker')
+def brickbreaker_game():
+    if 'username' not in session: return redirect(url_for('login'))
+    
+    all_scores = GameScore.query.all()
+    # Auslesen der Highscores (falls noch kein Eintrag, dann 0)
+    scores_dict = {s.username: (s.brickbreaker if hasattr(s, 'brickbreaker') and s.brickbreaker is not None else 0) for s in all_scores}
+    
+    leaderboard_data = [(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE]
+    leaderboard = sorted(leaderboard_data, key=lambda x: x[1], reverse=True)
+    return render_template('brickbreaker.html', leaderboard=leaderboard)
+
+@app.route('/api/submit-brickbreaker', methods=['POST'])
+def submit_brickbreaker():
+    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
+    score = int(request.json.get('score', 0))
+    current_user = session['username']
+    
+    user_score = GameScore.query.filter_by(username=current_user).first()
+    if not user_score:
+        user_score = GameScore(username=current_user, brickbreaker=score)
+        db.session.add(user_score)
+    else:
+        # Falls die Spalte neu ist und None enthält, fangen wir das hier ab
+        current_best = getattr(user_score, 'brickbreaker', 0)
+        if current_best is None: current_best = 0
+            
+        if score > current_best:
+            user_score.brickbreaker = score
             
     db.session.commit()
     return {"status": "success"}
