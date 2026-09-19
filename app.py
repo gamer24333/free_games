@@ -179,6 +179,8 @@ def ping_user():
         return {"status": "success"}
     return {"error": "Unauthorized"}, 401
 
+
+
 @app.route('/api/dashboard-stats')
 def dashboard_stats():
     if 'username' in session: 
@@ -292,6 +294,31 @@ def dashboard():
                            spezial_titel=spezial_titel,
                            spezial_text=spezial_text)
 
+
+# --- PIN ZURÜCKSETZEN ---
+@app.route('/api/change-pin', methods=['POST'])
+def change_pin():
+    if 'username' not in session:
+        return {"error": "Nicht autorisiert"}, 401
+    
+    data = request.get_json(silent=True) or {}
+    new_pin = str(data.get('new_pin', '')).strip()
+    confirm_pin = str(data.get('confirm_pin', '')).strip()
+    
+    if not new_pin or len(new_pin) < 4:
+        return {"error": "Der neue PIN muss mindestens 4 Zeichen lang sein!"}, 400
+    
+    if new_pin != confirm_pin:
+        return {"error": "Die beiden PINs stimmen nicht überein!"}, 400
+        
+    current_user = session['username']
+    user = UserSetting.query.filter_by(username=current_user).first()
+    if user:
+        user.pin = new_pin
+        db.session.commit()
+        return {"status": "success"}
+    
+    return {"error": "Nutzer nicht gefunden"}, 404
 
 # --- ADMIN PANEL ---
 @app.route('/admin')
