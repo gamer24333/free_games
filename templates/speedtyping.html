@@ -78,7 +78,10 @@
     <div class="top-bar">
         <a href="/games" class="btn" style="background: #555;">Zurück</a>
         <h1>⌨️ Speed Typing</h1>
-        <button class="btn" id="fullscreen-btn" onclick="toggleFullscreen()">📺 Vollbild</button>
+        <div>
+            <button class="btn" id="music-btn" onclick="toggleMusic()" style="background: #9b59b6; margin-right: 10px;">🔊 Musik an</button>
+            <button class="btn" id="fullscreen-btn" onclick="toggleFullscreen()">📺 Vollbild</button>
+        </div>
     </div>
     
     <div class="main-wrapper">
@@ -111,6 +114,68 @@
     </div>
 
     <script>
+        // --- WEB AUDIO API (MUSIK) ---
+        let audioCtx;
+        let audioBuffer;
+        let bgmSource;
+        let gainNode;
+        let isMusicEnabled = true;
+
+        async function initAudio() {
+            try {
+                window.AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                gainNode = audioCtx.createGain();
+                gainNode.gain.value = 0.4; // Lautstärke auf 40%
+                gainNode.connect(audioCtx.destination);
+
+                const response = await fetch('/static/speedtyping.mp3');
+                const arrayBuffer = await response.arrayBuffer();
+                audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+            } catch (err) {
+                console.error("Fehler beim Laden der Musik:", err);
+            }
+        }
+
+        function playMusic() {
+            if (!audioCtx || !audioBuffer || !isMusicEnabled) return;
+            
+            // Verhindert Blockaden durch Browser-Richtlinien
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            if (bgmSource) bgmSource.stop(); // Falls schon was läuft, stoppen
+            
+            bgmSource = audioCtx.createBufferSource();
+            bgmSource.buffer = audioBuffer;
+            bgmSource.loop = true; // Musik wiederholen, falls sie kürzer als 60s ist
+            bgmSource.connect(gainNode);
+            bgmSource.start();
+        }
+
+        function stopMusic() {
+            if (bgmSource) {
+                bgmSource.stop();
+                bgmSource = null;
+            }
+        }
+
+        function toggleMusic() {
+            isMusicEnabled = !isMusicEnabled;
+            const btn = document.getElementById("music-btn");
+            if (isMusicEnabled) {
+                btn.textContent = "🔊 Musik an";
+                if (isPlaying) playMusic(); // Startet Musik direkt, falls man mitten im Spiel ist
+            } else {
+                btn.textContent = "🔇 Musik aus";
+                stopMusic();
+            }
+            btn.blur(); // Fokus entfernen, damit die Leertaste nicht den Button drückt
+        }
+
+        // --- SPIEL LOGIK ---
         const wordPool = [
             "haus", "schule", "lernen", "freunde", "computer", "spielen", "laufen", "wasser", "sonne", "mond",
             "klasse", "lehrer", "pause", "essen", "trinken", "auto", "fahrrad", "musik", "film", "buch",
@@ -178,6 +243,9 @@
         function startGame() {
             if (isPlaying) return;
             isPlaying = true;
+            
+            playMusic(); // <-- MUSIK STARTET HIER
+            
             timerInterval = setInterval(() => {
                 timeLeft--;
                 timerDisplay.textContent = timeLeft + "s";
@@ -200,6 +268,8 @@
             isPlaying = false;
             input.disabled = true;
             
+            stopMusic(); // <-- MUSIK STOPPT HIER
+            
             const wpm = correctWords;
             timerDisplay.innerHTML = `<span style="font-size: 32px;">Fertig!</span>`;
             liveWpmDisplay.innerHTML = `${wpm} <span style="font-size: 20px;">WPM</span>`;
@@ -211,12 +281,12 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ score: wpm })
                 }).then(() => {
-                    setTimeout(() => location.reload(), 2500); 
+                    setTimeout(() => location.reload(), 3000); 
                 });
             }
         }
 
-        // Leertaste abfangen & prüfen über keydown (Behebt den Scroll-Bug komplett)
+        // Leertaste abfangen & prüfen über keydown (Behebt den Scroll-Bug)
         input.addEventListener('keydown', (e) => {
             if (e.key === ' ') {
                 e.preventDefault(); 
@@ -285,6 +355,7 @@
                 document.exitFullscreen()
                     .then(() => document.getElementById("fullscreen-btn").textContent = "📺 Vollbild");
             }
+            document.getElementById("fullscreen-btn").blur(); // Fokus entfernen
         }
 
         // F-Taste für Vollbild (ignoriert, solange das Input-Feld fokussiert ist)
@@ -295,6 +366,8 @@
             }
         });
 
+        // Audio initialisieren, sobald die Seite geladen ist
+        window.addEventListener('DOMContentLoaded', initAudio);
         initGame();
     </script>
 </body>
