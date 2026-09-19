@@ -380,7 +380,7 @@
             runId++;
             
             try {
-                const response = await fetch('/api/submit-score', {
+                const response = await fetch('/api/submit-brickbreaker', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ score: score })
