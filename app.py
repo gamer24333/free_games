@@ -49,6 +49,7 @@ class AdminMessage(db.Model):
     target = db.Column(db.String(50), nullable=False) # 'alle' oder einzelner Name
     title = db.Column(db.String(100), nullable=False)
     message = db.Column(db.Text, nullable=False)
+    banned_until = db.Column(db.DateTime, nullable=True)
 
 class UserSetting(db.Model):
     __tablename__ = 'user_settings'
@@ -56,6 +57,7 @@ class UserSetting(db.Model):
     pin = db.Column(db.String(20), nullable=True)
     is_admin = db.Column(db.Boolean, default=False)
     last_seen = db.Column(db.DateTime, nullable=True)
+    
 
 class ChatMessage(db.Model):
     __tablename__ = 'chat_messages'
@@ -133,6 +135,27 @@ def update_last_seen():
             db.session.commit()
         # 2. Update im RAM (für schnelle Live-Status Abfragen)
         last_active[current_user] = datetime.now()
+
+
+@app.before_request
+def check_if_banned():
+    if request.endpoint in ['login', 'static']:
+        return
+    if 'username' in session:
+        user = UserSetting.query.filter_by(username=session['username']).first()
+        if user and user.banned_until:
+            if user.banned_until > datetime.utcnow():
+                session.pop('username', None)
+                return f"""
+                <div style='background:#222; color:white; font-family:sans-serif; text-align:center; padding-top:100px;'>
+                    <h1 style='color:#ff2e63;'>🚫 DU WURDEST GEBANNT!</h1>
+                    <p>Dein Zugang wurde gesperrt.</p>
+                    <a href='/login' style='color:#00adb5;'>Zurück zum Login</a>
+                </div>
+                """, 403
+            else:
+                user.banned_until = None
+                db.session.commit()
 
 
 @app.route('/')
@@ -283,8 +306,17 @@ def admin_panel():
     all_users = UserSetting.query.all()
     pins_dict = {u.username: u.pin for u in all_users if u.pin}
     admins_list = get_admins_list()
-        
-    return render_template('admin.html', pins=pins_dict, admins=admins_list, klassen_liste=KLASSEN_LISTE)
+
+    
+    banned_users = {}
+    for u in all_users:
+        if u.banned_until and u.banned_until > datetime.utcnow():
+            if u.banned_until.year > 2090:
+                banned_users[u.username] = "Permanent (Für immer)"
+            else:
+                banned_users[u.username] = u.banned_until.strftime("%d.%m.%Y - %H:%M Uhr")
+    
+    return render_template('admin.html', pins=pins_dict, admins=admins_list, klassen_liste=KLASSEN_LISTE, banned_users=banned_users,)
 
 @app.route('/admin/make-admin', methods=['POST'])
 def make_admin():
@@ -346,6 +378,52 @@ def admin_clear_chat():
     db.session.add(system_msg)
     db.session.commit()
     
+    return redirect(url_for('admin_panel'))
+
+# NEU: Route zum Bannen von Usern
+@app.route('/admin/ban', methods=['POST'])
+def admin_ban():
+    if 'username' not in session: return "403", 403
+    me = session['username']
+    user = UserSetting.query.filter_by(username=me).first()
+    if not (me == "Till" or (user and user.is_admin)): return "403", 403
+    
+    schueler = request.form.get('schueler')
+    dauer = request.form.get('dauer')
+    
+    if schueler and schueler != "Till":
+        target_user = UserSetting.query.filter_by(username=schueler).first()
+        if not target_user:
+            target_user = UserSetting(username=schueler)
+            db.session.add(target_user)
+            
+        now = datetime.utcnow()
+        if dauer == "1h":
+            target_user.banned_until = now + timedelta(hours=1)
+        elif dauer == "1d":
+            target_user.banned_until = now + timedelta(days=1)
+        elif dauer == "1w":
+            target_user.banned_until = now + timedelta(weeks=1)
+        elif dauer == "perm":
+            target_user.banned_until = now + timedelta(days=36500) # 100 Jahre
+            
+        db.session.commit()
+        
+    return redirect(url_for('admin_panel'))
+
+# NEU: Route zum Entbannen von Usern
+@app.route('/admin/unban/<schueler>', methods=['POST'])
+def admin_unban(schueler):
+    if 'username' not in session: return "403", 403
+    me = session['username']
+    user = UserSetting.query.filter_by(username=me).first()
+    if not (me == "Till" or (user and user.is_admin)): return "403", 403
+    
+    target_user = UserSetting.query.filter_by(username=schueler).first()
+    if target_user:
+        target_user.banned_until = None
+        db.session.commit()
+        
     return redirect(url_for('admin_panel'))
 
 # --- FEEDBACK SYSTEM ---
