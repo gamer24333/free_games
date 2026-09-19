@@ -6,7 +6,9 @@
     <title>Neon Brick Breaker - Endless</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1a2e; color: white; margin: 0; padding-top: 20px;}
-        .game-layout { display: flex; justify-content: center; gap: 20px; max-width: 1100px; margin: 0 auto; padding: 10px; flex-wrap: wrap; }
+        
+        /* Layout-Änderung: flex-direction: column zwingt die Rangliste IMMER unter das Spiel */
+        .game-layout { display: flex; flex-direction: column; align-items: center; gap: 20px; max-width: 1100px; margin: 0 auto; padding: 10px; }
         
         .btn-back { display: inline-block; padding: 10px 20px; background: #16213e; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-bottom: 15px; border: 1px solid #0f3460;}
         .btn-back:hover { background: #0f3460; }
@@ -18,10 +20,11 @@
             border-radius: 8px;
             display: inline-block;
             box-shadow: 0 0 20px rgba(233, 69, 96, 0.4);
+            transition: border-color 0.3s;
         }
         canvas { display: block; background-color: #0f3460; max-width: 100%; border-radius: 4px; cursor: none; }
         
-        .leaderboard-box { background: #16213e; border: 2px solid #0f3460; border-radius: 8px; width: 280px; padding: 15px; text-align: left; box-sizing: border-box;}
+        .leaderboard-box { background: #16213e; border: 2px solid #0f3460; border-radius: 8px; width: 400px; max-width: 100%; padding: 15px; text-align: left; box-sizing: border-box;}
         .leaderboard-table { width: 100%; border-collapse: collapse; }
         .leaderboard-table th, .leaderboard-table td { padding: 8px; border-bottom: 1px solid #0f3460; }
         .leaderboard-table th { color: #e94560; }
@@ -58,16 +61,16 @@
                 <button id="fullscreenBtn" class="fullscreen-toggle-btn" onclick="toggleFullscreen()">📺 Vollbildmodus</button>
             </div>
             <canvas id="gameCanvas" width="800" height="600"></canvas>
-            <p style="margin: 10px 0; color: #ccc;"><b>Maus</b> oder <b>A/D</b> zum Bewegen. <b>Klick/Leertaste</b> zum Starten.</p>
+            <p style="margin: 10px 0; color: #ccc;"><b>Maus</b> oder <b>A/D</b> zum Bewegen. <b>Klick/Leertaste</b> zum Starten.<br><b>P / ESC</b> für Pause.</p>
             <div style="display:flex; justify-content: center; gap: 15px; font-size: 14px; margin-bottom: 10px;">
                 <span style="color:#39ff14;">🟩 Normal (+10)</span>
                 <span style="color:#f39c12;">🟧 Hart (+20)</span>
-                <span style="color:#e74c3c;">🟥 Falle (-30 & Ball wird irre)</span>
+                <span style="color:#ff4500;">🟥 Feuer-Power (Ball durchschlägt alles!)</span>
             </div>
         </div>
         
         <div class="leaderboard-box">
-            <h3 style="margin-top: 0; color: #e94560;">🏆 Rangliste</h3>
+            <h3 style="margin-top: 0; color: #e94560; text-align: center;">🏆 Rangliste</h3>
             <table class="leaderboard-table">
                 <thead><tr><th>Platz</th><th>Name</th><th>Score</th></tr></thead>
                 <tbody>
@@ -96,7 +99,7 @@
             if (audioCtx.state === 'suspended') await audioCtx.resume();
             if (!audioBuffer) {
                 try {
-                    let response = await fetch('/static/brick_breaker.mp3'); // Sound anpassen!
+                    let response = await fetch('/static/brickbreaker.mp3'); 
                     let arrayBuffer = await response.arrayBuffer();
                     audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                 } catch (e) { console.error("Audio Fehler:", e); return; }
@@ -128,10 +131,10 @@
         let isPaused = false;
         let runId = 0;
         let rowSpawnTimer = 0;
-        let baseSpawnRate = 600; // Frames bis neue Reihe kommt (ca. 10 Sekunden)
+        let baseSpawnRate = 600; // Frames bis neue Reihe kommt
 
         const paddle = { x: 350, y: 550, w: 120, h: 15, dx: 7 };
-        const ball = { x: 400, y: 535, radius: 8, dx: 0, dy: 0, baseSpeed: 5.5, currentSpeed: 5.5, frenzyTimer: 0 };
+        const ball = { x: 400, y: 535, radius: 8, dx: 0, dy: 0, baseSpeed: 5.5, currentSpeed: 5.5, fireballTimer: 0 };
         
         let bricks = [];
         const brickConfig = { rows: 4, cols: 9, w: 75, h: 25, padding: 10, offsetTop: 50, offsetLeft: 22 };
@@ -147,7 +150,7 @@
                 let type = 'normal'; // Grün
                 let hp = 1;
 
-                if (rand > 0.85) { type = 'bad'; hp = 1; } // Rot (Falle)
+                if (rand > 0.90) { type = 'bad'; hp = 1; } // Rot (Feuer-Powerup)
                 else if (rand > 0.60) { type = 'hard'; hp = 2; } // Orange (2 Hits)
 
                 let brickX = (c * (brickConfig.w + brickConfig.padding)) + brickConfig.offsetLeft;
@@ -157,9 +160,7 @@
         }
 
         function shiftAndSpawnRow() {
-            // Alle bestehenden Blöcke nach unten schieben
             bricks.forEach(b => b.y += brickConfig.h + brickConfig.padding);
-            // Neue Reihe ganz oben einfügen
             bricks = bricks.concat(generateRow(brickConfig.offsetTop));
         }
 
@@ -172,7 +173,7 @@
 
         // --- STEUERUNG ---
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' || e.key === 'p') { togglePause(); return; }
+            if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') { togglePause(); return; }
             if (e.key === 'a' || e.key === 'ArrowLeft') leftPressed = true;
             if (e.key === 'd' || e.key === 'ArrowRight') rightPressed = true;
             if (e.key === ' ' || e.key === 'Enter') startGame();
@@ -208,21 +209,16 @@
 
         // --- KOLLISION & PHYSIK ---
         function updatePhysics() {
-            // Paddle Bewegung (Tastatur)
             if (leftPressed && paddle.x > 0) paddle.x -= paddle.dx;
             if (rightPressed && paddle.x + paddle.w < canvas.width) paddle.x += paddle.dx;
 
-            // Frenzy Modus (Schneller Ball durch Falle)
-            if (ball.frenzyTimer > 0) {
-                ball.frenzyTimer--;
-                if (ball.frenzyTimer <= 0) {
-                    ball.currentSpeed = ball.baseSpeed + (score * 0.005); // Geschwindigkeit normalisiert sich
-                    normalizeBallVelocity();
-                }
-            } else {
-                ball.currentSpeed = ball.baseSpeed + (score * 0.005); // Ball wird minimal schneller je höher der Score
-                normalizeBallVelocity();
+            // Feuerball Timer verwalten
+            if (ball.fireballTimer > 0) {
+                ball.fireballTimer--;
             }
+            
+            ball.currentSpeed = ball.baseSpeed + (score * 0.003); // Minimal schneller über Zeit
+            normalizeBallVelocity();
 
             ball.x += ball.dx;
             ball.y += ball.dy;
@@ -231,7 +227,7 @@
             if (ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) ball.dx = -ball.dx;
             if (ball.y - ball.radius < 0) ball.dy = -ball.dy;
 
-            // Game Over (Boden berührt)
+            // Game Over
             if (ball.y + ball.radius > canvas.height) {
                 triggerGameOver();
             }
@@ -241,54 +237,60 @@
                 ball.x > paddle.x && ball.x < paddle.x + paddle.w) {
                 ball.dy = -Math.abs(ball.dy);
                 
-                // Winkel ändern je nachdem, wo der Ball das Paddle trifft
                 let hitPoint = ball.x - (paddle.x + paddle.w / 2);
                 ball.dx = hitPoint * 0.15;
                 normalizeBallVelocity();
             }
 
-            // Block Kollision (rückwärts iterieren um sicher zu löschen)
+            // Block Kollision
             for (let i = bricks.length - 1; i >= 0; i--) {
                 let b = bricks[i];
                 if (ball.x + ball.radius > b.x && ball.x - ball.radius < b.x + b.w &&
                     ball.y + ball.radius > b.y && ball.y - ball.radius < b.y + b.h) {
                     
-                    ball.dy = -ball.dy; // Einfacher Bounce
-                    b.hp--;
+                    // Feuerball-Mechanik: Prallt nicht ab, sondern durchschlägt!
+                    if (ball.fireballTimer <= 0) {
+                        ball.dy = -ball.dy; // Normaler Bounce
+                        b.hp--;
+                    } else {
+                        b.hp = 0; // Zerstört sofort alles
+                    }
 
                     if (b.hp <= 0) {
                         if (b.type === 'normal') score += 10;
                         else if (b.type === 'hard') score += 20;
                         else if (b.type === 'bad') {
-                            score = Math.max(0, score - 30);
-                            triggerFrenzy(); // Ball rast aus!
+                            score += 30; // Gute Belohnung!
+                            triggerFireball(); // Aktiviert den Feuerball
                         }
                         bricks.splice(i, 1);
                     }
-                    break; // Nur einen Block pro Frame treffen (verhindert Bugs)
+                    
+                    // Verhindert mehrfache Abpraller im gleichen Frame, ABER lässt den Feuerball durchfliegen
+                    if (ball.fireballTimer <= 0) break; 
                 }
             }
 
-            // Endless Mechanik: Neue Reihe nach Timer
+            // Endless Spawner
             rowSpawnTimer++;
-            let currentSpawnRate = Math.max(250, baseSpawnRate - (score * 0.2)); // Spawnt immer schneller
+            let currentSpawnRate = Math.max(250, baseSpawnRate - (score * 0.15));
             if (rowSpawnTimer > currentSpawnRate) {
                 shiftAndSpawnRow();
                 rowSpawnTimer = 0;
             }
 
-            // Tod durch zerquetschte Blöcke (Wenn Blöcke das Paddle erreichen)
+            // Tod durch zerquetschte Blöcke
             bricks.forEach(b => {
                 if (b.y + b.h >= paddle.y) triggerGameOver();
             });
         }
 
-        function triggerFrenzy() {
-            ball.frenzyTimer = 300; // 5 Sekunden Frenzy
-            ball.currentSpeed = ball.baseSpeed * 1.8;
-            normalizeBallVelocity();
-            document.getElementById('gameWrapper').style.borderColor = "#e74c3c"; // Roter Rahmen als Warnung
-            setTimeout(() => { document.getElementById('gameWrapper').style.borderColor = "#e94560"; }, 5000);
+        function triggerFireball() {
+            ball.fireballTimer = 300; // 5 Sekunden lang Feuerball
+            document.getElementById('gameWrapper').style.borderColor = "#ff4500"; 
+            setTimeout(() => { 
+                if(ball.fireballTimer <= 0) document.getElementById('gameWrapper').style.borderColor = "#e94560"; 
+            }, 5000);
         }
 
         function normalizeBallVelocity() {
@@ -313,9 +315,9 @@
             ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
             ctx.shadowBlur = 0;
 
-            // Ball
-            ctx.fillStyle = ball.frenzyTimer > 0 ? '#e74c3c' : '#00adb5';
-            ctx.shadowBlur = ball.frenzyTimer > 0 ? 20 : 10;
+            // Ball (Farbe ändert sich bei Feuerball)
+            ctx.fillStyle = ball.fireballTimer > 0 ? '#ff4500' : '#00adb5';
+            ctx.shadowBlur = ball.fireballTimer > 0 ? 25 : 10;
             ctx.shadowColor = ctx.fillStyle;
             ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI*2); ctx.fill();
             ctx.shadowBlur = 0;
@@ -324,7 +326,7 @@
             bricks.forEach(b => {
                 if (b.type === 'normal') { ctx.fillStyle = '#39ff14'; ctx.shadowColor = '#39ff14'; }
                 else if (b.type === 'hard') { ctx.fillStyle = b.hp === 2 ? '#f39c12' : '#f1c40f'; ctx.shadowColor = '#f39c12'; }
-                else if (b.type === 'bad') { ctx.fillStyle = '#e74c3c'; ctx.shadowColor = '#c0392b'; }
+                else if (b.type === 'bad') { ctx.fillStyle = '#ff4500'; ctx.shadowColor = '#c0392b'; }
 
                 ctx.shadowBlur = 5;
                 if (ctx.roundRect) {
@@ -341,9 +343,9 @@
             ctx.fillStyle = '#fff'; ctx.font = 'bold 20px Arial';
             ctx.fillText(`Score: ${score}`, 15, 30);
             
-            if (ball.frenzyTimer > 0) {
-                ctx.fillStyle = '#e74c3c'; ctx.font = 'bold 20px Arial';
-                ctx.fillText(`FRENZY!`, canvas.width / 2 - 40, 30);
+            if (ball.fireballTimer > 0) {
+                ctx.fillStyle = '#ff4500'; ctx.font = 'bold 22px Arial';
+                ctx.fillText(`🔥 FEUERBALL! 🔥`, canvas.width / 2 - 90, 30);
             }
 
             if (!gameStarted && !isGameOver) {
@@ -400,11 +402,12 @@
             runId++;
             score = 0;
             rowSpawnTimer = 0;
-            ball.x = 400; ball.y = 535; ball.dx = 0; ball.dy = 0; ball.currentSpeed = ball.baseSpeed; ball.frenzyTimer = 0;
+            ball.x = 400; ball.y = 535; ball.dx = 0; ball.dy = 0; ball.currentSpeed = ball.baseSpeed; ball.fireballTimer = 0;
             paddle.x = 350;
             initBricks();
             isGameOver = false;
             gameStarted = false;
+            document.getElementById('gameWrapper').style.borderColor = "#e94560";
             stopMusic();
         }
 
