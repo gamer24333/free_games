@@ -8,13 +8,13 @@
         .btn { display: inline-block; padding: 10px 20px; background: #555; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; }
         .btn:hover { background: #444; }
         .container { max-width: 600px; margin: 0 auto; background: #333; padding: 20px; border-radius: 12px; text-align: left; }
-        .danger-btn { background: #ff2e63; }
+        .danger-btn { background: #ff2e63; color: white; }
         .danger-btn:hover { background: #cc244f; }
         .success-btn { background: #2ecc71; color: white; }
         .success-btn:hover { background: #27ae60; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { padding: 10px; border-bottom: 1px solid #444; }
-        select { padding: 8px; background: #222; color: white; border: 1px solid #555; border-radius: 6px; font-size: 14px; }
+        select, input { padding: 8px; background: #222; color: white; border: 1px solid #555; border-radius: 6px; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -53,7 +53,7 @@
                                 <button type="submit" class="btn danger-btn" style="padding: 5px 10px; font-size: 12px;">Rechte entziehen ❌</button>
                             </form>
                         {% else %}
-                            <span style="color: #00adb5; font-size: 13px; font-style: italic;">Haupt-Admin</span>
+                            <span style="color: #00adb5; font-size: 13px; font-style: italic;">Haupt-Admin (Unantastbar)</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -63,10 +63,57 @@
 
         <hr style="border: 0; border-top: 1px solid #444; margin: 25px 0;">
 
+        <!-- NEU: BANN SYSTEM -->
+        <h3>🚫 Bann-Verwaltung (Ban-Hammer)</h3>
+        <p style="color: #aaa; font-size: 14px;">Schließe Störenfriede temporär oder für immer aus dem System aus.</p>
+        
+        <form action="/admin/ban" method="POST" style="margin-bottom: 25px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: #222; padding: 15px; border-radius: 8px; border: 1px solid #555;">
+            <select name="schueler" required style="flex-grow: 1;">
+                <option value="" disabled selected>Wen möchtest du bannen?</option>
+                {% for s in klassen_liste %}
+                    {% if s != "Till" and s not in banned_users %}
+                        <option value="{{ s }}">{{ s }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+            
+            <select name="dauer" required>
+                <option value="" disabled selected>Wie lange?</option>
+                <option value="1h">1 Stunde</option>
+                <option value="1d">1 Tag</option>
+                <option value="1w">1 Woche</option>
+                <option value="perm">Permanent (Für immer)</option>
+            </select>
+            
+            <button type="submit" class="btn danger-btn">Bannen 🔨</button>
+        </form>
+
+        <h4>Aktuell gesperrte Spieler:</h4>
+        <table>
+            <thead>
+                <tr><th>Name</th><th>Gebannt bis</th><th>Aktion</th></tr>
+            </thead>
+            <tbody>
+                {% for schueler, bis_wann in banned_users.items() %}
+                <tr>
+                    <td><b>{{ schueler }}</b></td>
+                    <td style="color: #ff2e63; font-size: 14px;">{{ bis_wann }}</td>
+                    <td>
+                        <form action="/admin/unban/{{ schueler }}" method="POST" style="margin: 0;">
+                            <button type="submit" class="btn success-btn" style="padding: 5px 10px; font-size: 12px;">Entbannen 🕊️</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="3" style="color: #aaa; font-size: 14px; text-align: center;">Niemand ist gebannt. Alles friedlich!</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
         <hr style="border: 0; border-top: 1px solid #444; margin: 25px 0;">
 
         <h3>📢 System-Nachricht (Pop-up) senden</h3>
-        <p style="color: #aaa; font-size: 14px;">Diese Nachricht poppt unübersehbar auf dem Dashboard der ausgewählten Person(en) auf. Sie erscheint genau einmal, bis sie weggeklickt wird. (Toll für Warnungen oder wichtige Infos, stört nicht im Spiel!)</p>
+        <p style="color: #aaa; font-size: 14px;">Diese Nachricht poppt unübersehbar auf dem Dashboard der ausgewählten Person(en) auf.</p>
         
         <form action="/admin/send-message" method="POST" style="background: #222; padding: 15px; border-radius: 8px; border: 1px solid #555;">
             <label style="display: block; font-size: 14px; margin-bottom: 5px; color: #00adb5; font-weight: bold;">An wen?</label>
@@ -88,6 +135,8 @@
             <button type="submit" class="btn success-btn" style="width: 100%;">🚀 Nachricht jetzt aussenden</button>
         </form>
         
+        <hr style="border: 0; border-top: 1px solid #444; margin: 25px 0;">
+
         <h3>🧹 Chat-Verwaltung</h3>
         <form action="/admin/clear-chat" method="POST" onsubmit="return confirm('Wirklich den gesamten globalen Chat löschen?');">
             <button type="submit" class="btn danger-btn">Globalen Chat komplett leeren</button>
@@ -95,7 +144,7 @@
         
         <br>
         <h3>🔒 Registrierte PINs zurücksetzen</h3>
-        <p style="color: #aaa; font-size: 14px;">Falls ein Mitschüler seine PIN vergessen hat, kannst du sie hier löschen. Er kann sich dann beim nächsten Login einfach eine neue aussuchen.</p>
+        <p style="color: #aaa; font-size: 14px;">Falls ein Mitschüler seine PIN vergessen hat, kannst du sie hier löschen.</p>
         
         <table>
             <thead>
