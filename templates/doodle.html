@@ -231,7 +231,7 @@
             if (['d', 'arrowright'].includes(k)) rightPressed = false;
         });
 
-        function update() {
+        function update(timeScale) {
             
             if (!gameStarted || isGameOver || isPaused) return;
 
