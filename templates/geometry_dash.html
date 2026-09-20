@@ -116,6 +116,7 @@
         window.focus();
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        let lastTime = performance.now();
         
         const wrapper = document.getElementById('gdWrapper');
         const fsBtn = document.getElementById('fullscreenBtn');
@@ -410,6 +411,16 @@
         }
 
         function update() {
+            // Wenn timestamp noch fehlt (beim allerersten Aufruf), nehmen wir die aktuelle Zeit
+            if (!timestamp) timestamp = performance.now();
+            
+            let deltaTime = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+            
+            // Verhindert riesige Sprünge, wenn der Tab gewechselt wird
+            if (deltaTime > 0.1) deltaTime = 0.016; 
+            
+            let timeScale = deltaTime * 60;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             // Hintergrund
@@ -436,21 +447,21 @@
 
             // --- PHYSIK UPDATE ---
             if (!isPaused && gameStarted && !isGameOver) {
-                gameSpeed += 0.0018; 
+                gameSpeed += 0.0018 * timeScale 
 
                 if (player.mode === 'ship') {
                     // SHIP STEUERUNG (Halten zum Fliegen)
                     if (isHolding) {
-                        player.vy -= 0.7; // Raketen-Antrieb nach oben
+                        player.vy -= 0.7 * timeScale; // Raketen-Antrieb nach oben
                     } else {
-                        player.vy += 0.6; // Gravitation nach unten
+                        player.vy += 0.6 * timeScale; // Gravitation nach unten
                     }
                     // Max Geschwindigkeit drosseln
                     player.vy = Math.max(-7, Math.min(player.vy, 7));
-                    player.y += player.vy;
+                    player.y += player.vy * timeScale;
                     
                     // Schiffs-Neigung basierend auf Flugrichtung
-                    player.rotation = player.vy * 0.08;
+                    player.rotation = player.vy * 0.08 ;
 
                     // Kollision mit Boden & Decke (Rutscht daran entlang, stirbt nicht)
                     if (player.y >= floorY - player.size) {
@@ -463,8 +474,8 @@
                 } 
                 else {
                     // CUBE & BALL PHYSIK
-                    player.vy += player.gravity;
-                    player.y += player.vy;
+                    player.vy += player.gravity * timeScale;
+                    player.y += player.vy * timeScale;
 
                     if (player.y >= floorY - player.size) {
                         player.y = floorY - player.size; player.vy = 0; player.isGrounded = true;
@@ -479,9 +490,9 @@
                     }
 
                     if (!player.isGrounded) {
-                        player.rotation += (player.gravity > 0 ? 0.09 : -0.09);
+                        player.rotation += (player.gravity > 0 ? 0.09 : -0.09) * timeScale;
                     } else if (player.mode === 'ball') {
-                        player.rotation += 0.05 * (gameSpeed / 5); 
+                        player.rotation += 0.05 * (gameSpeed / 5) * timeScale;
                     }
                 }
             }
@@ -531,7 +542,7 @@
             // --- HINDERNISSE UPDATE & ZEICHNEN ---
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 let obs = obstacles[i];
-                if (!isGameOver && !isPaused && gameStarted) obs.x -= gameSpeed;
+                if (!isGameOver && !isPaused && gameStarted) obs.x -= gameSpeed * timeScale;
 
                 if (obs.type === 'spike') {
                     ctx.fillStyle = '#ff2e63';
@@ -690,7 +701,7 @@
         }
 
         spawnObstacle();
-        update();
+        requestAnimationFrame(update);
         // Fokus-Fix: Hört sofort auf die Tastatur
         window.onload = function() {
             window.focus();
