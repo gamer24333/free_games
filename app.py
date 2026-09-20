@@ -1,5 +1,7 @@
 import os
 import random
+import uuid
+import time
 from flask import Flask, redirect, render_template, request, session, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
@@ -32,6 +34,39 @@ KLASSEN_LISTE = [
 last_active = {}
 user_activities = {}
 
+# --- SLITHER.IO RAM-SPEICHER ---
+SLITHER_STATE = {
+    "players": {},       # username -> {body: [[x,y], ...], color, score, last_seen}
+    "bots": {},          # bot_id -> {body: [[x,y], ...], color, score, angle, x, y}
+    "food": {},          # food_id -> {'x': int, 'y': int, 'c': color, 'v': value}
+    "map_size": 3000     # Größe der Arena
+}
+
+COLORS = ["#ff2e63", "#00adb5", "#2ecc71", "#f1c40f", "#9b59b6", "#e67e22", "#ffffff", "#e74c3c"]
+
+def spawn_food(amount=10):
+    for _ in range(amount):
+        fid = str(uuid.uuid4())[:8]
+        SLITHER_STATE["food"][fid] = {
+            'x': random.randint(100, SLITHER_STATE["map_size"] - 100),
+            'y': random.randint(100, SLITHER_STATE["map_size"] - 100),
+            'c': random.choice(COLORS),
+            'v': 1 # Futter-Wert
+        }
+
+# Initiales Futter spawnen
+spawn_food(150)
+
+# 3 Bots hinzufügen
+for i in range(3):
+    SLITHER_STATE["bots"][f"Bot {i+1}"] = {
+        "body": [[random.randint(500, 2500), random.randint(500, 2500)]],
+        "color": random.choice(COLORS),
+        "score": 50,
+        "angle": random.uniform(0, math.pi * 2),
+        "x": 0, "y": 0
+    }
+
 # --- GEHEIMCODES ---
 GEHEIME_CODES = {
     "TILLISTDERBESTEADMIN": "double_score",
@@ -63,7 +98,7 @@ class UserSetting(db.Model):
     last_seen = db.Column(db.DateTime, nullable=True)
     banned_until = db.Column(db.DateTime, nullable=True)
     playtime_total = db.Column(db.Integer, default=0)
-    score_multiplier = db.Column(db.Integer, default=1)  # <-- NEU FÜR GEHEIMCODES
+    score_multiplier = db.Column(db.Integer, default=1)  
 
 class ChatMessage(db.Model):
     __tablename__ = 'chat_messages'
@@ -91,6 +126,7 @@ class GameScore(db.Model):
     doodle = db.Column(db.Integer, default=0)
     brickbreaker = db.Column(db.Integer, default=0)
     speedtyping = db.Column(db.Integer, default=0)
+    slither = db.Column(db.Integer, default=0)
     
     playtime_gd = db.Column(db.Integer, default=0)
     playtime_clicker = db.Column(db.Integer, default=0)
@@ -101,6 +137,7 @@ class GameScore(db.Model):
     playtime_doodle = db.Column(db.Integer, default=0)
     playtime_brickbreaker = db.Column(db.Integer, default=0)
     playtime_speedtyping = db.Column(db.Integer, default=0)
+    playtime_slither = db.Column(db.Integer, default=0)
 
 class TicTacToeGame(db.Model):
     __tablename__ = 'tictactoe_games'
@@ -221,6 +258,7 @@ def ping_user():
                 elif game_name == "neon jump": score_entry.playtime_doodle = (score_entry.playtime_doodle or 0) + 5
                 elif game_name == "brickbreaker": score_entry.playtime_brickbreaker = (score_entry.playtime_brickbreaker or 0) + 5
                 elif game_name == "speedtyping": score_entry.playtime_speedtyping = (score_entry.playtime_speedtyping or 0) + 5
+                elif game_name == "slither": score_entry.playtime_slither = (score_entry.playtime_slither or 0) + 5
             
             db.session.commit()
             
@@ -275,6 +313,7 @@ def global_stats():
     assign_points('doodle', ignore_val=0)
     assign_points('brickbreaker', ignore_val=0)
     assign_points('speedtyping', ignore_val=0)
+    assign_points('slither', ignore_val=0)
     
     efficiency_list = []
     for u in all_users:
@@ -666,6 +705,106 @@ def delete_message(room, msg_index):
             db.session.commit()
     return redirect(url_for('chat', room=room))
 
+
+# --- SLITHER.IO MULTIPLAYER ROUTEN ---
+
+@app.route('/slither')
+def slither_menu():
+    if 'username' not in session: return redirect(url_for('login'))
+    
+    # Aufräumen: Inaktive Spieler entfernen (nach 5 Sekunden ohne Ping)
+    now = time.time()
+    active_players = []
+    for p, data in list(SLITHER_STATE["players"].items()):
+        if now - data.get("last_seen", 0) > 5:
+            del SLITHER_STATE["players"][p]
+        else:
+            active_players.append(p)
+            
+    return render_template('slither_menu.html', active_players=active_players)
+
+@app.route('/slither/play')
+def slither_play():
+    if 'username' not in session: return redirect(url_for('login'))
+    return render_template('slither_game.html', me=session['username'])
+
+@app.route('/api/slither/sync', methods=['POST'])
+def slither_sync():
+    if 'username' not in session: return {"error": "401"}, 401
+    me = session['username']
+    data = request.json or {}
+    
+    is_dead = data.get("is_dead", False)
+    if is_dead:
+        body = data.get("body", [])
+        score = data.get("score", 0)
+        color = data.get("color", "#fff")
+        
+        for segment in body[::2]:
+            fid = str(uuid.uuid4())[:8]
+            SLITHER_STATE["food"][fid] = {'x': segment[0], 'y': segment[1], 'c': color, 'v': 5}
+            
+        if me in SLITHER_STATE["players"]:
+            del SLITHER_STATE["players"][me]
+            
+        multiplier = get_user_multiplier(me)
+        final_score = int(score) * multiplier
+        user_score = GameScore.query.filter_by(username=me).first()
+        if not user_score:
+            db.session.add(GameScore(username=me, slither=final_score))
+        else:
+            current_best = getattr(user_score, 'slither', 0)
+            if current_best is None: current_best = 0
+            if final_score > current_best: user_score.slither = final_score
+        db.session.commit()
+            
+        return {"status": "dead"}
+
+    eaten = data.get("eaten", [])
+    for fid in eaten:
+        if fid in SLITHER_STATE["food"]:
+            del SLITHER_STATE["food"][fid]
+            spawn_food(1) 
+
+    SLITHER_STATE["players"][me] = {
+        "body": data.get("body", []),
+        "color": data.get("color", "#00adb5"),
+        "score": data.get("score", 0),
+        "last_seen": time.time()
+    }
+    
+    for bot_id, bot in SLITHER_STATE["bots"].items():
+        if not bot["body"]: continue
+        head = bot["body"][0]
+        bot["x"] = head[0]
+        bot["y"] = head[1]
+        
+        bot["angle"] += random.uniform(-0.2, 0.2)
+        speed = 5
+        new_x = bot["x"] + math.cos(bot["angle"]) * speed
+        new_y = bot["y"] + math.sin(bot["angle"]) * speed
+        
+        if new_x < 0 or new_x > SLITHER_STATE["map_size"]: bot["angle"] += math.pi
+        if new_y < 0 or new_y > SLITHER_STATE["map_size"]: bot["angle"] += math.pi
+        
+        bot["body"].insert(0, [new_x, new_y])
+        if len(bot["body"]) > (bot["score"] // 10) + 5:
+            bot["body"].pop()
+            
+        if random.random() < 0.02: bot["score"] += 1
+
+    all_entities = []
+    for p, d in SLITHER_STATE["players"].items(): all_entities.append((p, d["score"]))
+    for b, d in SLITHER_STATE["bots"].items(): all_entities.append((b, d["score"]))
+    leaderboard = sorted(all_entities, key=lambda x: x[1], reverse=True)[:5]
+
+    return {
+        "players": {p: d for p, d in SLITHER_STATE["players"].items() if p != me},
+        "bots": SLITHER_STATE["bots"],
+        "food": SLITHER_STATE["food"],
+        "leaderboard": leaderboard
+    }
+
 # --- GAMES & LEADERBOARDS ---
 @app.route('/games')
 def games_menu():
@@ -762,7 +901,6 @@ def reaction_game():
 def submit_reaction():
     if 'username' not in session: return {"error": "401"}, 401
     current_user = session['username']
-    # Achtung: Bei Reaction Time ist WENIGER besser! Multiplikator teilt die Zeit.
     multiplier = get_user_multiplier(current_user)
     val = int(int(request.json.get('score', 9999)) / multiplier)
     
