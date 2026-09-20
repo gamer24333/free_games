@@ -109,14 +109,15 @@
         </div>
     </div>
 
-    
-
     <script>
         // Zwingt den Browser, sofort auf Tasteneingaben zu hören!
         window.focus();
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        
         let lastTime = performance.now();
+        let timeAccumulator = 0;
+        const STEP_TIME = 1 / 60; // Fester 60-Hz-Takt für absolute Fairness
         
         const wrapper = document.getElementById('gdWrapper');
         const fsBtn = document.getElementById('fullscreenBtn');
@@ -242,7 +243,6 @@
 
         // --- Event Listener für HOLDING (Gedrückt halten) ---
         function handleInputStart(e) {
-            // Ignoriere bestimmte Tasten, die das Browserverhalten stören könnten
             if (e.type === 'keydown' && !(e.code === 'Space' || e.code === 'Enter')) return;
             if (e.type !== 'mousedown' && e.type !== 'touchstart') e.preventDefault(); 
             
@@ -278,7 +278,6 @@
         function createPortal() {
             let modes = ['cube', 'ball', 'ship'].filter(m => m !== player.mode);
             let nextMode = modes[Math.floor(Math.random() * modes.length)];
-            // Portal geht jetzt über den GANZEN Bildschirm (von ceiling bis floor)
             return { x: canvas.width, y: ceilingY, width: 45, height: floorY - ceilingY, type: 'portal', targetMode: nextMode };
         }
 
@@ -292,14 +291,12 @@
             let rand = Math.random();
             let obsDelayMultiplier = 1;
             
-            // --- HINDERNISSE GENERIEREN JE NACH MODUS ---
             if (player.mode === 'ball') {
                 if (rand < 0.20 && score > 5) {
                     obstacles.push(createPortal());
                     obsDelayMultiplier = 1.5;
                 } 
                 else {
-                    // Ball: Immer etwas spawnen (Decke oder Boden)
                     let onCeiling = Math.random() > 0.5;
                     if (Math.random() > 0.4) {
                         obstacles.push({ x: canvas.width, y: onCeiling ? ceilingY : floorY, width: 30, height: 35, type: 'spike', ceil: onCeiling });
@@ -314,18 +311,14 @@
                     obsDelayMultiplier = 1.5;
                 }
                 else {
-                    // Ship: Flappy-Bird artige Säulen
-                    let gapSize = 125; // Größe der Lücke zum Durchfliegen
+                    let gapSize = 125; 
                     let gapY = ceilingY + 30 + Math.random() * (floorY - ceilingY - gapSize - 60);
                     
-                    // Obere Säule
                     obstacles.push({ x: canvas.width, y: ceilingY, width: 45, height: gapY - ceilingY, type: 'block', ceil: true });
-                    // Untere Säule
                     obstacles.push({ x: canvas.width, y: floorY, width: 45, height: floorY - (gapY + gapSize), type: 'block', ceil: false });
                 }
             }
             else {
-                // Cube (Würfel)
                 if (rand < 0.15 && score > 5) {
                     obstacles.push(createPortal());
                     obsDelayMultiplier = 1.5;
@@ -334,7 +327,6 @@
                     obstacles.push({ x: canvas.width, y: floorY, width: 30, height: 35, type: 'spike', ceil: false });
                 } 
                 else if (rand < 0.65) {
-                    // Treppe
                     let height1 = floorY - 65;
                     let height2 = floorY - 110; 
                     
@@ -381,7 +373,6 @@
             
             stopMusic();
             
-            
             runId++;
             sendScoreToServer(score, runId);
         }
@@ -410,60 +401,22 @@
             spawnObstacle();
         }
 
-        function update() {
-            // Wenn timestamp noch fehlt (beim allerersten Aufruf), nehmen wir die aktuelle Zeit
-            if (!timestamp) timestamp = performance.now();
-            
-            let deltaTime = (timestamp - lastTime) / 1000;
-            lastTime = timestamp;
-            
-            // Verhindert riesige Sprünge, wenn der Tab gewechselt wird
-            if (deltaTime > 0.1) deltaTime = 0.016; 
-            
-            let timeScale = deltaTime * 60;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Hintergrund
-            ctx.fillStyle = '#0f111a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Grid-Hintergrund
-            ctx.strokeStyle = 'rgba(0, 173, 185, 0.05)'; ctx.lineWidth = 2;
-            let gridSize = 40;
-            let offset = gameStarted && !isPaused && !isGameOver ? (Date.now() / 20) % gridSize : 0;
-            for (let x = -offset; x < canvas.width; x += gridSize) {
-                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-            }
-
-            // Boden
-            ctx.fillStyle = '#161925'; ctx.fillRect(0, floorY, canvas.width, canvas.height - floorY);
-            ctx.strokeStyle = '#00adb5'; ctx.lineWidth = 4;
-            ctx.beginPath(); ctx.moveTo(0, floorY); ctx.lineTo(canvas.width, floorY); ctx.stroke();
-
-            // Decke (Für Ball und Ship sichtbar)
-            if (player.mode === 'ball' || player.mode === 'ship') {
-                ctx.fillStyle = '#161925'; ctx.fillRect(0, 0, canvas.width, ceilingY);
-                ctx.beginPath(); ctx.moveTo(0, ceilingY); ctx.lineTo(canvas.width, ceilingY); ctx.stroke();
-            }
-
-            // --- PHYSIK UPDATE ---
+        // --- PHYSIK-LOGIK (Fester Timestep für perfekte FPS-Unabhängigkeit) ---
+        function updatePhysics() {
             if (!isPaused && gameStarted && !isGameOver) {
-                gameSpeed += 0.0018 * timeScale 
+                gameSpeed += 0.0018;
 
                 if (player.mode === 'ship') {
-                    // SHIP STEUERUNG (Halten zum Fliegen)
                     if (isHolding) {
-                        player.vy -= 0.7 * timeScale; // Raketen-Antrieb nach oben
+                        player.vy -= 0.7; 
                     } else {
-                        player.vy += 0.6 * timeScale; // Gravitation nach unten
+                        player.vy += 0.6; 
                     }
-                    // Max Geschwindigkeit drosseln
                     player.vy = Math.max(-7, Math.min(player.vy, 7));
-                    player.y += player.vy * timeScale;
+                    player.y += player.vy;
                     
-                    // Schiffs-Neigung basierend auf Flugrichtung
-                    player.rotation = player.vy * 0.08 ;
+                    player.rotation = player.vy * 0.08;
 
-                    // Kollision mit Boden & Decke (Rutscht daran entlang, stirbt nicht)
                     if (player.y >= floorY - player.size) {
                         player.y = floorY - player.size;
                         if (player.vy > 0) player.vy = 0;
@@ -473,9 +426,8 @@
                     }
                 } 
                 else {
-                    // CUBE & BALL PHYSIK
-                    player.vy += player.gravity * timeScale;
-                    player.y += player.vy * timeScale;
+                    player.vy += player.gravity;
+                    player.y += player.vy;
 
                     if (player.y >= floorY - player.size) {
                         player.y = floorY - player.size; player.vy = 0; player.isGrounded = true;
@@ -490,14 +442,119 @@
                     }
 
                     if (!player.isGrounded) {
-                        player.rotation += (player.gravity > 0 ? 0.09 : -0.09) * timeScale;
+                        player.rotation += (player.gravity > 0 ? 0.09 : -0.09);
                     } else if (player.mode === 'ball') {
-                        player.rotation += 0.05 * (gameSpeed / 5) * timeScale;
+                        player.rotation += 0.05 * (gameSpeed / 5);
                     }
                 }
             }
 
-            // --- SPIELER ZEICHNEN ---
+            let onAnyPlatform = false;
+            let modeChanged = false;
+
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let obs = obstacles[i];
+                if (!isGameOver && !isPaused && gameStarted) obs.x -= gameSpeed;
+
+                // Plattform Kollision
+                if (obs.type === 'platform' && player.mode !== 'ship') {
+                    if (player.x + player.size > obs.x + 5 && player.x < obs.x + obs.width - 5) {
+                        if (player.y + player.size >= obs.y && player.y + player.size - player.vy <= obs.y + 15) {
+                            player.y = obs.y - player.size; player.vy = 0; player.isGrounded = true;
+                            onAnyPlatform = true;
+                        }
+                        if (player.mode === 'ball' && player.y <= obs.y + obs.height && player.y - player.vy >= obs.y + obs.height - 15) {
+                            player.y = obs.y + obs.height; player.vy = 0; player.isGrounded = true;
+                            onAnyPlatform = true;
+                        }
+                    }
+                }
+
+                // Hitbox Kollision
+                if (obs.type === 'spike' || obs.type === 'block') {
+                    let collisionMinY, collisionMaxY;
+                    
+                    if (obs.type === 'spike') {
+                        collisionMinY = obs.ceil ? obs.y : obs.y - obs.height + 5;
+                        collisionMaxY = obs.ceil ? obs.y + obs.height - 5 : obs.y;
+                    } else { 
+                        collisionMinY = obs.ceil ? obs.y : obs.y - obs.height;
+                        collisionMaxY = obs.ceil ? obs.y + obs.height : obs.y;
+                    }
+
+                    let hitPadX = player.mode === 'ship' ? 10 : 4;
+                    let hitPadY = player.mode === 'ship' ? 8 : 0;
+
+                    if (
+                        player.x + hitPadX < obs.x + obs.width &&
+                        player.x + player.size - hitPadX > obs.x &&
+                        player.y + player.size - hitPadY > collisionMinY &&
+                        player.y + hitPadY < collisionMaxY
+                    ) {
+                        triggerGameOver();
+                    }
+                }
+
+                // Portal
+                if (obs.type === 'portal') {
+                    if (player.x < obs.x + obs.width && player.x + player.size > obs.x) {
+                        if (player.mode !== obs.targetMode) {
+                            player.mode = obs.targetMode;
+                            isHolding = false;
+                            if (player.mode === 'cube') {
+                                player.gravity = 0.6;
+                                if (player.vy < 0) player.vy = 0; 
+                            } else if (player.mode === 'ball') {
+                                player.gravity = 0.5; 
+                            }
+                            modeChanged = true;
+                        }
+                    }
+                }
+
+                if (!isPaused && gameStarted && obs.x + obs.width < player.x && !obs.passed) {
+                    obs.passed = true;
+                    score++;
+                    if (score % 5 === 0) level++;
+                }
+
+                if (obs.x < -obs.width) obstacles.splice(i, 1);
+            }
+
+            if (modeChanged) {
+                obstacles = obstacles.filter(obs => obs.x < player.x + 50 || obs.type === 'portal');
+            }
+
+            if (onAnyPlatform) player.isGrounded = true;
+        }
+
+        // --- RENDER-LOGIK (Flüssig mit max. Monitor-FPS) ---
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Hintergrund
+            ctx.fillStyle = '#0f111a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Grid
+            ctx.strokeStyle = 'rgba(0, 173, 185, 0.05)'; ctx.lineWidth = 2;
+            let gridSize = 40;
+            let offset = gameStarted && !isPaused && !isGameOver ? (Date.now() / 20) % gridSize : 0;
+            for (let x = -offset; x < canvas.width; x += gridSize) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+
+            // Boden
+            ctx.fillStyle = '#161925'; ctx.fillRect(0, floorY, canvas.width, canvas.height - floorY);
+            ctx.strokeStyle = '#00adb5'; ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.moveTo(0, floorY); ctx.lineTo(canvas.width, floorY); ctx.stroke();
+
+            // Decke
+            if (player.mode === 'ball' || player.mode === 'ship') {
+                ctx.fillStyle = '#161925'; ctx.fillRect(0, 0, canvas.width, ceilingY);
+                ctx.beginPath(); ctx.moveTo(0, ceilingY); ctx.lineTo(canvas.width, ceilingY); ctx.stroke();
+            }
+
+            // Spieler zeichnen
             ctx.save();
             ctx.translate(player.x + player.size/2, player.y + player.size/2);
             ctx.rotate(player.rotation);
@@ -511,20 +568,17 @@
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
                 ctx.beginPath(); ctx.moveTo(-player.size/2, 0); ctx.lineTo(player.size/2, 0); ctx.stroke();
             } else if (player.mode === 'ship') {
-                // Das Raumschiff als Polygon
                 ctx.fillStyle = '#b142ff'; 
                 ctx.beginPath();
                 ctx.moveTo(-player.size/2, -player.size/3);
-                ctx.lineTo(player.size/2, 0); // Spitze
+                ctx.lineTo(player.size/2, 0);
                 ctx.lineTo(-player.size/2, player.size/3);
                 ctx.closePath();
                 ctx.fill();
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
-                // kleines Triebwerk/Fenster
                 ctx.fillStyle = '#fff';
                 ctx.beginPath(); ctx.arc(-5, 0, 4, 0, Math.PI*2); ctx.fill();
                 
-                // Feuerstrahl wenn angetrieben
                 if (isHolding) {
                     ctx.fillStyle = '#ff9f43';
                     ctx.beginPath();
@@ -536,14 +590,8 @@
             }
             ctx.restore();
 
-            let onAnyPlatform = false;
-            let modeChanged = false; // NEU: Damit wir wissen, ob sich der Modus in diesem Frame geändert hat
-
-            // --- HINDERNISSE UPDATE & ZEICHNEN ---
-            for (let i = obstacles.length - 1; i >= 0; i--) {
-                let obs = obstacles[i];
-                if (!isGameOver && !isPaused && gameStarted) obs.x -= gameSpeed * timeScale;
-
+            // Hindernisse zeichnen
+            for (let obs of obstacles) {
                 if (obs.type === 'spike') {
                     ctx.fillStyle = '#ff2e63';
                     ctx.beginPath();
@@ -574,10 +622,7 @@
                     }
                 } 
                 else if (obs.type === 'portal') {
-                    // FARBEN: Grün = Cube, Orange = Ball, Lila = Ship
                     let portalColor = obs.targetMode === 'ball' ? '#ff9f43' : (obs.targetMode === 'ship' ? '#b142ff' : '#39ff14');
-                    
-                    // Schicker Portal-Laser Effekt
                     ctx.fillStyle = portalColor; ctx.globalAlpha = 0.25;
                     ctx.fillRect(obs.x, obs.y, obs.width, obs.height); 
                     ctx.globalAlpha = 1.0;
@@ -588,84 +633,7 @@
                     ctx.fillText(obs.targetMode.toUpperCase(), obs.x + obs.width/2, floorY - 20);
                     ctx.textAlign = "left";
                 }
-                
-                // Plattform Kollision (nur für Cube/Ball relevant)
-                if (obs.type === 'platform' && player.mode !== 'ship') {
-                    if (player.x + player.size > obs.x + 5 && player.x < obs.x + obs.width - 5) {
-                        if (player.y + player.size >= obs.y && player.y + player.size - player.vy <= obs.y + 15) {
-                            player.y = obs.y - player.size; player.vy = 0; player.isGrounded = true;
-                            onAnyPlatform = true;
-                            if (obs.mustTouch) obs.touched = true; 
-                        }
-                        if (player.mode === 'ball' && player.y <= obs.y + obs.height && player.y - player.vy >= obs.y + obs.height - 15) {
-                            player.y = obs.y + obs.height; player.vy = 0; player.isGrounded = true;
-                            onAnyPlatform = true;
-                        }
-                    }
-                }
-
-                // Hitbox Kollision für Tod
-                if (obs.type === 'spike' || obs.type === 'block') {
-                    let collisionMinY, collisionMaxY;
-                    
-                    if (obs.type === 'spike') {
-                        collisionMinY = obs.ceil ? obs.y : obs.y - obs.height + 5;
-                        collisionMaxY = obs.ceil ? obs.y + obs.height - 5 : obs.y;
-                    } else { 
-                        collisionMinY = obs.ceil ? obs.y : obs.y - obs.height;
-                        collisionMaxY = obs.ceil ? obs.y + obs.height : obs.y;
-                    }
-
-                    // Hitbox-Toleranz: Für das Ship ziehen wir extra Pixel ab (ist fehlerverzeihender)
-                let hitPadX = player.mode === 'ship' ? 10 : 4;
-                let hitPadY = player.mode === 'ship' ? 8 : 0;
-
-                if (
-                    player.x + hitPadX < obs.x + obs.width &&
-                    player.x + player.size - hitPadX > obs.x &&
-                    player.y + player.size - hitPadY > collisionMinY &&
-                    player.y + hitPadY < collisionMaxY
-                ) {
-                    triggerGameOver();
-                }
             }
-
-                // Durch Portal fliegen (Verwandlung)
-                if (obs.type === 'portal') {
-                    // Da die Portale jetzt groß sind, reicht es, wenn die X-Achse überlappt
-                    if (player.x < obs.x + obs.width && player.x + player.size > obs.x) {
-                        if (player.mode !== obs.targetMode) {
-                            player.mode = obs.targetMode;
-                            isHolding = false; // Zurücksetzen für Ship
-                            if (player.mode === 'cube') {
-                                player.gravity = 0.6;
-                                if (player.vy < 0) player.vy = 0; 
-                            } else if (player.mode === 'ball') {
-                                player.gravity = 0.5; 
-                            }
-                            
-                            // NEU: Wenn ein Wechsel stattfand, den 'modeChanged' Status setzen
-                            modeChanged = true;
-                        }
-                    }
-                }
-
-                if (!isPaused && gameStarted && obs.x + obs.width < player.x && !obs.passed) {
-                    obs.passed = true;
-                    score++;
-                    if (score % 5 === 0) level++;
-                }
-
-                if (obs.x < -obs.width) obstacles.splice(i, 1);
-            }
-            
-            // NEU: Bildschirm-Aufräumer bei Portalwechsel
-            if (modeChanged) {
-                // Löscht alle unpassenden Hindernisse (z.B. fliegende Wände), die vor dem Spieler liegen, lässt aber weitere Portale bestehen.
-                obstacles = obstacles.filter(obs => obs.x < player.x + 50 || obs.type === 'portal');
-            }
-
-            if (onAnyPlatform) player.isGrounded = true;
 
             // UI
             ctx.fillStyle = '#fff'; ctx.font = 'bold 20px Arial';
@@ -696,12 +664,32 @@
                 ctx.fillText('Speichere... Gleich gehts weiter!', canvas.width / 2, canvas.height / 2 + 20);
                 ctx.textAlign = 'left';
             }
+        }
 
-            requestAnimationFrame(update);
+        // --- HAUPT-LOOP MIT AKKUMULATOR ---
+        function gameLoop(timestamp) {
+            if (!timestamp) timestamp = performance.now();
+            let deltaTime = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            if (deltaTime > 0.25) deltaTime = 0.25;
+            timeAccumulator += deltaTime;
+
+            // Die Physik läuft strikt im 60-Hz-Takt (exakt wie gewünscht)
+            while (timeAccumulator >= STEP_TIME) {
+                updatePhysics();
+                timeAccumulator -= STEP_TIME;
+            }
+
+            // Das Zeichnen läuft mit maximaler Bildschirm-Flüssigkeit
+            drawGame();
+
+            requestAnimationFrame(gameLoop);
         }
 
         spawnObstacle();
-        requestAnimationFrame(update);
+        requestAnimationFrame(gameLoop);
+
         // Fokus-Fix: Hört sofort auf die Tastatur
         window.onload = function() {
             window.focus();
@@ -715,7 +703,7 @@
             fetch('/api/ping', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ activity: "Spielt Geometry Dash" }) // <-- Hier den Spielnamen anpassen!
+                body: JSON.stringify({ activity: "Spielt Geometry Dash" })
             }).catch(e => console.log(e));
         }, 5000);
     </script>
