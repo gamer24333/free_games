@@ -5,15 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dashboard</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 50px; }
-        .btn { display: inline-block; padding: 15px 30px; margin: 10px; background: #00adb5; color: white; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold; position: relative; }
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 60px; position: relative; }
+        .btn { display: inline-block; padding: 15px 30px; margin: 10px; background: #00adb5; color: white; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold; position: relative; cursor: pointer; border: none; }
         .btn:hover { background: #007c82; }
         .badge { background: #ff2e63; color: white; border-radius: 50%; padding: 3px 8px; font-size: 12px; position: absolute; top: -8px; right: -8px; display: none; box-shadow: 0 0 8px rgba(255,46,99,0.6); }
         .invite-box { background: #333; padding: 15px; border-radius: 8px; max-width: 500px; margin: 25px auto; border: 2px solid #ff2e63; text-align: left; }
         .invite-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; }
         .admin-box { margin-top: 40px; border-top: 2px dashed #555; padding-top: 20px; }
+        
+        /* Code Button oben links */
+        .code-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: #f39c12;
+            padding: 10px 15px;
+            font-size: 14px;
+            border-radius: 8px;
+            z-index: 1000;
+        }
+        .code-btn:hover { background: #e67e22; }
 
-        /* Zahnrad Einstellungen Icon oben rechts */
+        /* Zahnrad oben rechts */
         .settings-gear {
             position: fixed;
             top: 20px;
@@ -26,13 +39,10 @@
             transition: color 0.2s, transform 0.2s;
             z-index: 1000;
         }
-        .settings-gear:hover {
-            color: #00adb5;
-            transform: rotate(45deg);
-        }
+        .settings-gear:hover { color: #00adb5; transform: rotate(45deg); }
 
-        /* Settings Modal Styling */
-        .settings-modal {
+        /* Modals (Pop-ups) */
+        .modal-overlay {
             display: none;
             position: fixed;
             top: 0; left: 0;
@@ -42,7 +52,7 @@
             align-items: center;
             z-index: 10000;
         }
-        .settings-box {
+        .modal-box {
             background: #2a2a2a;
             border: 2px solid #00adb5;
             padding: 30px;
@@ -52,120 +62,58 @@
             color: white;
             box-shadow: 0 0 20px rgba(0, 173, 181, 0.3);
         }
-        .settings-box input {
-            width: 100%;
-            background: #333;
-            color: white;
-            border: 1px solid #555;
-            border-radius: 6px;
-            padding: 10px;
-            box-sizing: border-box;
-            margin-top: 10px;
-            font-size: 16px;
-            text-align: center;
-        }
-        
-        /* Overlay-Styling */
-        .overlay-container {
-            display: none; 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100vw; 
-            height: 100vh; 
-            background-color: rgba(17, 17, 17, 0.98); 
-            color: white; 
-            z-index: 99999; 
-            justify-content: center; 
-            align-items: center; 
-            flex-direction: column; 
-            padding: 20px;
-            box-sizing: border-box;
-        }
-        .overlay-content {
-            max-width: 600px;
-            background: #2a2a2a;
-            padding: 40px;
-            border-radius: 12px;
-            border: 2px solid #00adb5;
-            box-shadow: 0 0 20px rgba(0, 173, 181, 0.3);
-        }
-        /* Feedback Modal Styling */
-        .feedback-modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.7);
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-        }
-        .feedback-box {
-            background: #222;
-            border: 2px solid #444;
-            padding: 25px;
-            border-radius: 12px;
-            width: 350px;
-            text-align: center;
-            color: white;
-        }
-        .feedback-box textarea {
-            width: 100%;
-            background: #333;
-            color: white;
-            border: 1px solid #555;
-            border-radius: 6px;
-            padding: 8px;
-            box-sizing: border-box;
-            resize: none;
-            margin-top: 10px;
-            font-size: 14px;
+        .modal-box.gold { border-color: #f39c12; box-shadow: 0 0 20px rgba(243, 156, 18, 0.3); }
+        .modal-box input, .modal-box textarea {
+            width: 100%; background: #333; color: white; border: 1px solid #555;
+            border-radius: 6px; padding: 10px; box-sizing: border-box; margin-top: 10px;
+            font-size: 16px; text-align: center; font-family: inherit;
         }
     </style>
 </head>
 <body>
 
-    <!-- Einstellungen Zahnrad oben rechts -->
+    <!-- Buttons in den Ecken -->
+    <button class="btn code-btn" onclick="openCodeModal()">🎁 Code eingeben</button>
     <button class="settings-gear" onclick="openSettingsModal()" title="Einstellungen">⚙️</button>
 
-    <!-- PIN Reset / Einstellungen Modal -->
-    <div id="settingsModal" class="settings-modal">
-        <div class="settings-box">
+    <!-- CODE MODAL -->
+    <div id="codeModal" class="modal-overlay">
+        <div class="modal-box gold">
+            <h3 style="color: #f39c12; margin-top: 0;">🎁 Geheimcode einlösen</h3>
+            <p style="font-size: 14px; color: #ccc; line-height: 1.4;">Hast du einen Code gefunden? Gib ihn hier ein, um deine Belohnung abzuholen!</p>
+            <input type="text" id="secretCode" placeholder="CODE EINGEBEN" style="text-transform: uppercase; font-weight: bold; letter-spacing: 2px;">
+            <div style="margin-top: 20px; display: flex; justify-content: space-between; gap: 10px;">
+                <button onclick="closeCodeModal()" class="btn" style="background: #555; margin:0; flex: 1;">Abbrechen</button>
+                <button onclick="submitCode()" class="btn" style="background: #f39c12; margin:0; flex: 1;">Einlösen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTINGS / PIN MODAL -->
+    <div id="settingsModal" class="modal-overlay">
+        <div class="modal-box">
             <h3 style="color: #ff2e63; margin-top: 0;">⚠️ PIN zurücksetzen</h3>
             <p style="font-size: 14px; color: #ccc; margin: 15px 0; line-height: 1.4;">
-                Willst du das wirklich machen? Hier kannst du deinen Anmelde-PIN ändern. Bitte merke dir deinen neuen PIN gut!
+                Hier kannst du deinen Anmelde-PIN ändern. Bitte merke dir deinen neuen PIN gut!
             </p>
             <input type="password" id="newPin" placeholder="Neuer PIN (mind. 4 Zeichen)" maxlength="20">
             <input type="password" id="confirmPin" placeholder="Neuer PIN bestätigen" maxlength="20">
             <div style="margin-top: 20px; display: flex; justify-content: space-between; gap: 10px;">
-                <button onclick="closeSettingsModal()" class="btn" style="background: #555; padding: 10px 15px; font-size: 14px; margin:0; flex: 1;">Abbrechen</button>
-                <button onclick="submitPinChange()" class="btn" style="background: #27ae60; padding: 10px 15px; font-size: 14px; margin:0; flex: 1;">PIN ändern</button>
+                <button onclick="closeSettingsModal()" class="btn" style="background: #555; margin:0; flex: 1;">Abbrechen</button>
+                <button onclick="submitPinChange()" class="btn" style="background: #27ae60; margin:0; flex: 1;">Ändern</button>
             </div>
         </div>
     </div>
-    
-    {% if zeige_spezial_nachricht %}
-    <div id="special-overlay" class="overlay-container">
-        <div class="overlay-content">
-            <h1 style="font-size: 2.5rem; margin-top: 0; color: #ff2e63;">{{ spezial_titel }}</h1>
-            <p style="font-size: 1.25rem; line-height: 1.6; color: #eee; margin: 25px 0; white-space: pre-wrap;">{{ spezial_text }}</p>
-            <button onclick="schliesseNachricht()" class="btn" style="background: #2ecc71; border: none; cursor: pointer; padding: 15px 40px; font-size: 18px;">
-                Verstanden & Schließen
-            </button>
-        </div>
-    </div>
-    {% endif %}
 
-    <!-- Feedback Modal -->
-    <div id="feedbackModal" class="feedback-modal">
-        <div class="feedback-box">
-            <h3>💡 Feedback an die Admins</h3>
-            <p style="font-size: 13px; color: #aaa; margin-top: 5px;">Was sollen wir verbessern oder hinzufügen? (z.B. "Mach Fortnite")</p>
-            <textarea id="feedbackText" rows="4" placeholder="Dein Vorschlag..."></textarea>
-            <div style="margin-top: 15px; display: flex; justify-content: space-between;">
-                <button onclick="closeFeedbackModal()" class="btn" style="background: #555; padding: 10px 20px; font-size: 14px; margin:0;">Abbrechen</button>
-                <button onclick="sendFeedback()" class="btn" style="background: #27ae60; padding: 10px 20px; font-size: 14px; margin:0;">Absenden</button>
+    <!-- FEEDBACK MODAL -->
+    <div id="feedbackModal" class="modal-overlay">
+        <div class="modal-box" style="border-color: #9b59b6; box-shadow: 0 0 20px rgba(155, 89, 182, 0.3);">
+            <h3 style="color: #9b59b6; margin-top: 0;">💡 Feedback an die Admins</h3>
+            <p style="font-size: 13px; color: #aaa;">Was sollen wir verbessern oder hinzufügen?</p>
+            <textarea id="feedbackText" rows="4" placeholder="Dein Vorschlag..." style="text-align: left; resize: none;"></textarea>
+            <div style="margin-top: 15px; display: flex; justify-content: space-between; gap: 10px;">
+                <button onclick="closeFeedbackModal()" class="btn" style="background: #555; margin:0; flex: 1;">Abbrechen</button>
+                <button onclick="sendFeedback()" class="btn" style="background: #27ae60; margin:0; flex: 1;">Absenden</button>
             </div>
         </div>
     </div>
@@ -180,11 +128,10 @@
         </a>
         
         <a href="/games" class="btn" style="background: #2ecc71;">🎮 Spiele-Zentrale</a>
-        
-        <a href="/stats" class="btn" style="background: #f39c12;">👑 Ranglisten & Spielzeit</a>
 
-        <button onclick="openFeedbackModal()" class="btn" style="background: #9b59b6;">💡 Feedback / Wunsch</button>
-       
+        <button onclick="openFeedbackModal()" class="btn" style="background: #9b59b6;">💡 Feedback</button>
+        
+        <a href="/stats" class="btn" style="background: #e67e22;">👑 Ranglisten & Zeit</a>
     </div>
 
     {% if einladungen %}
@@ -201,13 +148,12 @@
                         {% if einl.typ == 'tictactoe' %}
                             <a href="/tictactoe/game/{{ einl.id }}" class="btn" style="padding: 6px 12px; font-size: 14px; margin: 0; background: #00adb5;">Weiterspielen</a>
                             <form action="/tictactoe/delete-match/{{ einl.id }}" method="POST" style="margin: 0;">
-                                <button type="submit" class="btn" style="background: #ff2e63; padding: 6px 12px; font-size: 14px; margin: 0; border: none; cursor: pointer;">❌ Löschen</button>
+                                <button type="submit" class="btn" style="background: #ff2e63; padding: 6px 12px; font-size: 14px; margin: 0;">❌</button>
                             </form>
                         {% else %}
                             <a href="/tankroyale/match/{{ einl.id }}" class="btn" style="padding: 6px 12px; font-size: 14px; margin: 0; background: #ff9f43; color: black;">In den Panzer! 💥</a>
-                            
                             <form action="/tankroyale/delete-match/{{ einl.id }}" method="POST" style="margin: 0;">
-                                <button type="submit" class="btn" style="background: #ff2e63; padding: 6px 12px; font-size: 14px; margin: 0; border: none; cursor: pointer;">❌ Löschen</button>
+                                <button type="submit" class="btn" style="background: #ff2e63; padding: 6px 12px; font-size: 14px; margin: 0;">❌</button>
                             </form>
                         {% endif %}
                     </div>
@@ -215,11 +161,11 @@
                     <span><b>{{ einl.von }}</b> fordert dich zu {% if einl.typ == 'tictactoe' %}Tic-Tac-Toe{% else %}Tank Royale{% endif %} heraus!</span>
                     {% if einl.typ == 'tictactoe' %}
                         <form action="/tictactoe/accept/{{ einl.id }}" method="POST" style="margin: 0;">
-                            <button type="submit" class="btn" style="background: #2ecc71; padding: 6px 12px; font-size: 14px; margin: 0; border: none; cursor: pointer;">Annehmen</button>
+                            <button type="submit" class="btn" style="background: #2ecc71; padding: 6px 12px; font-size: 14px; margin: 0;">Annehmen</button>
                         </form>
                     {% else %}
                         <form action="/tankroyale/accept/{{ einl.id }}" method="POST" style="margin: 0;">
-                            <button type="submit" class="btn" style="background: #ff9f43; padding: 6px 12px; font-size: 14px; margin: 0; border: none; cursor: pointer; color: black;">Annehmen</button>
+                            <button type="submit" class="btn" style="background: #ff9f43; padding: 6px 12px; font-size: 14px; margin: 0; color: black;">Annehmen</button>
                         </form>
                     {% endif %}
                 {% endif %}
@@ -230,7 +176,7 @@
 
     {% if is_admin %}
     <div class="admin-box">
-        <a href="/admin" class="btn" style="background: #9b59b6;">🛠️ Admin-Panel öffnen</a>
+        <a href="/admin" class="btn" style="background: #e74c3c;">🛠️ Admin-Panel öffnen</a>
     </div>
     {% endif %}
     
@@ -238,30 +184,46 @@
     <a href="/logout" style="color: #ff2e63; text-decoration: none; font-weight: bold;">Abmelden</a>
 
     <script>
-
-    // --- SETTINGS & PIN RESET MODAL STEUERUNG ---
-    function openSettingsModal() {
-        document.getElementById('settingsModal').style.display = 'flex';
+    // --- CODE MODAL STEUERUNG ---
+    function openCodeModal() { document.getElementById('codeModal').style.display = 'flex'; }
+    function closeCodeModal() { 
+        document.getElementById('codeModal').style.display = 'none'; 
+        document.getElementById('secretCode').value = ''; 
+    }
+    async function submitCode() {
+        const code = document.getElementById('secretCode').value.trim();
+        if (!code) return;
+        try {
+            const response = await fetch('/api/redeem-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: code })
+            });
+            const data = await response.json();
+            if (response.ok) {
+                alert("🎉 " + data.message);
+                closeCodeModal();
+            } else {
+                alert("❌ " + data.error);
+            }
+        } catch (e) {
+            alert("Verbindungsfehler.");
+        }
     }
 
-    function closeSettingsModal() {
+    // --- SETTINGS MODAL STEUERUNG ---
+    function openSettingsModal() { document.getElementById('settingsModal').style.display = 'flex'; }
+    function closeSettingsModal() { 
         document.getElementById('settingsModal').style.display = 'none';
         document.getElementById('newPin').value = '';
         document.getElementById('confirmPin').value = '';
     }
-
     async function submitPinChange() {
         const newPin = document.getElementById('newPin').value.trim();
         const confirmPin = document.getElementById('confirmPin').value.trim();
 
-        if (!newPin || newPin.length < 4) {
-            alert("Der neue PIN muss mindestens 4 Zeichen lang sein!");
-            return;
-        }
-        if (newPin !== confirmPin) {
-            alert("Die beiden PINs stimmen nicht überein!");
-            return;
-        }
+        if (!newPin || newPin.length < 4) return alert("Der neue PIN muss mindestens 4 Zeichen lang sein!");
+        if (newPin !== confirmPin) return alert("Die beiden PINs stimmen nicht überein!");
 
         try {
             const response = await fetch('/api/change-pin', {
@@ -269,33 +231,25 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ new_pin: newPin, confirm_pin: confirmPin })
             });
-            const data = await response.json();
             if (response.ok) {
                 alert("Dein PIN wurde erfolgreich geändert!");
                 closeSettingsModal();
             } else {
-                alert(data.error || "Fehler beim Ändern des PINs.");
+                const data = await response.json();
+                alert(data.error || "Fehler beim Ändern.");
             }
-        } catch (e) {
-            console.error(e);
-            alert("Verbindungsfehler.");
-        }
-    }
-        
-    // --- FEEDBACK MODAL STEUERUNG ---
-    function openFeedbackModal() {
-        document.getElementById('feedbackModal').style.display = 'flex';
+        } catch (e) { alert("Verbindungsfehler."); }
     }
 
-    function closeFeedbackModal() {
+    // --- FEEDBACK MODAL STEUERUNG ---
+    function openFeedbackModal() { document.getElementById('feedbackModal').style.display = 'flex'; }
+    function closeFeedbackModal() { 
         document.getElementById('feedbackModal').style.display = 'none';
         document.getElementById('feedbackText').value = '';
     }
-
     async function sendFeedback() {
         const text = document.getElementById('feedbackText').value.trim();
         if (!text) return alert("Bitte schreibe eine Nachricht!");
-
         try {
             const response = await fetch('/api/submit-feedback', {
                 method: 'POST',
@@ -305,163 +259,36 @@
             if (response.ok) {
                 alert("Vielen Dank! Dein Feedback wurde an die Admins gesendet.");
                 closeFeedbackModal();
-            } else {
-                alert("Fehler beim Senden.");
             }
-        } catch (e) {
-            console.error(e);
-        }
+        } catch (e) { console.error(e); }
     }
 
-    // Prüfen, ob der Nutzer Admin ist und ungelesenes Feedback vorliegt (Wird nur beim Laden des Dashboards ausgeführt!)
-    async function checkAdminFeedback() {
-        try {
-            const response = await fetch('/api/admin/feedback');
-            if (response.ok) {
-                const feedbacks = await response.json();
-                if (feedbacks.length > 0) {
-                    const fb = feedbacks[0];
-                    alert(`📢 Neues Admin-Feedback!\n\nVon: ${fb.sender}\nNachricht: "${fb.message}"`);
-                    
-                    // Als gelesen markieren, damit es beim nächsten Dashboard-Besuch nicht doppelt poppt
-                    await fetch(`/api/admin/feedback/read/${fb.id}`, { method: 'POST' });
-                }
-            }
-        } catch (e) {
-            // Ignorieren (schlägt fehl, wenn kein Admin)
-        }
-    }
-
-    // Direkt beim Aufrufen des Homescreens / Dashboards prüfen
-    checkAdminFeedback();
-        
-    // --- NEU: SYSTEM-BENACHRICHTIGUNGEN LOGIK ---
-    let lastKnownMessageCount = 0; // Speichert die letzte bekannte Anzahl von Nachrichten
-
-    // Erlaubnis für Benachrichtigungen beim Laden abfragen
-    document.addEventListener("DOMContentLoaded", function() {
-        if ("Notification" in window) {
-            if (Notification.permission !== "granted" && Notification.permission !== "denied") {
-                Notification.requestPermission();
-            }
-        }
-    });
-
-    // Funktion, die eine echte Desktop-Benachrichtigung absendet
-    function sendeSystemBenachrichtigung(titel, text) {
-        if ("Notification" in window && Notification.permission === "granted") {
-            const notification = new Notification(titel, {
-                body: text,
-                icon: "/static/favicon.ico" // optional: Pfad zu deinem Logo, falls vorhanden
-            });
-
-            // Wenn man auf die Benachrichtigung klickt, öffnet sich der Chat
-            notification.onclick = function() {
-                window.focus();
-                window.location.href = "/chat";
-            };
-        }
-    }
-
-    // --- Logik für das Einmalige Overlay ---
-    {% if zeige_spezial_nachricht %}
-    document.addEventListener("DOMContentLoaded", function() {
-        const nachrichtId = "{{ spezial_nachricht_id }}" || "version_1";
-        const storageKey = "gesehen_" + nachrichtId;
-        
-        if (!localStorage.getItem(storageKey)) {
-            document.getElementById("special-overlay").style.display = "flex";
-        }
-    });
-
-    function schliesseNachricht() {
-        document.getElementById("special-overlay").style.display = "none";
-        
-        const nachrichtId = "{{ spezial_nachricht_id }}" || "version_1";
-        const storageKey = "gesehen_" + nachrichtId;
-        
-        localStorage.setItem(storageKey, "true");
-    }
-    {% endif %}
-
-    // --- VOLLBILD LOGIK ---
-    function toggleFullscreen() {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen()
-                .then(() => {
-                    document.getElementById("fullscreen-btn").textContent = "📺 Vollbild beenden";
-                })
-                .catch((err) => {
-                    console.error("Fehler beim Aktivieren des Vollbildmodus:", err.message);
-                });
-        } else {
-            document.exitFullscreen()
-                .then(() => {
-                    document.getElementById("fullscreen-btn").textContent = "📺 Vollbildmodus (F)";
-                });
-        }
-    }
-
-    document.addEventListener("keydown", function(event) {
-        if (event.key === "f" || event.key === "F") {
-            if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-                event.preventDefault();
-                toggleFullscreen();
-            }
-        }
-        if (event.key === "F11") {
-            event.preventDefault();
-            toggleFullscreen();
-        }
-    });
-
-    document.addEventListener("fullscreenchange", function() {
-        const btn = document.getElementById("fullscreen-btn");
-        if (btn) {
-            if (document.fullscreenElement) {
-                btn.textContent = "📺 Vollbild beenden";
-            } else {
-                btn.textContent = "📺 Vollbildmodus (F)";
-            }
-        }
-    });
-
-    // --- Aktualisiertes Message-Polling-Skript mit Push-Trigger ---
+    // --- CHAT NOTIFICATIONS (Polling) ---
+    let lastKnownMessageCount = 0;
     async function checkNewMessages() {
         try {
             const response = await fetch('/api/dashboard-stats');
             if (response.ok) {
                 const stats = await response.json();
-                
                 const lastSeenGlobal = localStorage.getItem('last_seen_messages_global') || 0;
                 const newGlobal = stats.global_messages_count - lastSeenGlobal;
                 
                 let newPrivateTotal = 0;
                 const localPrivateStorage = JSON.parse(localStorage.getItem('last_seen_messages_private') || '{}');
-                
                 for (const [partner, currentCount] of Object.entries(stats.private_messages_stats)) {
                     const lastSeenPrivate = localPrivateStorage[partner] || 0;
-                    if (currentCount > lastSeenPrivate) {
-                        newPrivateTotal += (currentCount - lastSeenPrivate);
-                    }
+                    if (currentCount > lastSeenPrivate) newPrivateTotal += (currentCount - lastSeenPrivate);
                 }
                 
                 const totalNewMessages = (newGlobal > 0 ? newGlobal : 0) + newPrivateTotal;
                 const badge = document.getElementById('chatBadge');
                 
-                // HIER STARTET DIE PUSH-LOGIK:
-                // Wenn die Anzahl der neuen Nachrichten gestiegen ist, senden wir eine echte Benachrichtigung!
-                if (totalNewMessages > lastKnownMessageCount) {
-                    const nachrichtenDifferenz = totalNewMessages - lastKnownMessageCount;
-                    sendeSystemBenachrichtigung(
-                        "Neue Nachricht erhalten! 💬",
-                        `Du hast ${nachrichtenDifferenz} neue ungelesene Nachricht(en).`
-                    );
+                if (totalNewMessages > lastKnownMessageCount && "Notification" in window && Notification.permission === "granted") {
+                    const diff = totalNewMessages - lastKnownMessageCount;
+                    new Notification("Neue Nachricht erhalten! 💬", { body: `Du hast ${diff} neue ungelesene Nachricht(en).`, icon: "/static/favicon.ico" }).onclick = () => { window.location.href = "/chat"; };
                 }
                 
-                // Speicher den aktuellen Stand ab, damit wir beim nächsten Mal wissen, ob etwas Neues dazukam
                 lastKnownMessageCount = totalNewMessages;
-
                 if (totalNewMessages > 0) {
                     badge.textContent = totalNewMessages;
                     badge.style.display = 'inline-block';
@@ -471,6 +298,12 @@
             }
         } catch (e) { console.error(e); }
     }
+    
+    document.addEventListener("DOMContentLoaded", function() {
+        if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+            Notification.requestPermission();
+        }
+    });
 
     setInterval(checkNewMessages, 5000);
     checkNewMessages();
