@@ -51,7 +51,18 @@
         <div class="card">
             <h2 style="margin-top:0;">⏱️ Eure Spielzeiten (in Minuten)</h2>
             <table>
-                <tr><th>Spieler</th><th>SpeedTyping</th><th>Clicker</th><th>Flappy</th><th>BrickBreaker</th></tr>
+                <tr>
+                    <th>Spieler</th>
+                    <th>SpeedTyping</th>
+                    <th>Clicker</th>
+                    <th>Flappy</th>
+                    <th>BrickBreaker</th>
+                    <th>Geometry Dash</th>
+                    <th>Reaction</th>
+                    <th>Snake</th>
+                    <th>Crossy Huhn</th>
+                    <th>Neon Jump</th>
+                </tr>
                 {% for name, s in scores.items() %}
                 <tr>
                     <td><b>{{ name }}</b></td>
@@ -59,6 +70,11 @@
                     <td>{{ ((s.playtime_clicker or 0) / 60) | round | int }}m</td>
                     <td>{{ ((s.playtime_flappy or 0) / 60) | round | int }}m</td>
                     <td>{{ ((s.playtime_brickbreaker or 0) / 60) | round | int }}m</td>
+                    <td>{{ ((s.playtime_gd or 0) / 60) | round | int }}m</td>
+                    <td>{{ ((s.playtime_reaction or 0) / 60) | round | int }}m</td>
+                    <td>{{ ((s.playtime_snake or 0) / 60) | round | int }}m</td>
+                    <td>{{ ((s.playtime_crossy or 0) / 60) | round | int }}m</td>
+                    <td>{{ ((s.playtime_doodle or 0) / 60) | round | int }}m</td>
                 </tr>
                 {% endfor %}
             </table>
