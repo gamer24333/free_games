@@ -19,6 +19,12 @@ if db_url and db_url.startswith("postgres://"):
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///local_portal.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# ---  Verhindert Verbindungsabbrüche (SSL closed unexpectedly) ---
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "pool_pre_ping": True,  # Prüft, ob die Verbindung noch lebt, bevor sie genutzt wird
+    "pool_recycle": 300,    # Erneuert die Verbindung alle 5 Minuten präventiv
+}
+
 db = SQLAlchemy(app)
 
 # Feste Klassenliste
