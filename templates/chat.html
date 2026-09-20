@@ -188,7 +188,6 @@
     // --- LIVE UPDATER WITH AUDIO PROTECTION ---
     async function loadMessages() {
         try {
-            // FIX: Prüfen, ob aktuell eine Sprachnachricht abgespielt wird
             const audios = chatBox.querySelectorAll('audio');
             let isAudioPlaying = false;
             audios.forEach(audio => {
@@ -197,20 +196,17 @@
                 }
             });
 
-            // Wenn gerade jemand ein Audio hört, überspringen wir das Update, damit es nicht abbricht!
             if (isAudioPlaying) return;
 
             const response = await fetch(`/api/chat-messages/${currentRoom}`);
             if (response.ok) {
                 
                 const rawNachrichten = await response.json();
-                // Nur die letzten 100 Nachrichten behalten
                 const nachrichten = rawNachrichten.slice(-150); 
                 
                 const wasAtBottom = chatBox.scrollHeight - chatBox.clientHeight <= chatBox.scrollTop + 50;
                 
                 chatBox.innerHTML = '';
-                
                 
                 nachrichten.forEach((msg, index) => {
                     let deleteButton = '';
@@ -218,8 +214,12 @@
 
                     const isSenderAdmin = adminList.includes(msg.name);
                     const isMeAdmin = adminList.includes(currentUsername);
-                    const nameColor = isSenderAdmin ? "#9b59b6" : "#00adb5";
                     const crown = isSenderAdmin ? "👑 " : "";
+                    
+                    // --- NEU: Level, Titel & Custom Farben aus der DB laden ---
+                    let nameStyle = msg.color ? (msg.color === 'rainbow' ? 'background-image: linear-gradient(to left, violet, indigo, blue, green, yellow, orange, red); -webkit-background-clip: text; color: transparent;' : `color: ${msg.color};`) : (isSenderAdmin ? 'color: #9b59b6;' : 'color: #00adb5;');
+                    let titleBadge = msg.title ? `<span style="background:#f1c40f; color:black; font-size:10px; padding:2px 5px; border-radius:5px; margin-right:5px; box-shadow: 0 0 5px rgba(241,196,15,0.5);">${msg.title}</span>` : '';
+                    let levelBadge = `<span style="color:#aaa; font-size:10px; margin-right:5px;">[Lv.${msg.level || 1}]</span>`;
                     
                     if (msg.name === currentUsername || isMeAdmin) {
                         deleteButton = `
@@ -236,9 +236,10 @@
                         }
                     }
 
+                    // --- NEU: HTML zusammenbauen mit Level und Titel ---
                     chatBox.innerHTML += `
                     <div class="message" style="position: relative; padding-right: 40px;">
-                        <b style="color: ${nameColor};">${crown}${msg.name}</b>
+                        <b style="${nameStyle}">${levelBadge} ${titleBadge} ${crown}${msg.name}</b>
                         <span>${formatMessageText(msg.text)}</span>
                         ${statusHook}
                         ${deleteButton}
@@ -249,7 +250,6 @@
             }
         } catch (e) { console.error(e); }
     }
-    setInterval(loadMessages, 3000);
 
     // --- 🖼️ BILD-UPLOAD (iPad optimiert) ---
     const imageInput = document.getElementById('imageInput');
