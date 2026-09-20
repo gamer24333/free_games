@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Class-Slither Arena</title>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background: #111; color: white; font-family: Arial, sans-serif; }
+        canvas { display: block; }
+        
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        #leaderboard { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 10px; border: 1px solid #555; pointer-events: none; }
+        #leaderboard h3 { margin: 0 0 10px 0; color: #2ecc71; text-align: center; }
+        
+        #score-display { position: absolute; bottom: 20px; left: 20px; font-size: 24px; font-weight: bold; background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 30px; pointer-events: none; }
+        
+        #death-screen { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; flex-direction: column; pointer-events: all; }
+        .btn { padding: 15px 30px; background: #00adb5; color: white; text-decoration: none; border-radius: 8px; font-size: 20px; border: none; cursor: pointer; font-weight: bold; margin-top: 20px; }
+        .btn:hover { background: #007c82; }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui-layer">
+        <div id="leaderboard">
+            <h3>🏆 Top 5</h3>
+            <div id="lb-list"></div>
+        </div>
+        <div id="score-display">Punkte: <span id="my-score">0</span></div>
+    </div>
+
+    <div id="death-screen">
+        <h1 style="color: #ff2e63; font-size: 50px; margin: 0;">Du wurdest gefressen! 💀</h1>
+        <p style="font-size: 24px;">Dein Score: <span id="final-score">0</span></p>
+        <button class="btn" onclick="location.reload()">Neuer Versuch</button>
+        <a href="/slither" style="color: #aaa; margin-top: 15px; text-decoration: none;">Zurück ins Menü</a>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const myName = "{{ me }}";
+        const mapSize = 3000;
+        
+        // Farben-Pool
+        const colors = ["#ff2e63", "#00adb5", "#2ecc71", "#f1c40f", "#9b59b6", "#e67e22"];
+        const myColor = colors[Math.floor(Math.random() * colors.length)];
+
+        // Mein Spieler
+        let myBody = [
+            [Math.random() * (mapSize - 400) + 200, Math.random() * (mapSize - 400) + 200]
+        ];
+        let myScore = 10;
+        let myAngle = 0;
+        let isDead = false;
+        
+        // Maussteuerung
+        let targetAngle = 0;
+        window.addEventListener('mousemove', (e) => {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            targetAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+        });
+
+        // Server-Daten
+        let otherPlayers = {};
+        let bots = {};
+        let foods = {};
+        let leaderboard = [];
+        let newlyEatenFood = [];
+
+        function getRadius(score) {
+            return 10 + (score / 20); // Schlange wird dicker
+        }
+
+        // Main Game Loop (Lokal gerendert für weiche Bewegungen, ca. 60 FPS)
+        function updateLocal() {
+            if (isDead) return;
+
+            // Bewegung glätten
+            let angleDiff = targetAngle - myAngle;
+            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+            myAngle += angleDiff * 0.1;
+
+            const speed = 4 + (100 / (myScore + 100)); // Wird langsamer, je größer
+            
+            const head = myBody[0];
+            let newX = head[0] + Math.cos(myAngle) * speed;
+            let newY = head[1] + Math.sin(myAngle) * speed;
+
+            // Kartengrenzen blockieren
+            if (newX < 0) newX = 0; if (newX > mapSize) newX = mapSize;
+            if (newY < 0) newY = 0; if (newY > mapSize) newY = mapSize;
+
+            myBody.unshift([newX, newY]); // Neuen Kopf setzen
+
+            const targetLength = Math.floor(myScore / 5) + 5;
+            while (myBody.length > targetLength) {
+                myBody.pop(); // Schwanz abschneiden
+            }
+
+            // Kollision mit Futter prüfen
+            const myRadius = getRadius(myScore);
+            for (let [fid, f] of Object.entries(foods)) {
+                const dist = Math.hypot(newX - f.x, newY - f.y);
+                if (dist < myRadius + (f.v === 5 ? 10 : 5)) {
+                    myScore += f.v;
+                    newlyEatenFood.push(fid);
+                    delete foods[fid]; // Lokal sofort löschen
+                }
+            }
+
+            // Kollision mit anderen Spielern (Wurde ich gefressen?)
+            let killedBy = null;
+            const checkCollision = (entities) => {
+                for (let [name, data] of Object.entries(entities)) {
+                    if (!data.body || data.body.length === 0) continue;
+                    const enemyRadius = getRadius(data.score);
+                    // Kopf gegen fremde Körperteile
+                    for (let i = 0; i < data.body.length; i++) {
+                        const dist = Math.hypot(newX - data.body[i][0], newY - data.body[i][1]);
+                        if (dist < (myRadius + enemyRadius) * 0.7) {
+                            killedBy = name;
+                            break;
+                        }
+                    }
+                    if (killedBy) break;
+                }
+            };
+            
+            checkCollision(otherPlayers);
+            if (!killedBy) checkCollision(bots);
+
+            if (killedBy) {
+                isDead = true;
+                syncServer(true); // Tod sofort melden
+                document.getElementById('death-screen').style.display = "flex";
+                document.getElementById('final-score').innerText = myScore;
+            }
+        }
+
+        function drawGame() {
+            if (isDead) return;
+
+            // Kamera auf Spieler zentrieren
+            const head = myBody[0];
+            const camX = head[0] - canvas.width / 2;
+            const camY = head[1] - canvas.height / 2;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(-camX, -camY);
+
+            // Raster zeichnen (Arena)
+            ctx.strokeStyle = "#222";
+            ctx.lineWidth = 2;
+            for(let x=0; x<=mapSize; x+=100) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,mapSize); ctx.stroke(); }
+            for(let y=0; y<=mapSize; y+=100) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(mapSize,y); ctx.stroke(); }
+            ctx.strokeStyle = "#ff2e63"; ctx.strokeRect(0, 0, mapSize, mapSize); // Rote Todes-Grenze
+
+            // Futter zeichnen
+            for (let [fid, f] of Object.entries(foods)) {
+                ctx.beginPath();
+                ctx.arc(f.x, f.y, f.v === 5 ? 10 : 5, 0, Math.PI * 2);
+                ctx.fillStyle = f.c;
+                ctx.fill();
+                ctx.shadowBlur = 10; ctx.shadowColor = f.c;
+            }
+            ctx.shadowBlur = 0; // Shadow Reset
+
+            // Helper um Schlangen zu zeichnen
+            const drawSnake = (body, color, name, score) => {
+                if(!body || body.length === 0) return;
+                const r = getRadius(score);
+                
+                // Körper
+                ctx.lineWidth = r * 2;
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
+                ctx.strokeStyle = color;
+                
+                ctx.beginPath();
+                ctx.moveTo(body[0][0], body[0][1]);
+                for (let i = 1; i < body.length; i++) ctx.lineTo(body[i][0], body[i][1]);
+                ctx.stroke();
+
+                // Name über dem Kopf
+                ctx.fillStyle = "white";
+                ctx.font = "14px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText(name, body[0][0], body[0][1] - r - 10);
+            };
+
+            // Andere Spieler & Bots
+            for (let [p, d] of Object.entries(otherPlayers)) drawSnake(d.body, d.color, p, d.score);
+            for (let [b, d] of Object.entries(bots)) drawSnake(d.body, d.color, b, d.score);
+
+            // Ich selbst
+            drawSnake(myBody, myColor, myName, myScore);
+
+            ctx.restore();
+
+            // UI updaten
+            document.getElementById('my-score').innerText = myScore;
+            
+            let lbHtml = "";
+            leaderboard.forEach((item, index) => {
+                const isMe = item[0] === myName ? 'style="color:#00adb5; font-weight:bold;"' : '';
+                lbHtml += `<div ${isMe}>${index+1}. ${item[0]} - ${item[1]}</div>`;
+            });
+            document.getElementById('lb-list').innerHTML = lbHtml;
+
+            requestAnimationFrame(() => {
+                updateLocal();
+                drawGame();
+            });
+        }
+
+        // Server Synchronisation (alle 100ms)
+        async function syncServer(sendingDeath = false) {
+            try {
+                const res = await fetch('/api/slither/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        body: myBody,
+                        color: myColor,
+                        score: myScore,
+                        eaten: newlyEatenFood,
+                        is_dead: sendingDeath
+                    })
+                });
+                
+                newlyEatenFood = []; // Geleert nach dem Senden
+                
+                if(res.ok && !sendingDeath) {
+                    const data = await res.json();
+                    otherPlayers = data.players;
+                    bots = data.bots;
+                    foods = data.food;
+                    leaderboard = data.leaderboard;
+                }
+            } catch (e) { console.log(e); }
+        }
+
+        setInterval(() => { if(!isDead) syncServer(false); }, 100);
+
+        // Resize Fix
+        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+
+        // Start
+        updateLocal();
+        drawGame();
+    </script>
+</body>
+</html>
