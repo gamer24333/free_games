@@ -58,6 +58,7 @@ class UserSetting(db.Model):
     is_admin = db.Column(db.Boolean, default=False)
     last_seen = db.Column(db.DateTime, nullable=True)
     banned_until = db.Column(db.DateTime, nullable=True)
+    playtime_total = db.Column(db.Integer, default=0)
     
 
 class ChatMessage(db.Model):
@@ -86,6 +87,15 @@ class GameScore(db.Model):
     doodle = db.Column(db.Integer, default=0)
     brickbreaker = db.Column(db.Integer, default=0)
     speedtyping = db.Column(db.Integer, default=0)
+    playtime_gd = db.Column(db.Integer, default=0)
+    playtime_clicker = db.Column(db.Integer, default=0)
+    playtime_flappy = db.Column(db.Integer, default=0)
+    playtime_reaction = db.Column(db.Integer, default=0)
+    playtime_snake = db.Column(db.Integer, default=0)
+    playtime_crossy = db.Column(db.Integer, default=0)
+    playtime_doodle = db.Column(db.Integer, default=0)
+    playtime_brickbreaker = db.Column(db.Integer, default=0)
+    playtime_speedtyping = db.Column(db.Integer, default=0)
 
 class TicTacToeGame(db.Model):
     __tablename__ = 'tictactoe_games'
@@ -167,16 +177,41 @@ def index():
 
 # Herzschlag-Schnittstelle für den Live-Online-Status im Chat
 @app.route('/api/ping', methods=['POST'])
+@app.route('/api/ping', methods=['POST'])
 def ping_user():
     if 'username' in session:
         current_user = session['username']
         last_active[current_user] = datetime.now()
         
-        # Aktivität aus dem JSON-Request auslesen
         data = request.get_json(silent=True) or {}
         activity = data.get('activity', 'Im Portal')
         user_activities[current_user] = activity
         
+        # --- NEU: Spielzeit tracken ---
+        user = UserSetting.query.filter_by(username=current_user).first()
+        if user:
+            user.playtime_total = (user.playtime_total or 0) + 5
+            
+            # Spezifische Spielzeit
+            if activity.startswith("Spielt "):
+                game_name = activity.replace("Spielt ", "").lower()
+                score_entry = GameScore.query.filter_by(username=current_user).first()
+                if not score_entry:
+                    score_entry = GameScore(username=current_user)
+                    db.session.add(score_entry)
+                
+                if game_name == "geometry dash": score_entry.playtime_gd = (score_entry.playtime_gd or 0) + 5
+                elif game_name == "clicker": score_entry.playtime_clicker = (score_entry.playtime_clicker or 0) + 5
+                elif game_name == "flappy bird": score_entry.playtime_flappy = (score_entry.playtime_flappy or 0) + 5
+                elif game_name == "reaction": score_entry.playtime_reaction = (score_entry.playtime_reaction or 0) + 5
+                elif game_name == "snake": score_entry.playtime_snake = (score_entry.playtime_snake or 0) + 5
+                elif game_name == "crossy": score_entry.playtime_crossy = (score_entry.playtime_crossy or 0) + 5
+                elif game_name == "neon jump": score_entry.playtime_doodle = (score_entry.playtime_doodle or 0) + 5
+                elif game_name == "brickbreaker": score_entry.playtime_brickbreaker = (score_entry.playtime_brickbreaker or 0) + 5
+                elif game_name == "speedtyping": score_entry.playtime_speedtyping = (score_entry.playtime_speedtyping or 0) + 5
+            
+            db.session.commit()
+            
         return {"status": "success"}
     return {"error": "Unauthorized"}, 401
 
@@ -208,6 +243,49 @@ def dashboard_stats():
             "user_activities": user_activities  # <- NEU: Aktivitäten an den Client senden
         }
     return {"error": "Nicht autorisiert"}, 401
+
+@app.route('/stats')
+def global_stats():
+    if 'username' not in session: return redirect(url_for('login'))
+    
+    all_users = UserSetting.query.all()
+    all_scores = GameScore.query.all()
+    
+    points = {u.username: 0 for u in all_users}
+    
+    def assign_points(game_attr, reverse=True, ignore_val=None):
+        valid_scores = [s for s in all_scores if getattr(s, game_attr) is not None and getattr(s, game_attr) != ignore_val]
+        valid_scores.sort(key=lambda x: getattr(x, game_attr), reverse=reverse)
+        for i, s in enumerate(valid_scores[:10]): # Nur Top 10 bekommen Punkte
+            points[s.username] += (10 - i)
+            
+    assign_points('geometry_dash', ignore_val=0)
+    assign_points('clicker', ignore_val=0)
+    assign_points('flappy', ignore_val=-1)
+    assign_points('reaction', reverse=False, ignore_val=9999) # Bei Reaction ist weniger besser
+    assign_points('snake', ignore_val=0)
+    assign_points('crossy', ignore_val=0)
+    assign_points('doodle', ignore_val=0)
+    assign_points('brickbreaker', ignore_val=0)
+    assign_points('speedtyping', ignore_val=0)
+    
+    efficiency_list = []
+    for u in all_users:
+        total_min = max(1, (u.playtime_total or 0) / 60.0) # Verhindert Division durch 0
+        pts = points.get(u.username, 0)
+        eff = round(pts / (total_min / 10), 2) # Faktor für schönere Zahlen
+        
+        efficiency_list.append({
+            'name': u.username,
+            'points': pts,
+            'playtime_min': round((u.playtime_total or 0) / 60),
+            'efficiency': eff
+        })
+        
+    efficiency_list.sort(key=lambda x: x['efficiency'], reverse=True)
+    scores_dict = {s.username: s for s in all_scores}
+    
+    return render_template('stats.html', efficiency=efficiency_list, scores=scores_dict)
 
 
 @app.route('/login', methods=['GET', 'POST'])
