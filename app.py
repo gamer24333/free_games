@@ -113,7 +113,7 @@ class UserSetting(db.Model):
     xp = db.Column(db.Integer, default=0)
     coins = db.Column(db.Integer, default=0)
     inventory = db.Column(db.Text, default='[]')
-    active_title = db.Column(db.String(50), nullable=True)
+    active_title = db.Column(db.Text, default='[]')
     active_color = db.Column(db.String(50), nullable=True)
 
 class ChatMessage(db.Model):
@@ -324,8 +324,28 @@ def dashboard_stats():
 @app.route('/api/shop/data')
 def shop_data():
     if 'username' not in session: return {}, 401
-    u = UserSetting.query.filter_by(username=session['username']).first()
+    username = session['username']
+    u = UserSetting.query.filter_by(username=username).first()
+    if not u: return {}, 404
+    
     inv = json.loads(u.inventory) if u.inventory else []
+    
+    # Admins automatisch Admin-Items ins Inventar geben
+    admins_list = get_admins_list()
+    if username == "Till" or u.is_admin or username in admins_list:
+        admin_items = ["title_admin", "title_crown", "color_purple"]
+        for ai in admin_items:
+            if ai not in inv:
+                inv.append(ai)
+        u.inventory = json.dumps(inv)
+        db.session.commit()
+
+    try:
+        active_titles = json.loads(u.active_title) if u.active_title and u.active_title.startswith('[') else ([u.active_title] if u.active_title else [])
+    except:
+        active_titles = [u.active_title] if u.active_title else []
+
+    
     return jsonify({
         "coins": u.coins or 0,
         "inventory": inv,
@@ -365,9 +385,19 @@ def shop_equip():
     
     item = SHOP_ITEMS[item_id]
     if item["type"] == "title":
-        u.active_title = item["value"] if u.active_title != item["value"] else None # Toggle
+        try:
+            active_titles = json.loads(u.active_title) if u.active_title and u.active_title.startswith('[') else ([u.active_title] if u.active_title else [])
+        except:
+            active_titles = [u.active_title] if u.active_title else []
+            
+        if item["value"] in active_titles:
+            active_titles.remove(item["value"]) # Unequip
+        else:
+            active_titles.append(item["value"]) # Equip
+        u.active_title = json.dumps(active_titles)
+        
     elif item["type"] == "color":
-        u.active_color = item["value"] if u.active_color != item["value"] else None # Toggle
+        u.active_color = item["value"] if u.active_color != item["value"] else None # Toggle color
         
     db.session.commit()
     return {"status": "success"}
