@@ -208,6 +208,11 @@
         const scoreEl = document.getElementById('score');
         const gameContainer = document.querySelector('.game-container');
         const fullscreenLink = document.getElementById('fullscreenLink');
+        
+        let lastTime = performance.now();
+        let timeAccumulator = 0;
+        const STEP_TIME = 0.12; // 120 Millisekunden pro Schritt (als Sekunden)
+        
 
         // Hintergrundmusik einrichten
        // Hintergrundmusik einrichten (Web Audio API)
@@ -551,11 +556,34 @@
             }
         }
 
-        resetGame();
-        setInterval(() => {
-            update();
+       resetGame();
+        
+        function loop(timestamp) {
+            if (!timestamp) timestamp = performance.now();
+            
+            // Vergangene Zeit berechnen (in Sekunden)
+            let deltaTime = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+            
+            // Limitieren, falls der Tab verlassen wurde (verhindert den "Death of a thousand steps")
+            if (deltaTime > 0.25) deltaTime = 0.25;
+            
+            // Zeit ansammeln
+            timeAccumulator += deltaTime;
+            
+            // Solange genug Zeit für einen Schritt angesammelt wurde, mache einen Schritt
+            while (timeAccumulator >= STEP_TIME) {
+                update(); // Hier springt die Schlange ein Feld weiter
+                timeAccumulator -= STEP_TIME;
+            }
+            
+            // Das Zeichnen passiert immer, so flüssig der Monitor es hergibt
             draw();
-        }, 120);
+            
+            requestAnimationFrame(loop);
+        }
+        
+        requestAnimationFrame(loop);
         // Fokus-Fix: Hört sofort auf die Tastatur
         window.onload = function() {
             window.focus();
