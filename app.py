@@ -784,14 +784,41 @@ def slither_sync():
         new_x = bot["x"] + math.cos(bot["angle"]) * speed
         new_y = bot["y"] + math.sin(bot["angle"]) * speed
         
-        # --- NEU: BOTS STERBEN AN DER WAND ---
-        if new_x < 0 or new_x > SLITHER_STATE["map_size"] or new_y < 0 or new_y > SLITHER_STATE["map_size"]:
+        # --- AB HIER NEU: BOTS STERBEN AN DER WAND ODER AN SPIELERN ---
+        bot_radius = 10 + (bot["score"] / 20)
+        bot_died = False
+        
+        # 1. Kollision mit echten Spielern prüfen
+        for p_name, p_data in SLITHER_STATE["players"].items():
+            if not p_data.get("body"): continue
+            enemy_radius = 10 + (p_data.get("score", 0) / 20)
+            for segment in p_data["body"]:
+                dist = math.hypot(new_x - segment[0], new_y - segment[1])
+                if dist < (bot_radius + enemy_radius) * 0.7:
+                    bot_died = True
+                    break
+            if bot_died: break
+            
+        # 2. Kollision mit anderen Bots prüfen
+        if not bot_died:
+            for other_bot_id, other_bot in SLITHER_STATE["bots"].items():
+                if other_bot_id == bot_id or not other_bot.get("body"): continue
+                enemy_radius = 10 + (other_bot.get("score", 0) / 20)
+                for segment in other_bot["body"]:
+                    dist = math.hypot(new_x - segment[0], new_y - segment[1])
+                    if dist < (bot_radius + enemy_radius) * 0.7:
+                        bot_died = True
+                        break
+                if bot_died: break
+
+        # Wenn der Bot die Wand berührt ODER in einen Spieler/anderen Bot gecrasht ist
+        if bot_died or new_x < 0 or new_x > SLITHER_STATE["map_size"] or new_y < 0 or new_y > SLITHER_STATE["map_size"]:
             # Bot platzt in Futter!
             for segment in bot["body"][::2]:
                 fid = str(uuid.uuid4())[:8]
                 SLITHER_STATE["food"][fid] = {'x': segment[0], 'y': segment[1], 'c': bot["color"], 'v': 3}
             
-            # Bot direkt in der Mitte neu spawnen lassen
+            # Bot an zufälliger Position neu spawnen
             SLITHER_STATE["bots"][bot_id] = {
                 "body": [[random.randint(1000, 2000), random.randint(1000, 2000)]],
                 "color": random.choice(COLORS),
