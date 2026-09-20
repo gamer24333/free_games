@@ -417,7 +417,8 @@ def shop_equip():
             active_titles.append(item["value"]) # Equip
         u.active_title = json.dumps(active_titles)
         
-   elif item["type"] == "color":
+    elif item["type"] == "color":
+        
         if u.active_color == item["value"]:
             u.active_color = None
         else:
