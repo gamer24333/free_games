@@ -416,7 +416,7 @@
         let hasInv = false;
         for (const [id, item] of Object.entries(data.shop_items)) {
             const isOwned = data.inventory.includes(id);
-            const isEquipped = (data.active_title === item.value || data.active_color === item.value);
+            const isEquipped = Array.isArray(data.active_title) ? data.active_title.includes(item.value) : (data.active_title === item.value || data.active_color === item.value);
             
             // Item für Shop
             if (!isOwned) {
