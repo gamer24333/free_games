@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ranglisten & Spielzeit</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #222; color: white; text-align: center; margin: 0; padding: 20px; }
+        h1, h2 { color: #00adb5; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .btn { display: inline-block; padding: 10px 20px; background: #555; color: white; text-decoration: none; border-radius: 5px; margin-bottom: 20px; font-weight: bold; }
+        
+        /* Karten-Layout für die Tabellen */
+        .card { background: #333; padding: 20px; border-radius: 12px; border: 2px solid #555; margin-bottom: 30px; overflow-x: auto; }
+        .gold-card { border-color: #f1c40f; box-shadow: 0 0 15px rgba(241, 196, 15, 0.3); }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; border-bottom: 1px solid #444; text-align: left; }
+        th { background: #00adb5; color: white; }
+        .gold-card th { background: #f1c40f; color: #222; }
+        tr:hover { background: #444; }
+        .highlight { font-weight: bold; color: #2ecc71; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/welcome" class="btn" style="float: left;">🏠 Zurück zum Dashboard</a>
+        <div style="clear: both;"></div>
+        
+        <h1>🏆 Globale Ranglisten & Statistiken</h1>
+        
+        <!-- Effizienz-König -->
+        <div class="card gold-card">
+            <h2 style="color: #f1c40f; margin-top:0;">👑 Der Effizienz-König (Punkte vs. Zeit)</h2>
+            <p style="font-size: 14px; color:#ccc;">Wer hat die meisten Highscore-Punkte in der geringsten Spielzeit gesammelt?</p>
+            <table>
+                <tr><th>Rang</th><th>Spieler</th><th>Score-Punkte</th><th>Gesamt-Spielzeit</th><th>Effizienz-Wert</th></tr>
+                {% for p in efficiency[:10] %}
+                <tr>
+                    <td>#{{ loop.index }}</td>
+                    <td>{{ p.name }}</td>
+                    <td>{{ p.points }}</td>
+                    <td>{{ p.playtime_min }} Min.</td>
+                    <td class="highlight">{{ p.efficiency }} ⚡</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+
+        <!-- Spielzeit pro Spiel -->
+        <div class="card">
+            <h2 style="margin-top:0;">⏱️ Eure Spielzeiten (in Minuten)</h2>
+            <table>
+                <tr><th>Spieler</th><th>SpeedTyping</th><th>Clicker</th><th>Flappy</th><th>BrickBreaker</th></tr>
+                {% for name, s in scores.items() %}
+                <tr>
+                    <td><b>{{ name }}</b></td>
+                    <td>{{ ((s.playtime_speedtyping or 0) / 60) | round | int }}m</td>
+                    <td>{{ ((s.playtime_clicker or 0) / 60) | round | int }}m</td>
+                    <td>{{ ((s.playtime_flappy or 0) / 60) | round | int }}m</td>
+                    <td>{{ ((s.playtime_brickbreaker or 0) / 60) | round | int }}m</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+</body>
+</html>
