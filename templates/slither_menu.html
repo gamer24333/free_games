@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slither.io Menü</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #222; color: white; text-align: center; margin-top: 50px; }
+        .btn { display: inline-block; padding: 15px 30px; margin: 20px; background: #2ecc71; color: white; text-decoration: none; border-radius: 8px; font-size: 24px; font-weight: bold; }
+        .btn:hover { background: #27ae60; }
+        .box { background: #333; padding: 20px; border-radius: 12px; max-width: 500px; margin: 0 auto; border: 2px solid #00adb5; }
+        .player-tag { display: inline-block; background: #00adb5; padding: 5px 10px; border-radius: 15px; margin: 5px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <h1>🐍 Class-Slither (Live Arena)</h1>
+    
+    <div class="box">
+        <h2 style="margin-top: 0;">Wer ist gerade online?</h2>
+        {% if active_players %}
+            {% for p in active_players %}
+                <span class="player-tag">{{ p }}</span>
+            {% endfor %}
+        {% else %}
+            <p style="color: #aaa;">Die Arena ist leer. Sei der Erste!</p>
+        {% endif %}
+    </div>
+
+    <a href="/slither/play" class="btn">🚀 Arena Betreten!</a>
+    <br>
+    <a href="/games" style="color: #ff2e63; text-decoration: none; font-weight: bold;">Zurück zur Spiele-Zentrale</a>
+</body>
+</html>
