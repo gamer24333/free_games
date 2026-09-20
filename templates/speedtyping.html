@@ -29,12 +29,58 @@
             border-radius: 12px; 
             box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
             border: 2px solid #00adb5; 
+            position: relative;
+        }
+
+        /* Vollbild-Modus (greift nur, wenn die .game-container im Vollbild ist) */
+        .game-container:fullscreen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #222;
+            border: none;
+            border-radius: 0;
+            padding: 50px;
+        }
+        .game-container:fullscreen #word-display {
+            width: 90%;
+            max-width: 900px;
+            height: auto;
+            max-height: 250px;
+            font-size: 32px;
+        }
+        .game-container:fullscreen #input-field {
+            max-width: 600px;
+            font-size: 36px;
+            padding: 20px;
         }
         
-        .stats-bar { display: flex; justify-content: center; gap: 40px; margin-bottom: 20px; }
+        .stats-bar { 
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            gap: 40px; 
+            margin-bottom: 20px; 
+            position: relative; 
+            width: 100%;
+        }
+        
         .stat-box { font-size: 48px; font-weight: bold; }
         #timer { color: #ff2e63; }
         #live-wpm { color: #2ecc71; }
+
+        /* Vollbild-Button im Spielfeld */
+        #fullscreen-btn {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            margin: 0;
+            padding: 8px 12px;
+            font-size: 14px;
+            background: #555;
+        }
         
         #word-display {
             background: #222; border-radius: 8px; padding: 20px; font-size: 24px;
@@ -78,17 +124,15 @@
     <div class="top-bar">
         <a href="/games" class="btn" style="background: #555;">Zurück</a>
         <h1>⌨️ Speed Typing</h1>
-        <div>
-            <button class="btn" id="music-btn" onclick="toggleMusic()" style="background: #9b59b6; margin-right: 10px;">🔊 Musik an</button>
-            <button class="btn" id="fullscreen-btn" onclick="toggleFullscreen()">📺 Vollbild</button>
-        </div>
+        <div style="width: 80px;"></div> <!-- Platzhalter für symmetrisches Layout -->
     </div>
     
     <div class="main-wrapper">
-        <div class="game-container">
+        <div class="game-container" id="game-container">
             <div class="stats-bar">
                 <div class="stat-box" id="timer">60s</div>
                 <div class="stat-box" id="live-wpm">0 <span style="font-size: 20px;">WPM</span></div>
+                <button class="btn" id="fullscreen-btn" onclick="toggleFullscreen()" title="Vollbildmodus (F)">📺 Vollbild</button>
             </div>
             
             <div id="word-display"></div>
@@ -119,7 +163,6 @@
         let audioBuffer;
         let bgmSource;
         let gainNode;
-        let isMusicEnabled = true;
 
         async function initAudio() {
             try {
@@ -127,7 +170,7 @@
                 audioCtx = new AudioContext();
                 
                 gainNode = audioCtx.createGain();
-                gainNode.gain.value = 0.4; // Lautstärke auf 40%
+                gainNode.gain.value = 0.4; 
                 gainNode.connect(audioCtx.destination);
 
                 const response = await fetch('/static/speedtyping.mp3');
@@ -139,18 +182,17 @@
         }
 
         function playMusic() {
-            if (!audioCtx || !audioBuffer || !isMusicEnabled) return;
+            if (!audioCtx || !audioBuffer) return;
             
-            // Verhindert Blockaden durch Browser-Richtlinien
             if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
+                audioCtx.resume(); // Wird beim ersten Tastendruck entsperrt
             }
 
-            if (bgmSource) bgmSource.stop(); // Falls schon was läuft, stoppen
+            if (bgmSource) bgmSource.stop(); 
             
             bgmSource = audioCtx.createBufferSource();
             bgmSource.buffer = audioBuffer;
-            bgmSource.loop = true; // Musik wiederholen, falls sie kürzer als 60s ist
+            bgmSource.loop = true; 
             bgmSource.connect(gainNode);
             bgmSource.start();
         }
@@ -160,19 +202,6 @@
                 bgmSource.stop();
                 bgmSource = null;
             }
-        }
-
-        function toggleMusic() {
-            isMusicEnabled = !isMusicEnabled;
-            const btn = document.getElementById("music-btn");
-            if (isMusicEnabled) {
-                btn.textContent = "🔊 Musik an";
-                if (isPlaying) playMusic(); // Startet Musik direkt, falls man mitten im Spiel ist
-            } else {
-                btn.textContent = "🔇 Musik aus";
-                stopMusic();
-            }
-            btn.blur(); // Fokus entfernen, damit die Leertaste nicht den Button drückt
         }
 
         // --- SPIEL LOGIK ---
@@ -244,7 +273,7 @@
             if (isPlaying) return;
             isPlaying = true;
             
-            playMusic(); // <-- MUSIK STARTET HIER
+            playMusic(); // <-- Musik startet vollautomatisch
             
             timerInterval = setInterval(() => {
                 timeLeft--;
@@ -268,7 +297,7 @@
             isPlaying = false;
             input.disabled = true;
             
-            stopMusic(); // <-- MUSIK STOPPT HIER
+            stopMusic(); // <-- Musik stoppt vollautomatisch
             
             const wpm = correctWords;
             timerDisplay.innerHTML = `<span style="font-size: 32px;">Fertig!</span>`;
@@ -286,19 +315,20 @@
             }
         }
 
-        // Leertaste abfangen & prüfen über keydown (Behebt den Scroll-Bug)
+        // Leertaste abfangen & prüfen über keydown (Ignoriert Großschreibung!)
         input.addEventListener('keydown', (e) => {
             if (e.key === ' ') {
                 e.preventDefault(); 
                 
-                const typedValue = input.value.trim();
+                // toLowerCase() macht iPad-Eingaben "Hund" und "hund" identisch
+                const typedValue = input.value.trim().toLowerCase();
                 if (typedValue.length === 0) return; 
 
                 if (!isPlaying) startGame();
 
                 const wordSpans = display.querySelectorAll('.word');
                 const currentSpan = wordSpans[currentWordIndex];
-                const targetWord = words[currentWordIndex];
+                const targetWord = words[currentWordIndex].toLowerCase();
                 
                 if (typedValue === targetWord) {
                     currentSpan.classList.replace('active', 'correct');
@@ -328,34 +358,49 @@
             }
         });
 
-        // Live Eingabe-Feedback (rot markieren bei Fehler)
+        // Live Eingabe-Feedback (Ignoriert Großschreibung für iPad)
         input.addEventListener('input', (e) => {
             if (!isPlaying && input.value.trim().length > 0) startGame();
             
-            const typedValue = input.value.trim();
+            const typedValue = input.value.trim().toLowerCase();
             if (typedValue.length === 0) return;
             
             const wordSpans = display.querySelectorAll('.word');
             const currentSpan = wordSpans[currentWordIndex];
+            const targetWord = words[currentWordIndex].toLowerCase();
             
-            if (!words[currentWordIndex].startsWith(typedValue)) {
+            if (!targetWord.startsWith(typedValue)) {
                 currentSpan.style.backgroundColor = "rgba(255, 46, 99, 0.3)";
             } else {
                 currentSpan.style.backgroundColor = "";
             }
         });
 
-        // --- VOLLBILD LOGIK ---
+        // --- FOKUS-VOLLBILD LOGIK ---
         function toggleFullscreen() {
+            // Wir versetzen nur die game-container in den Vollbildmodus!
+            const gameContainer = document.getElementById("game-container");
+            const btn = document.getElementById("fullscreen-btn");
+            
             if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen()
-                    .then(() => document.getElementById("fullscreen-btn").textContent = "📺 Vollbild beenden")
-                    .catch(err => console.error(err));
+                if (gameContainer.requestFullscreen) {
+                    gameContainer.requestFullscreen()
+                        .then(() => btn.textContent = "📺 Beenden")
+                        .catch(err => console.error(err));
+                } else if (gameContainer.webkitRequestFullscreen) { /* Safari / iPad Support */
+                    gameContainer.webkitRequestFullscreen();
+                    btn.textContent = "📺 Beenden";
+                }
             } else {
-                document.exitFullscreen()
-                    .then(() => document.getElementById("fullscreen-btn").textContent = "📺 Vollbild");
+                if (document.exitFullscreen) {
+                    document.exitFullscreen()
+                        .then(() => btn.textContent = "📺 Vollbild");
+                } else if (document.webkitExitFullscreen) { /* Safari / iPad Support */
+                    document.webkitExitFullscreen();
+                    btn.textContent = "📺 Vollbild";
+                }
             }
-            document.getElementById("fullscreen-btn").blur(); // Fokus entfernen
+            btn.blur(); 
         }
 
         // F-Taste für Vollbild (ignoriert, solange das Input-Feld fokussiert ist)
