@@ -73,6 +73,10 @@
         let ammoTriple = 2;
         let crate = { x: -100, y: -100, active: false };
 
+        let lastTime = performance.now();
+        let timeAccumulator = 0;
+        const STEP_TIME = 1 / 60; // Zwingt die Physik auf exakt 60 Ticks pro Sekunde
+        
         let isBotMode = false;
         let botCalculated = false;
         let botTargetX = null;
@@ -603,41 +607,52 @@
 
         shootBtn.addEventListener('click', fireTank);
 
-        function gameLoop() { 
-            handleInput(); 
-
-            // Simuliere hier das visuelle Fahren des Bots in Echtzeit!
-            if (isBotMode && botIsMoving) {
-                let st = gameState.raw_state.split(',').map(Number);
-                let diff = botTargetX - gameState.p2_x;
-                
-                // 1.5 Pixel pro Frame bewegen, kostet 0.5 Fuel
-                if (Math.abs(diff) >= 1.5 && st[5] >= 0.5) {
-                    gameState.p2_x += (diff > 0 ? 1.5 : -1.5);
-                    st[5] -= 0.5; // Bot-Treibstoff abziehen
-                    gameState.raw_state = st.join(',');
-                } else {
-                    // Bot ist angekommen oder Tank ist leer
-                    botIsMoving = false;
-                    botAimAndShoot();
-                }
-            }
-
-            draw(); 
+        function gameLoop(timestamp) { 
+            if (!timestamp) timestamp = performance.now();
             
-            // Wenn der Bot dran ist, noch nichts berechnet wurde und er nicht gerade fährt, starte seinen Zug
-            if (isBotMode && gameState.turn === "Computer-Bot 🤖" && !botCalculated && bullets.length === 0 && !botIsMoving) {
-                triggerBotTurn();
+            // Vergangene Zeit berechnen (in Sekunden)
+            let dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+            
+            // Limitieren, falls der Tab verlassen wurde
+            if (dt > 0.25) dt = 0.25;
+            
+            timeAccumulator += dt;
+            
+            // Die gesamte Spiel-Logik läuft jetzt in festen 60-FPS-Schritten!
+            while (timeAccumulator >= STEP_TIME) {
+                handleInput(); 
+
+                // Simuliere hier das visuelle Fahren des Bots in Echtzeit!
+                if (isBotMode && botIsMoving) {
+                    let st = gameState.raw_state.split(',').map(Number);
+                    let diff = botTargetX - gameState.p2_x;
+                    
+                    // 1.5 Pixel pro Frame bewegen, kostet 0.5 Fuel
+                    if (Math.abs(diff) >= 1.5 && st[5] >= 0.5) {
+                        gameState.p2_x += (diff > 0 ? 1.5 : -1.5);
+                        st[5] -= 0.5; // Bot-Treibstoff abziehen
+                        gameState.raw_state = st.join(',');
+                    } else {
+                        // Bot ist angekommen oder Tank ist leer
+                        botIsMoving = false;
+                        botAimAndShoot();
+                    }
+                }
+
+                // Da in deiner draw() Funktion auch die Physik (Kisten fallen, Kugeln fliegen) 
+                // berechnet wird, rufen wir sie hier exakt 60 mal pro Sekunde auf!
+                draw(); 
+                
+                // Wenn der Bot dran ist, noch nichts berechnet wurde und er nicht gerade fährt, starte seinen Zug
+                if (isBotMode && gameState.turn === "Computer-Bot 🤖" && !botCalculated && bullets.length === 0 && !botIsMoving) {
+                    triggerBotTurn();
+                }
+
+                timeAccumulator -= STEP_TIME;
             }
-            requestAnimationFrame(gameLoop); 
-        }
 
-        setInterval(() => {
-            if (!isBotMode) updateStatus();
-        }, 1500);
-
-        initMatch();
-        gameLoop();
+        requestAnimationFrame(gameLoop);
         // Fokus-Fix: Hört sofort auf die Tastatur
         window.onload = function() {
             window.focus();
