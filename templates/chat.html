@@ -98,7 +98,6 @@
 
 <script>
     const currentRoom = "{{ room }}";
-    
     const currentUsername = "{{ session['username'] }}";
     const adminList = {{ admins|tojson }};
     
@@ -107,7 +106,6 @@
     const messageInput = document.getElementById('messageInput');
     const emojiButtons = document.querySelectorAll('.emoji-btn');
 
-    
     function scrollToBottom() {
         chatBox.scrollTop = chatBox.scrollHeight;
     }
@@ -127,13 +125,11 @@
         }
         if (text.startsWith('[AUDIO]')) {
             const base64Data = text.replace('[AUDIO]', '');
-            // playsinline hilft iOS-Geräten, Audio direkt im Chat abzuspielen
             return `<audio controls playsinline src="${base64Data}" style="display: block; margin-top: 5px; max-width: 100%;"></audio>`;
         }
         return text;
     }
         
-    // --- OPTIMISTIC UI FÜR TEXT & MEDIEN ---
     function appendTemporaryMessage(contentHtml) {
         const tempIndex = chatBox.children.length;
         const isMeAdmin = adminList.includes(currentUsername);
@@ -178,7 +174,6 @@
         }
     }
 
-    // --- LIVE UPDATER WITH AUDIO PROTECTION ---
     async function loadMessages() {
         try {
             const audios = chatBox.querySelectorAll('audio');
@@ -193,11 +188,9 @@
 
             const response = await fetch(`/api/chat-messages/${currentRoom}`);
             if (response.ok) {
-                
                 const rawNachrichten = await response.json();
                 const nachrichten = rawNachrichten.slice(-150); 
 
-                // 💡 HIER WIRD DER ZÄHLER JETZT KORREKT AKTUALISIERT:
                 if (currentRoom === "global") {
                     localStorage.setItem('last_seen_messages_global', rawNachrichten.length);
                 } else {
@@ -218,11 +211,32 @@
                     const isMeAdmin = adminList.includes(currentUsername);
                     const crown = isSenderAdmin ? "👑 " : "";
                     
-                    // --- NEU: Level, Titel & Custom Farben aus der DB laden ---
-                    let nameStyle = msg.color ? (msg.color === 'rainbow' ? 'background-image: linear-gradient(to left, violet, indigo, blue, green, yellow, orange, red); -webkit-background-clip: text; color: transparent;' : `color: ${msg.color};`) : (isSenderAdmin ? 'color: #9b59b6;' : 'color: #00adb5;');
+                    // --- FARBEN & TITEL KORREKT PARSEN ---
+                    let nameStyle = '';
+                    if (msg.color) {
+                        if (msg.color === 'rainbow') {
+                            nameStyle = 'background-image: linear-gradient(to right, red, orange, yellow, green, blue, purple); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: bold;';
+                        } else {
+                            nameStyle = `color: ${msg.color}; font-weight: bold;`;
+                        }
+                    } else {
+                        nameStyle = isSenderAdmin ? 'color: #9b59b6; font-weight: bold;' : 'color: #00adb5; font-weight: bold;';
+                    }
+
                     let titleBadges = '';
-                    if (msg.titles && Array.isArray(msg.titles)) {
-                        msg.titles.forEach(t => {
+                    if (msg.title) {
+                        let titlesList = [];
+                        try {
+                            if (typeof msg.title === 'string' && msg.title.startsWith('[')) {
+                                titlesList = JSON.parse(msg.title);
+                            } else {
+                                titlesList = [msg.title];
+                            }
+                        } catch(e) {
+                            titlesList = [msg.title];
+                        }
+
+                        titlesList.forEach(t => {
                             if (t) {
                                 titleBadges += `<span style="background:#f1c40f; color:black; font-size:10px; padding:2px 5px; border-radius:5px; margin-right:5px; box-shadow: 0 0 5px rgba(241,196,15,0.5);">${t}</span>`;
                             }
@@ -246,7 +260,6 @@
                         }
                     }
 
-                    // --- NEU: HTML zusammenbauen mit Level und Titel ---
                     chatBox.innerHTML += `
                     <div class="message" style="position: relative; padding-right: 40px;">
                         <b style="${nameStyle}">${levelBadge} ${titleBadges} ${crown}${msg.name}</b>
@@ -261,9 +274,7 @@
         } catch (e) { console.error(e); }
     }
 
-    // --- 🖼️ BILD-UPLOAD (iPad optimiert) ---
     const imageInput = document.getElementById('imageInput');
-    // Für iOS erzwingen wir gängige Formate im Event-Listener
     imageInput.setAttribute('accept', 'image/jpeg, image/png, image/gif');
     
     imageInput.addEventListener('change', function() {
@@ -273,17 +284,14 @@
         const reader = new FileReader();
         reader.onloadend = async function() {
             const base64String = '[IMAGE]' + reader.result;
-            
             const previewHtml = `<img src="${reader.result}" style="max-width: 200px; border-radius: 8px; display: block; margin-top: 5px;">`;
             appendTemporaryMessage(previewHtml);
-            
             await sendMediaMessage(base64String);
         };
         reader.readAsDataURL(file);
         imageInput.value = ""; 
     });
 
-    // --- 🎙️ SPRACHNACHRICHTEN (iPad & Safari kompatibel) ---
     let mediaRecorder;
     let audioChunks = [];
     const voiceBtn = document.getElementById('voiceBtn');
@@ -292,17 +300,13 @@
     voiceBtn.addEventListener('click', async () => {
         if (!mediaRecorder || mediaRecorder.state === "inactive") {
             try {
-                // iOS verlangt korrekte Berechtigungs-Anfragen
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
-                // iOS/Safari unterstützt oft kein audio/mp3 beim Aufnehmen. 
-                // Wir testen, was das Gerät kann (audio/webm oder Standard-Container)
                 let options = { mimeType: 'audio/webm' };
                 if (!MediaRecorder.isTypeSupported('audio/webm')) {
-                    options = { mimeType: 'audio/mp4' }; // Fallback für iPads
+                    options = { mimeType: 'audio/mp4' };
                 }
                 if (!MediaRecorder.isTypeSupported('audio/mp4')) {
-                    options = {}; // Fallback falls beides zickt
+                    options = {};
                 }
 
                 mediaRecorder = new MediaRecorder(stream, options);
@@ -317,21 +321,17 @@
                     const reader = new FileReader();
                     reader.onloadend = async function() {
                         const base64Audio = '[AUDIO]' + reader.result;
-                        
                         const previewHtml = `<audio controls playsinline src="${reader.result}" style="display: block; margin-top: 5px; max-width: 100%;"></audio>`;
                         appendTemporaryMessage(previewHtml);
-
                         await sendMediaMessage(base64Audio);
                     };
                     reader.readAsDataURL(audioBlob);
                     voiceStatus.textContent = "";
                     voiceBtn.style.background = "#e74c3c";
-                    
-                    // Schaltet das Mikrofon-Lämpchen auf dem iPad nach der Aufnahme wieder aus
                     stream.getTracks().forEach(track => track.stop());
                 };
 
-                mediaRecorder.start(10); // Schreibt Daten alle 10ms (hilft iOS-Stabilität)
+                mediaRecorder.start(10);
                 voiceStatus.textContent = "🔴 Aufnahme läuft... (Nochmal drücken zum Stoppen)";
                 voiceBtn.style.background = "#2c3e50";
             } catch (err) {
@@ -343,7 +343,6 @@
         }
     });
 
-    // --- ACTIVITY ERKENNUNG & SIDEBAR UPDATER ---
     function getMyCurrentActivity() {
         const path = window.location.pathname;
         if (path.includes('/chat')) return '💬 Im Chat';
@@ -361,7 +360,6 @@
         return '🌐 Im Portal';
     }
     
-    // --- DM BADGES & ONLINE STATUS UPDATER ---
     async function checkSidebarUpdates() {
         try {
             const response = await fetch('/api/dashboard-stats');
@@ -392,22 +390,22 @@
 
                 if (stats.online_users) {
                     document.querySelectorAll('.partner-btn').forEach(btn => {
-                            const partnerName = btn.getAttribute('data-partner');
-                            const dot = document.getElementById(`status-${partnerName}`);
-                            const activitySpan = document.getElementById(`activity-${partnerName}`);
-                            if (dot) {
-                                if (stats.online_users.includes(partnerName)) {
-                                    dot.classList.add('online');
-                                    if (activitySpan && stats.user_activities && stats.user_activities[partnerName]) {
-                                        activitySpan.textContent = stats.user_activities[partnerName];
-                                    }
-                                } else {
-                                    dot.classList.remove('online');
-                                    if (activitySpan) {
-                                        activitySpan.textContent = "Offline";
+                        const partnerName = btn.getAttribute('data-partner');
+                        const dot = document.getElementById(`status-${partnerName}`);
+                        const activitySpan = document.getElementById(`activity-${partnerName}`);
+                        if (dot) {
+                            if (stats.online_users.includes(partnerName)) {
+                                dot.classList.add('online');
+                                if (activitySpan && stats.user_activities && stats.user_activities[partnerName]) {
+                                    activitySpan.textContent = stats.user_activities[partnerName];
+                                }
+                            } else {
+                                dot.classList.remove('online');
+                                if (activitySpan) {
+                                    activitySpan.textContent = "Offline";
                                 }
                             }
-                        }                   
+                        }                    
                     });
                 }
             }
@@ -416,12 +414,10 @@
     setInterval(checkSidebarUpdates, 4000);
     checkSidebarUpdates();
 
-    // 💡 HIER ERGÄNZEN: Nachrichten sofort beim Laden holen und alle 3 Sekunden aktualisieren
     loadMessages();
     setInterval(loadMessages, 3000);
 
-    // --- AKTIVITÄTS-PING AN DEN SERVER ---
-async function sendHeartbeat() {
+    async function sendHeartbeat() {
         try {
             await fetch('/api/ping', { 
                 method: 'POST',
@@ -431,11 +427,9 @@ async function sendHeartbeat() {
         } catch (e) { 
             console.error("Ping-Fehler:", e); 
         }
-}
-// Sofort pingen und danach alle 10 Sekunden wiederholen
-sendHeartbeat();
-setInterval(sendHeartbeat, 10000);
-    
+    }
+    sendHeartbeat();
+    setInterval(sendHeartbeat, 10000);
 </script>
 </body>
 </html>
