@@ -2,14 +2,14 @@ import os
 import random
 import uuid
 import time
+import json
+import math
+from datetime import datetime, timedelta
 from flask import Flask, redirect, render_template, request, session, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime, timedelta
-import math
-import json
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY")
+app.secret_key = os.environ.get("SECRET_KEY", "dev_secret")
 
 # --- DATENBANK KONFIGURATION (NEON.TECH) ---
 db_url = os.environ.get("DATABASE_URL")
@@ -30,9 +30,18 @@ KLASSEN_LISTE = [
     "TestAccount"
 ]
 
-# RAM-Speicher für die Online-Erkennung (letzter Ping/Aktivität)
+# RAM-Speicher
 last_active = {}
 user_activities = {}
+
+# --- SHOP ITEMS ---
+SHOP_ITEMS = {
+    "title_destroyer": {"id": "title_destroyer", "type": "title", "name": "Titel: Der Zerstörer", "desc": "Ein bedrohlicher Titel im Chat.", "price": 250, "value": "Der Zerstörer"},
+    "title_king": {"id": "title_king", "type": "title", "name": "Titel: King", "desc": "Zeig allen, wer der Boss ist.", "price": 500, "value": "King"},
+    "color_gold": {"id": "color_gold", "type": "color", "name": "Name: Gold", "desc": "Dein Name leuchtet Gold.", "price": 300, "value": "#f1c40f"},
+    "color_rainbow": {"id": "color_rainbow", "type": "color", "name": "Name: Regenbogen", "desc": "Bunter Chat-Name!", "price": 800, "value": "rainbow"},
+    "color_neon": {"id": "color_neon", "type": "color", "name": "Name: Neon Cyan", "desc": "Helles Hacker-Blau.", "price": 300, "value": "#00adb5"}
+}
 
 # --- SLITHER.IO RAM-SPEICHER ---
 SLITHER_STATE = {
@@ -70,11 +79,11 @@ for i in range(3):
 # --- GEHEIMCODES ---
 GEHEIME_CODES = {
     "TILLISTDERBESTEADMIN": "double_score",
-    "HACKER": "admin"  # Macht den User direkt zum Admin
+    "HACKER": "admin",
+    "REICHTUM": "1000_coins"
 }
 
 # --- DATENBANK MODELLE (TABELLEN) ---
-
 class Feedback(db.Model):
     __tablename__ = 'feedback'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -86,7 +95,7 @@ class AdminMessage(db.Model):
     __tablename__ = 'admin_messages'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     sender = db.Column(db.String(50), nullable=False)
-    target = db.Column(db.String(50), nullable=False) # 'alle' oder einzelner Name
+    target = db.Column(db.String(50), nullable=False)
     title = db.Column(db.String(100), nullable=False)
     message = db.Column(db.Text, nullable=False)
 
@@ -99,6 +108,13 @@ class UserSetting(db.Model):
     banned_until = db.Column(db.DateTime, nullable=True)
     playtime_total = db.Column(db.Integer, default=0)
     score_multiplier = db.Column(db.Integer, default=1)  
+    
+    # NEUE SPALTEN (XP, Coins, Inventar)
+    xp = db.Column(db.Integer, default=0)
+    coins = db.Column(db.Integer, default=0)
+    inventory = db.Column(db.Text, default='[]')
+    active_title = db.Column(db.String(50), nullable=True)
+    active_color = db.Column(db.String(50), nullable=True)
 
 class ChatMessage(db.Model):
     __tablename__ = 'chat_messages'
@@ -167,7 +183,6 @@ class RedeemedCode(db.Model):
 
 
 # --- HILFSFUNKTIONEN ---
-
 def get_private_room_name(user1, user2):
     return "_".join(sorted([user1, user2]))
 
@@ -187,9 +202,19 @@ def get_user_multiplier(username):
         return user.score_multiplier
     return 1
 
+def get_level_info(xp):
+    xp = xp or 0
+    level = min(50, 1 + (xp // 100))
+    if level < 10: rank = "Rookie"
+    elif level < 20: rank = "Amateur"
+    elif level < 30: rank = "Profi"
+    elif level < 40: rank = "Meister"
+    elif level < 50: rank = "Großmeister"
+    else: rank = "Legende"
+    return level, rank
+
 
 # --- ROUTEN ---
-
 @app.before_request
 def update_last_seen():
     if 'username' in session:
@@ -237,11 +262,17 @@ def ping_user():
         activity = data.get('activity', 'Im Portal')
         user_activities[current_user] = activity
         
-        # --- Spielzeit tracken ---
+        # --- Spielzeit & XP/Coins tracken ---
         user = UserSetting.query.filter_by(username=current_user).first()
         if user:
             user.playtime_total = (user.playtime_total or 0) + 5
             
+            # NEU: XP und Coins generieren
+            user.xp = (user.xp or 0) + 2  # 2 XP pro Ping
+            # Alle 25 Pings gibt es 1 Coin (um Inflation zu stoppen)
+            if (user.playtime_total % 25) == 0: 
+                user.coins = (user.coins or 0) + 1
+
             if activity.startswith("Spielt "):
                 game_name = activity.replace("Spielt ", "").lower()
                 score_entry = GameScore.query.filter_by(username=current_user).first()
@@ -289,6 +320,58 @@ def dashboard_stats():
         }
     return {"error": "Nicht autorisiert"}, 401
 
+# --- SHOP & INVENTAR ROUTEN ---
+@app.route('/api/shop/data')
+def shop_data():
+    if 'username' not in session: return {}, 401
+    u = UserSetting.query.filter_by(username=session['username']).first()
+    inv = json.loads(u.inventory) if u.inventory else []
+    return jsonify({
+        "coins": u.coins or 0,
+        "inventory": inv,
+        "active_title": u.active_title,
+        "active_color": u.active_color,
+        "shop_items": SHOP_ITEMS
+    })
+
+@app.route('/api/shop/buy', methods=['POST'])
+def shop_buy():
+    if 'username' not in session: return {"error": "401"}, 401
+    item_id = request.json.get('item_id')
+    if item_id not in SHOP_ITEMS: return {"error": "Item nicht gefunden"}, 400
+    
+    u = UserSetting.query.filter_by(username=session['username']).first()
+    inv = json.loads(u.inventory) if u.inventory else []
+    
+    if item_id in inv: return {"error": "Du besitzt dieses Item bereits!"}, 400
+    
+    price = SHOP_ITEMS[item_id]["price"]
+    if (u.coins or 0) < price: return {"error": "Nicht genug Münzen!"}, 400
+    
+    u.coins -= price
+    inv.append(item_id)
+    u.inventory = json.dumps(inv)
+    db.session.commit()
+    return {"status": "success", "coins": u.coins}
+
+@app.route('/api/shop/equip', methods=['POST'])
+def shop_equip():
+    if 'username' not in session: return {"error": "401"}, 401
+    item_id = request.json.get('item_id')
+    u = UserSetting.query.filter_by(username=session['username']).first()
+    inv = json.loads(u.inventory) if u.inventory else []
+    
+    if item_id not in inv: return {"error": "Item nicht im Inventar!"}, 400
+    
+    item = SHOP_ITEMS[item_id]
+    if item["type"] == "title":
+        u.active_title = item["value"] if u.active_title != item["value"] else None # Toggle
+    elif item["type"] == "color":
+        u.active_color = item["value"] if u.active_color != item["value"] else None # Toggle
+        
+    db.session.commit()
+    return {"status": "success"}
+
 @app.route('/stats')
 def global_stats():
     if 'username' not in session: return redirect(url_for('login'))
@@ -320,15 +403,18 @@ def global_stats():
         total_min = max(1, (u.playtime_total or 0) / 60.0)
         pts = points.get(u.username, 0)
         eff = round(pts / (total_min / 10), 2) 
+        lvl, rank = get_level_info(u.xp)
         
         efficiency_list.append({
             'name': u.username,
             'points': pts,
             'playtime_min': round((u.playtime_total or 0) / 60),
-            'efficiency': eff
+            'efficiency': eff,
+            'level': lvl, 
+            'rank': rank
         })
         
-    efficiency_list.sort(key=lambda x: x['efficiency'], reverse=True)
+    efficiency_list.sort(key=lambda x: x['points'], reverse=True)
     scores_dict = {s.username: s for s in all_scores}
     
     return render_template('stats.html', efficiency=efficiency_list, scores=scores_dict)
@@ -359,6 +445,9 @@ def redeem_code():
     elif belohnung == "admin":
         user.is_admin = True
         msg = "Code akzeptiert! Du bist jetzt Admin!"
+    elif belohnung == "1000_coins":
+        user.coins = (user.coins or 0) + 1000
+        msg = "Code akzeptiert! +1000 Münzen für den Shop!"
     else:
         msg = "Code akzeptiert!"
         
@@ -441,10 +530,16 @@ def dashboard():
     user = UserSetting.query.filter_by(username=me).first()
     is_admin = True if (me == "Till" or (user and user.is_admin)) else False
     
+    lvl, rank = get_level_info(user.xp if user else 0)
+    
     return render_template('dashboard.html', 
                            name=me, 
                            einladungen=aktive_matches, 
-                           is_admin=is_admin, 
+                           is_admin=is_admin,
+                           user_level=lvl, 
+                           user_rank=rank, 
+                           user_xp=(user.xp if user else 0), 
+                           user_coins=(user.coins if user else 0),
                            zeige_spezial_nachricht=zeige_spezial_nachricht,
                            spezial_nachricht_id=spezial_nachricht_id,
                            spezial_titel=spezial_titel,
@@ -622,7 +717,7 @@ def mark_feedback_read(fb_id):
         db.session.commit()
     return {"status": "success"}
 
-# --- CHAT ROUTEN ---
+# --- CHAT ROUTEN (MIT LEVELS & TITELN) ---
 @app.route('/chat')
 @app.route('/chat/<room>')
 def chat(room="global"):
@@ -634,15 +729,8 @@ def chat(room="global"):
     current_user = session['username']
     chpartner = sorted([schueler for schueler in KLASSEN_LISTE if schueler != current_user])
     
-    actual_room = room
-    if room != "global": actual_room = get_private_room_name(current_user, room)
-        
-    db_messages = ChatMessage.query.filter_by(room=actual_room).order_by(ChatMessage.id.asc()).all()
-    db_messages = db_messages[-150:]
-    raum_nachrichten = [{"name": m.sender, "text": m.text} for m in db_messages]
-    
     admins = get_admins_list()
-    return render_template('chat.html', room=room, nachrichten=raum_nachrichten, partner=chpartner, admins=admins, online_liste=online_names)
+    return render_template('chat.html', room=room, partner=chpartner, admins=admins, online_liste=online_names)
 
 @app.route('/chat/<room>/send', methods=['POST'])
 def send_message(room):
@@ -662,31 +750,46 @@ def api_chat_messages(room):
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
     current_user = session['username']
     actual_room = room
+    
     if room != "global":
         partner = room
         actual_room = get_private_room_name(current_user, partner)
-        db_messages = ChatMessage.query.filter_by(room=actual_room).order_by(ChatMessage.id.asc()).all()
-        total_msg_count = len(db_messages)
+        
+    db_messages = ChatMessage.query.filter_by(room=actual_room).order_by(ChatMessage.id.asc()).all()[-150:]
+    
+    # Nutzer-Metadaten laden (Level, Titel, Farbe)
+    all_users = UserSetting.query.all()
+    meta = {}
+    for u in all_users:
+        lvl, _ = get_level_info(u.xp)
+        meta[u.username] = {'lvl': lvl, 'title': u.active_title, 'color': u.active_color}
+
+    partner_seen_count = 9999
+    if room != "global":
+        total_msg_count = ChatMessage.query.filter_by(room=actual_room).count()
         status_rec = ChatReadStatus.query.filter_by(room_id=actual_room, username=current_user).first()
         if not status_rec:
             status_rec = ChatReadStatus(room_id=actual_room, username=current_user, seen_count=total_msg_count)
             db.session.add(status_rec)
-        else: status_rec.seen_count = total_msg_count
+        else: 
+            status_rec.seen_count = total_msg_count
         db.session.commit()
         
         partner_rec = ChatReadStatus.query.filter_by(room_id=actual_room, username=partner).first()
         partner_seen_count = partner_rec.seen_count if partner_rec else 0
-        sliced_messages = db_messages[-150:]
         
-        nachrichten = []
-        for index, m in enumerate(db_messages):
-            nachrichten.append({
-                "name": m.sender, "text": m.text, "gelesen": (index < partner_seen_count)
-            })
-        return jsonify(nachrichten)
-        
-    db_messages = ChatMessage.query.filter_by(room='global').order_by(ChatMessage.id.asc()).all()
-    return jsonify([{"name": m.sender, "text": m.text} for m in db_messages[-150:]])
+    nachrichten = []
+    for index, m in enumerate(db_messages):
+        u_meta = meta.get(m.sender, {'lvl': 1, 'title': None, 'color': None})
+        nachrichten.append({
+            "name": m.sender, 
+            "text": m.text, 
+            "gelesen": (index < partner_seen_count) if room != "global" else True,
+            "level": u_meta['lvl'], 
+            "title": u_meta['title'], 
+            "color": u_meta['color']
+        })
+    return jsonify(nachrichten)
 
 @app.route('/chat/<room>/delete/<int:msg_index>', methods=['POST'])
 def delete_message(room, msg_index):
@@ -698,8 +801,8 @@ def delete_message(room, msg_index):
     db_messages = ChatMessage.query.filter_by(room=actual_room).order_by(ChatMessage.id.asc()).all()
     sliced_messages = db_messages[-150:]
     
-    if 0 <= msg_index < len(db_messages):
-        target_msg = db_messages[msg_index]
+    if 0 <= msg_index < len(sliced_messages):
+        target_msg = sliced_messages[msg_index]
         if target_msg.sender == current_user or current_user in admins:
             db.session.delete(target_msg)
             db.session.commit()
@@ -707,7 +810,6 @@ def delete_message(room, msg_index):
 
 
 # --- SLITHER.IO MULTIPLAYER ROUTEN ---
-
 @app.route('/slither')
 def slither_menu():
     if 'username' not in session: return redirect(url_for('login'))
@@ -1355,4 +1457,15 @@ def tankroyale_delete_match(game_id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        # Automatisches Hinzufügen der neuen Spalten zur bestehenden Datenbank
+        try:
+            db.session.execute(db.text('ALTER TABLE user_settings ADD COLUMN xp INTEGER DEFAULT 0'))
+            db.session.execute(db.text('ALTER TABLE user_settings ADD COLUMN coins INTEGER DEFAULT 0'))
+            db.session.execute(db.text('ALTER TABLE user_settings ADD COLUMN inventory TEXT DEFAULT \'[]\''))
+            db.session.execute(db.text('ALTER TABLE user_settings ADD COLUMN active_title VARCHAR(50)'))
+            db.session.execute(db.text('ALTER TABLE user_settings ADD COLUMN active_color VARCHAR(50)'))
+            db.session.commit()
+        except:
+            db.session.rollback() # Spalten existieren bereits
+            
     app.run(debug=True)
