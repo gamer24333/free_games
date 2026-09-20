@@ -93,6 +93,7 @@
         const scoreEl = document.getElementById('scoreText');
         const gameContainer = document.querySelector('.game-container');
         const fullscreenLink = document.getElementById('fullscreenLink');
+        let lastTime = performance.now();
         
         // --- MUSIK EINBINDEN ---
         // --- MUSIK EINBINDEN (WEB AUDIO API) ---
@@ -231,6 +232,7 @@
         });
 
         function update() {
+            
             if (!gameStarted || isGameOver || isPaused) return;
 
             // X-Bewegung
@@ -238,7 +240,7 @@
             else if (rightPressed) player.dx = 5;
             else player.dx = 0;
 
-            player.x += player.dx;
+            player.x += player.dx * timeScale;
 
             // Portal-Effekt (links raus -> rechts rein)
             if (player.x < -player.w) player.x = canvas.width;
@@ -246,7 +248,7 @@
 
             // Y-Bewegung & Schwerkraft
             player.dy += GRAVITY;
-            player.y += player.dy;
+            player.y += player.dy * timeScale;
 
             // Kamera verschieben, wenn Spieler hoch springt
             if (player.y < canvas.height / 2) {
@@ -321,17 +323,17 @@
             // Plattformen und Monster bewegen
             platforms.forEach(p => {
                 if (p.type === 'moving') {
-                    p.x += p.dx;
+                    p.x += p.dx  * timeScale;
                     if (p.x < 0 || p.x + p.w > canvas.width) p.dx *= -1;
                 }
             });
             monsters.forEach(m => {
-                m.x += m.dx;
+                m.x += m.dx  * timeScale;
                 if (m.x < m.platform.x || m.x + m.w > m.platform.x + m.platform.w) m.dx *= -1;
             });
             springs.forEach(s => {
                 if (s.platform.type === 'moving') {
-                    s.x += s.platform.dx;
+                    s.x += s.platform.dx  * timeScale;
                 }
             });
 
@@ -458,8 +460,17 @@
 
         resetGame();
         
-        function loop() {
-            update();
+        function loop(timestamp) {
+            // 1. Zeit hier berechnen!
+            if (!timestamp) timestamp = performance.now();
+            let deltaTime = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+            if (deltaTime > 0.1) deltaTime = 0.016; 
+            
+            let timeScale = deltaTime * 60;
+
+            // 2. timeScale an update() übergeben
+            update(timeScale);
             draw();
             requestAnimationFrame(loop);
         }
