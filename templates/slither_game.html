@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Class-Slither Arena</title>
     <style>
-        body { margin: 0; padding: 0; overflow: hidden; background: #111; color: white; font-family: Arial, sans-serif; }
+        body { margin: 0; padding: 0; overflow: hidden; background: #111; color: white; font-family: Arial, sans-serif; touch-action: none; /* WICHTIG FÜR IPAD: Verhindert Scrollen */ }
         canvas { display: block; }
         
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
@@ -14,6 +14,10 @@
         
         #score-display { position: absolute; bottom: 20px; left: 20px; font-size: 24px; font-weight: bold; background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 30px; pointer-events: none; }
         
+        /* Neuer Boost Button für iPad/Handy */
+        #mobile-boost { position: absolute; bottom: 30px; right: 30px; width: 80px; height: 80px; background: rgba(255, 46, 99, 0.8); border-radius: 50%; border: 3px solid #ff2e63; color: white; font-weight: bold; font-size: 14px; display: flex; justify-content: center; align-items: center; pointer-events: all; user-select: none; box-shadow: 0 0 15px #ff2e63; cursor: pointer; }
+        #mobile-boost:active { background: #ff2e63; transform: scale(0.95); }
+
         #death-screen { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; flex-direction: column; pointer-events: all; }
         .btn { padding: 15px 30px; background: #00adb5; color: white; text-decoration: none; border-radius: 8px; font-size: 20px; border: none; cursor: pointer; font-weight: bold; margin-top: 20px; }
         .btn:hover { background: #007c82; }
@@ -29,6 +33,7 @@
             <div id="lb-list"></div>
         </div>
         <div id="score-display">Punkte: <span id="my-score">0</span></div>
+        <div id="mobile-boost">⚡ BOOST</div>
     </div>
 
     <div id="death-screen">
@@ -48,87 +53,128 @@
         const myName = "{{ me }}";
         const mapSize = 3000;
         
-        // Farben-Pool
         const colors = ["#ff2e63", "#00adb5", "#2ecc71", "#f1c40f", "#9b59b6", "#e67e22"];
         const myColor = colors[Math.floor(Math.random() * colors.length)];
 
-        // Mein Spieler
-        let myBody = [
-            [Math.random() * (mapSize - 400) + 200, Math.random() * (mapSize - 400) + 200]
-        ];
+        let myBody = [[Math.random() * (mapSize - 400) + 200, Math.random() * (mapSize - 400) + 200]];
         let myScore = 10;
         let myAngle = 0;
         let isDead = false;
         
-        // Maussteuerung
+        // --- STEUERUNG (MAUS & TOUCH & WASD) ---
         let targetAngle = 0;
+        let isBoosting = false;
+        let keys = {w: false, a: false, s: false, d: false};
+
+        // 1. Maus
         window.addEventListener('mousemove', (e) => {
+            if(Object.values(keys).includes(true)) return; // WASD hat Vorrang
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
             targetAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
         });
 
-        // Server-Daten
+        // 2. Touch (iPad)
+        canvas.addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            targetAngle = Math.atan2(touch.clientY - canvas.height/2, touch.clientX - canvas.width/2);
+        }, {passive: false});
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault(); // Stoppt das Scrollen auf Touch-Geräten
+            const touch = e.touches[0];
+            targetAngle = Math.atan2(touch.clientY - canvas.height/2, touch.clientX - canvas.width/2);
+        }, {passive: false});
+
+        // 3. Tastatur (WASD + Boost auf E oder Leertaste)
+        window.addEventListener('keydown', (e) => {
+            const k = e.key.toLowerCase();
+            if(k === 'w' || k === 'arrowup') keys.w = true;
+            if(k === 'a' || k === 'arrowleft') keys.a = true;
+            if(k === 's' || k === 'arrowdown') keys.s = true;
+            if(k === 'd' || k === 'arrowright') keys.d = true;
+            if(k === 'e' || k === ' ') isBoosting = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if(k === 'w' || k === 'arrowup') keys.w = false;
+            if(k === 'a' || k === 'arrowleft') keys.a = false;
+            if(k === 's' || k === 'arrowdown') keys.s = false;
+            if(k === 'd' || k === 'arrowright') keys.d = false;
+            if(k === 'e' || k === ' ') isBoosting = false;
+        });
+
+        // 4. Boost Button (Touch & Klick)
+        const boostBtn = document.getElementById('mobile-boost');
+        boostBtn.addEventListener('mousedown', () => isBoosting = true);
+        boostBtn.addEventListener('mouseup', () => isBoosting = false);
+        boostBtn.addEventListener('touchstart', (e) => { e.preventDefault(); isBoosting = true; });
+        boostBtn.addEventListener('touchend', (e) => { e.preventDefault(); isBoosting = false; });
+
         let otherPlayers = {};
         let bots = {};
         let foods = {};
         let leaderboard = [];
         let newlyEatenFood = [];
+        let boostCostTracker = 0;
 
-        function getRadius(score) {
-            return 10 + (score / 20); // Schlange wird dicker
-        }
+        function getRadius(score) { return 10 + (score / 20); }
 
-        // Main Game Loop (Lokal gerendert für weiche Bewegungen, ca. 60 FPS)
         function updateLocal() {
             if (isDead) return;
+
+            // WASD Winkel berechnen
+            let dx = 0, dy = 0;
+            if (keys.w) dy -= 1; if (keys.s) dy += 1;
+            if (keys.a) dx -= 1; if (keys.d) dx += 1;
+            if (dx !== 0 || dy !== 0) targetAngle = Math.atan2(dy, dx);
 
             // Bewegung glätten
             let angleDiff = targetAngle - myAngle;
             while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
             while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-            myAngle += angleDiff * 0.1;
+            myAngle += angleDiff * 0.15;
 
-            const speed = 4 + (100 / (myScore + 100)); // Wird langsamer, je größer
+            // --- BOOST LOGIK ---
+            let speed = 4 + (100 / (myScore + 100));
+            if (isBoosting && myScore > 15) {
+                speed *= 1.8; // Fast doppelt so schnell!
+                boostCostTracker += 0.3; 
+                if (boostCostTracker >= 1) {
+                    myScore -= 1; // Kostet Punkte
+                    boostCostTracker -= 1;
+                }
+            }
             
             const head = myBody[0];
             let newX = head[0] + Math.cos(myAngle) * speed;
             let newY = head[1] + Math.sin(myAngle) * speed;
 
-            // Kartengrenzen blockieren
             if (newX < 0) newX = 0; if (newX > mapSize) newX = mapSize;
             if (newY < 0) newY = 0; if (newY > mapSize) newY = mapSize;
 
-            myBody.unshift([newX, newY]); // Neuen Kopf setzen
+            myBody.unshift([newX, newY]); 
 
             const targetLength = Math.floor(myScore / 5) + 5;
-            while (myBody.length > targetLength) {
-                myBody.pop(); // Schwanz abschneiden
-            }
+            while (myBody.length > targetLength) myBody.pop();
 
-            // Kollision mit Futter prüfen
             const myRadius = getRadius(myScore);
             for (let [fid, f] of Object.entries(foods)) {
-                const dist = Math.hypot(newX - f.x, newY - f.y);
-                if (dist < myRadius + (f.v === 5 ? 10 : 5)) {
+                if (Math.hypot(newX - f.x, newY - f.y) < myRadius + (f.v === 5 ? 10 : 5)) {
                     myScore += f.v;
                     newlyEatenFood.push(fid);
-                    delete foods[fid]; // Lokal sofort löschen
+                    delete foods[fid]; 
                 }
             }
 
-            // Kollision mit anderen Spielern (Wurde ich gefressen?)
             let killedBy = null;
             const checkCollision = (entities) => {
                 for (let [name, data] of Object.entries(entities)) {
                     if (!data.body || data.body.length === 0) continue;
                     const enemyRadius = getRadius(data.score);
-                    // Kopf gegen fremde Körperteile
                     for (let i = 0; i < data.body.length; i++) {
-                        const dist = Math.hypot(newX - data.body[i][0], newY - data.body[i][1]);
-                        if (dist < (myRadius + enemyRadius) * 0.7) {
-                            killedBy = name;
-                            break;
+                        if (Math.hypot(newX - data.body[i][0], newY - data.body[i][1]) < (myRadius + enemyRadius) * 0.7) {
+                            killedBy = name; break;
                         }
                     }
                     if (killedBy) break;
@@ -140,7 +186,7 @@
 
             if (killedBy) {
                 isDead = true;
-                syncServer(true); // Tod sofort melden
+                syncServer(true); 
                 document.getElementById('death-screen').style.display = "flex";
                 document.getElementById('final-score').innerText = myScore;
             }
@@ -149,23 +195,18 @@
         function drawGame() {
             if (isDead) return;
 
-            // Kamera auf Spieler zentrieren
-            const head = myBody[0];
-            const camX = head[0] - canvas.width / 2;
-            const camY = head[1] - canvas.height / 2;
+            const camX = myBody[0][0] - canvas.width / 2;
+            const camY = myBody[0][1] - canvas.height / 2;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.save();
             ctx.translate(-camX, -camY);
 
-            // Raster zeichnen (Arena)
-            ctx.strokeStyle = "#222";
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#222"; ctx.lineWidth = 2;
             for(let x=0; x<=mapSize; x+=100) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,mapSize); ctx.stroke(); }
             for(let y=0; y<=mapSize; y+=100) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(mapSize,y); ctx.stroke(); }
-            ctx.strokeStyle = "#ff2e63"; ctx.strokeRect(0, 0, mapSize, mapSize); // Rote Todes-Grenze
+            ctx.strokeStyle = "#ff2e63"; ctx.strokeRect(0, 0, mapSize, mapSize); 
 
-            // Futter zeichnen
             for (let [fid, f] of Object.entries(foods)) {
                 ctx.beginPath();
                 ctx.arc(f.x, f.y, f.v === 5 ? 10 : 5, 0, Math.PI * 2);
@@ -173,91 +214,94 @@
                 ctx.fill();
                 ctx.shadowBlur = 10; ctx.shadowColor = f.c;
             }
-            ctx.shadowBlur = 0; // Shadow Reset
+            ctx.shadowBlur = 0;
 
-            // Helper um Schlangen zu zeichnen
             const drawSnake = (body, color, name, score) => {
                 if(!body || body.length === 0) return;
                 const r = getRadius(score);
                 
-                // Körper
                 ctx.lineWidth = r * 2;
                 ctx.lineCap = "round";
                 ctx.lineJoin = "round";
                 ctx.strokeStyle = color;
                 
+                // Leuchten, wenn geboostet wird (nur für den eigenen Spieler im Moment visualisiert)
+                if(name === myName && isBoosting && score > 15) { ctx.shadowBlur = 15; ctx.shadowColor = color; }
+                
                 ctx.beginPath();
                 ctx.moveTo(body[0][0], body[0][1]);
                 for (let i = 1; i < body.length; i++) ctx.lineTo(body[i][0], body[i][1]);
                 ctx.stroke();
+                ctx.shadowBlur = 0;
 
-                // Name über dem Kopf
+                // --- ÜBERRASCHUNG: AUGEN RENDERN ---
+                let headAng = 0;
+                if(body.length > 1) headAng = Math.atan2(body[0][1] - body[1][1], body[0][0] - body[1][0]);
+                
+                const eyeDist = r * 0.6; const eyeR = r * 0.3;
+                const rightEyeX = body[0][0] + Math.cos(headAng + 0.8) * eyeDist;
+                const rightEyeY = body[0][1] + Math.sin(headAng + 0.8) * eyeDist;
+                const leftEyeX = body[0][0] + Math.cos(headAng - 0.8) * eyeDist;
+                const leftEyeY = body[0][1] + Math.sin(headAng - 0.8) * eyeDist;
+
+                ctx.fillStyle = "white"; // Weißes Auge
+                ctx.beginPath(); ctx.arc(rightEyeX, rightEyeY, eyeR, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(leftEyeX, leftEyeY, eyeR, 0, Math.PI*2); ctx.fill();
+                
+                ctx.fillStyle = "black"; // Pupille schaut nach vorne
+                ctx.beginPath(); ctx.arc(rightEyeX + Math.cos(headAng)*eyeR*0.4, rightEyeY + Math.sin(headAng)*eyeR*0.4, eyeR*0.5, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(leftEyeX + Math.cos(headAng)*eyeR*0.4, leftEyeY + Math.sin(headAng)*eyeR*0.4, eyeR*0.5, 0, Math.PI*2); ctx.fill();
+
+                // Name
                 ctx.fillStyle = "white";
                 ctx.font = "14px Arial";
                 ctx.textAlign = "center";
-                ctx.fillText(name, body[0][0], body[0][1] - r - 10);
+                ctx.fillText(name, body[0][0], body[0][1] - r - 15);
+
+                // --- ÜBERRASCHUNG 2: KRONE FÜR PLATZ 1 ---
+                if (leaderboard.length > 0 && leaderboard[0][0] === name) {
+                    ctx.font = "24px Arial";
+                    ctx.fillText("👑", body[0][0], body[0][1] - r - 30);
+                }
             };
 
-            // Andere Spieler & Bots
             for (let [p, d] of Object.entries(otherPlayers)) drawSnake(d.body, d.color, p, d.score);
             for (let [b, d] of Object.entries(bots)) drawSnake(d.body, d.color, b, d.score);
-
-            // Ich selbst
             drawSnake(myBody, myColor, myName, myScore);
 
             ctx.restore();
 
-            // UI updaten
             document.getElementById('my-score').innerText = myScore;
             
             let lbHtml = "";
             leaderboard.forEach((item, index) => {
                 const isMe = item[0] === myName ? 'style="color:#00adb5; font-weight:bold;"' : '';
-                lbHtml += `<div ${isMe}>${index+1}. ${item[0]} - ${item[1]}</div>`;
+                lbHtml += `<div ${isMe}>${index+1}. ${item[0]} ${index===0 ? '👑' : ''} - ${item[1]}</div>`;
             });
             document.getElementById('lb-list').innerHTML = lbHtml;
 
-            requestAnimationFrame(() => {
-                updateLocal();
-                drawGame();
-            });
+            requestAnimationFrame(() => { updateLocal(); drawGame(); });
         }
 
-        // Server Synchronisation (alle 100ms)
         async function syncServer(sendingDeath = false) {
             try {
                 const res = await fetch('/api/slither/sync', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        body: myBody,
-                        color: myColor,
-                        score: myScore,
-                        eaten: newlyEatenFood,
-                        is_dead: sendingDeath
-                    })
+                    body: JSON.stringify({ body: myBody, color: myColor, score: myScore, eaten: newlyEatenFood, is_dead: sendingDeath })
                 });
-                
-                newlyEatenFood = []; // Geleert nach dem Senden
-                
+                newlyEatenFood = []; 
                 if(res.ok && !sendingDeath) {
                     const data = await res.json();
-                    otherPlayers = data.players;
-                    bots = data.bots;
-                    foods = data.food;
-                    leaderboard = data.leaderboard;
+                    otherPlayers = data.players; bots = data.bots; foods = data.food; leaderboard = data.leaderboard;
                 }
             } catch (e) { console.log(e); }
         }
 
         setInterval(() => { if(!isDead) syncServer(false); }, 100);
-
-        // Resize Fix
         window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
 
-        // Start
-        updateLocal();
-        drawGame();
+        updateLocal(); drawGame();
     </script>
 </body>
 </html>
