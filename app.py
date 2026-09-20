@@ -784,13 +784,28 @@ def slither_sync():
         new_x = bot["x"] + math.cos(bot["angle"]) * speed
         new_y = bot["y"] + math.sin(bot["angle"]) * speed
         
-        if new_x < 0 or new_x > SLITHER_STATE["map_size"]: bot["angle"] += math.pi
-        if new_y < 0 or new_y > SLITHER_STATE["map_size"]: bot["angle"] += math.pi
+        # --- NEU: BOTS STERBEN AN DER WAND ---
+        if new_x < 0 or new_x > SLITHER_STATE["map_size"] or new_y < 0 or new_y > SLITHER_STATE["map_size"]:
+            # Bot platzt in Futter!
+            for segment in bot["body"][::2]:
+                fid = str(uuid.uuid4())[:8]
+                SLITHER_STATE["food"][fid] = {'x': segment[0], 'y': segment[1], 'c': bot["color"], 'v': 3}
+            
+            # Bot direkt in der Mitte neu spawnen lassen
+            SLITHER_STATE["bots"][bot_id] = {
+                "body": [[random.randint(1000, 2000), random.randint(1000, 2000)]],
+                "color": random.choice(COLORS),
+                "score": 50,
+                "angle": random.uniform(0, math.pi * 2),
+                "x": 0, "y": 0
+            }
+            continue # Diesen Bot für diesen Durchlauf überspringen
         
         bot["body"].insert(0, [new_x, new_y])
         if len(bot["body"]) > (bot["score"] // 10) + 5:
             bot["body"].pop()
             
+        # Bot isst Futter (simuliert)
         if random.random() < 0.02: bot["score"] += 1
 
     all_entities = []
