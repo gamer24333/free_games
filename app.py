@@ -417,8 +417,12 @@ def shop_equip():
             active_titles.append(item["value"]) # Equip
         u.active_title = json.dumps(active_titles)
         
-    elif item["type"] == "color":
-        u.active_color = item["value"] if u.active_color != item["value"] else None # Toggle color
+   elif item["type"] == "color":
+        # Wenn die Farbe bereits aktiv ist, ausschalten (None), sonst aktivieren
+        if u.active_color == item["value"]:
+            u.active_color = None
+        else:
+            u.active_color = item["value"]
         
     db.session.commit()
     return {"status": "success"}
