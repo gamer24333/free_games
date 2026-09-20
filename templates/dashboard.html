@@ -403,6 +403,73 @@ HTML
 
     setInterval(checkNewMessages, 5000);
     checkNewMessages();
+
+        // --- SHOP & INVENTAR MODAL STEUERUNG ---
+    async function openShopModal() { 
+        document.getElementById('shopModal').style.display = 'flex'; 
+        await loadShopData();
+    }
+    
+    function closeShopModal() { document.getElementById('shopModal').style.display = 'none'; }
+    
+    async function loadShopData() {
+        const res = await fetch('/api/shop/data');
+        const data = await res.json();
+        
+        document.getElementById('coin-balance').textContent = data.coins + " 🪙";
+        
+        const shopView = document.getElementById('shop-view');
+        const invView = document.getElementById('inventory-view');
+        shopView.innerHTML = ''; invView.innerHTML = '';
+        
+        let hasInv = false;
+        for (const [id, item] of Object.entries(data.shop_items)) {
+            const isOwned = data.inventory.includes(id);
+            const isEquipped = (data.active_title === item.value || data.active_color === item.value);
+            
+            // Item für Shop
+            if (!isOwned) {
+                shopView.innerHTML += `
+                <div class="shop-item">
+                    <div class="shop-item-info">
+                        <h4>${item.name}</h4><p>${item.desc}</p>
+                    </div>
+                    <button class="shop-btn" onclick="buyItem('${id}')">${item.price} 🪙</button>
+                </div>`;
+            }
+            // Item für Inventar
+            if (isOwned) {
+                hasInv = true;
+                invView.innerHTML += `
+                <div class="shop-item">
+                    <div class="shop-item-info">
+                        <h4>${item.name}</h4><p>${item.desc}</p>
+                    </div>
+                    <button class="shop-btn ${isEquipped ? 'equipped' : 'equip'}" onclick="equipItem('${id}')">
+                        ${isEquipped ? 'Ausgerüstet' : 'Ausrüsten'}
+                    </button>
+                </div>`;
+            }
+        }
+        if (shopView.innerHTML === '') shopView.innerHTML = '<p>Du hast bereits alles gekauft!</p>';
+        if (!hasInv) invView.innerHTML = '<p>Dein Inventar ist leer.</p>';
+    }
+
+    async function buyItem(itemId) {
+        const res = await fetch('/api/shop/buy', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId })
+        });
+        const data = await res.json();
+        if (res.ok) { alert("Erfolgreich gekauft!"); loadShopData(); } 
+        else { alert("❌ " + data.error); }
+    }
+
+    async function equipItem(itemId) {
+        const res = await fetch('/api/shop/equip', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId })
+        });
+        if (res.ok) { loadShopData(); }
+    }
     </script>
 </body>
 </html>
