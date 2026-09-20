@@ -35,12 +35,16 @@ last_active = {}
 user_activities = {}
 
 # --- SHOP ITEMS ---
+# --- SHOP ITEMS ---
 SHOP_ITEMS = {
     "title_destroyer": {"id": "title_destroyer", "type": "title", "name": "Titel: Der Zerstörer", "desc": "Ein bedrohlicher Titel im Chat.", "price": 250, "value": "Der Zerstörer"},
     "title_king": {"id": "title_king", "type": "title", "name": "Titel: King", "desc": "Zeig allen, wer der Boss ist.", "price": 500, "value": "King"},
     "color_gold": {"id": "color_gold", "type": "color", "name": "Name: Gold", "desc": "Dein Name leuchtet Gold.", "price": 300, "value": "#f1c40f"},
     "color_rainbow": {"id": "color_rainbow", "type": "color", "name": "Name: Regenbogen", "desc": "Bunter Chat-Name!", "price": 800, "value": "rainbow"},
-    "color_neon": {"id": "color_neon", "type": "color", "name": "Name: Neon Cyan", "desc": "Helles Hacker-Blau.", "price": 300, "value": "#00adb5"}
+    "color_neon": {"id": "color_neon", "type": "color", "name": "Name: Neon Cyan", "desc": "Helles Hacker-Blau.", "price": 300, "value": "#00adb5"},
+    "title_admin": {"id": "title_admin", "type": "title", "name": "Titel: Admin", "desc": "Offizieller Admin-Titel.", "price": 0, "value": "Admin", "admin_only": True},
+    "title_crown": {"id": "title_crown", "type": "title", "name": "Titel: Krone", "desc": "Das Zeichen des Bosses.", "price": 0, "value": "👑", "admin_only": True},
+    "color_purple": {"id": "color_purple", "type": "color", "name": "Name: Admin Lila", "desc": "Die Admin-Farbe.", "price": 0, "value": "#9b59b6", "admin_only": True}
 }
 
 # --- SLITHER.IO RAM-SPEICHER ---
@@ -332,7 +336,9 @@ def shop_data():
     
     # Admins automatisch Admin-Items ins Inventar geben
     admins_list = get_admins_list()
-    if username == "Till" or u.is_admin or username in admins_list:
+    is_admin_user = (username == "Till" or u.is_admin or username in admins_list)
+    
+    if is_admin_user:
         admin_items = ["title_admin", "title_crown", "color_purple"]
         for ai in admin_items:
             if ai not in inv:
@@ -340,6 +346,15 @@ def shop_data():
         u.inventory = json.dumps(inv)
         db.session.commit()
 
+    # Nur Admins sehen die Admin-Items im Shop/Inventar-Bereich
+    filtered_shop_items = {}
+    for item_id, item_data in SHOP_ITEMS.items():
+        if item_data.get("admin_only"):
+            if is_admin_user:
+                filtered_shop_items[item_id] = item_data
+        else:
+            filtered_shop_items[item_id] = item_data
+            
     try:
         active_titles = json.loads(u.active_title) if u.active_title and u.active_title.startswith('[') else ([u.active_title] if u.active_title else [])
     except:
@@ -351,7 +366,7 @@ def shop_data():
         "inventory": inv,
         "active_title": u.active_title,
         "active_color": u.active_color,
-        "shop_items": SHOP_ITEMS
+        "shop_items": filtered_shop_items
     })
 
 @app.route('/api/shop/buy', methods=['POST'])
@@ -362,6 +377,12 @@ def shop_buy():
     
     u = UserSetting.query.filter_by(username=session['username']).first()
     inv = json.loads(u.inventory) if u.inventory else []
+    admins_list = get_admins_list()
+    is_admin_user = (session['username'] == "Till" or u.is_admin or session['username'] in admins_list)
+
+    # Verhindern, dass normale User Admin-Items kaufen
+    if SHOP_ITEMS[item_id].get("admin_only") and not is_admin_user:
+        return {"error": "Dieses Item ist exklusiv für Admins!"}, 403
     
     if item_id in inv: return {"error": "Du besitzt dieses Item bereits!"}, 400
     
