@@ -220,7 +220,15 @@
                     
                     // --- NEU: Level, Titel & Custom Farben aus der DB laden ---
                     let nameStyle = msg.color ? (msg.color === 'rainbow' ? 'background-image: linear-gradient(to left, violet, indigo, blue, green, yellow, orange, red); -webkit-background-clip: text; color: transparent;' : `color: ${msg.color};`) : (isSenderAdmin ? 'color: #9b59b6;' : 'color: #00adb5;');
-                    let titleBadge = msg.title ? `<span style="background:#f1c40f; color:black; font-size:10px; padding:2px 5px; border-radius:5px; margin-right:5px; box-shadow: 0 0 5px rgba(241,196,15,0.5);">${msg.title}</span>` : '';
+                    let titleBadges = '';
+                    if (msg.titles && Array.isArray(msg.titles)) {
+                        msg.titles.forEach(t => {
+                            if (t) {
+                                titleBadges += `<span style="background:#f1c40f; color:black; font-size:10px; padding:2px 5px; border-radius:5px; margin-right:5px; box-shadow: 0 0 5px rgba(241,196,15,0.5);">${t}</span>`;
+                            }
+                        });
+                    }
+                    
                     let levelBadge = `<span style="color:#aaa; font-size:10px; margin-right:5px;">[Lv.${msg.level || 1}]</span>`;
                     
                     if (msg.name === currentUsername || isMeAdmin) {
@@ -241,7 +249,7 @@
                     // --- NEU: HTML zusammenbauen mit Level und Titel ---
                     chatBox.innerHTML += `
                     <div class="message" style="position: relative; padding-right: 40px;">
-                        <b style="${nameStyle}">${levelBadge} ${titleBadge} ${crown}${msg.name}</b>
+                        <b style="${nameStyle}">${levelBadge} ${titleBadges} ${crown}${msg.name}</b>
                         <span>${formatMessageText(msg.text)}</span>
                         ${statusHook}
                         ${deleteButton}
