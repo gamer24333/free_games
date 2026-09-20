@@ -418,7 +418,6 @@ def shop_equip():
         u.active_title = json.dumps(active_titles)
         
    elif item["type"] == "color":
-        # Wenn die Farbe bereits aktiv ist, ausschalten (None), sonst aktivieren
         if u.active_color == item["value"]:
             u.active_color = None
         else:
