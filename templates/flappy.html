@@ -211,6 +211,7 @@
         const ctx = canvas.getContext('2d');
         const fullscreenLink = document.getElementById('fullscreenLink');
         const gameContainer = document.querySelector('.game-container');
+        let lastTime = performance.now();
 
        // Hintergrundmusik einrichten (WEB AUDIO API)
         let audioCtx = null;
@@ -406,17 +407,18 @@
             }
         }
 
-        function update() {
+        function update(timeScale) {
             if (gameActive && !gameOver && !gamePaused) {
-                birdVelocity += gravity;
-                birdY += birdVelocity;
+                birdVelocity += gravity * timeScale;;
+                birdY += birdVelocity  * timeScale;
 
                 if (birdY + 12 >= canvas.height - 58 || birdY - 12 <= 0) {
                     triggerGameOver();
                 }
 
-                frameCount++;
-                if (frameCount % 100 === 0) {
+                frameCount += timeScale; // Koppelt den Zähler an die Zeit, nicht an die FPS
+                if (frameCount >= 100) {
+                    frameCount = 0; // Timer wieder auf 0 setzen
                     const topLimit = 50;
                     const bottomLimit = canvas.height - 58 - pipeGap - 50;
                     const topHeight = Math.floor(Math.random() * (bottomLimit - topLimit)) + topLimit;
@@ -431,7 +433,7 @@
                 }
 
                 pipes.forEach(pipe => {
-                    pipe.x -= 2;
+                    pipe.x -= 2  * timeScale;
 
                     if (60 + 12 > pipe.x && 60 - 12 < pipe.x + pipeWidth) {
                         if (birdY - 12 < pipe.top || birdY + 12 > canvas.height - pipe.bottom) {
@@ -561,13 +563,22 @@
             }
         }
 
-        function loop() {
-            update();
+        function loop(timestamp) {
+            // 1. Zeit hier berechnen!
+            if (!timestamp) timestamp = performance.now();
+            let deltaTime = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+            if (deltaTime > 0.1) deltaTime = 0.016; 
+            
+            let timeScale = deltaTime * 60;
+
+            // 2. timeScale an update() übergeben
+            update(timeScale);
             draw();
             requestAnimationFrame(loop);
         }
-
-        loop();
+        requestAnimationFrame(loop);
+        
         // Fokus-Fix: Hört sofort auf die Tastatur
         window.onload = function() {
             window.focus();
