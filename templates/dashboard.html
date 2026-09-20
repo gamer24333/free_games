@@ -1,3 +1,12 @@
+Das ist ein ziemlich cooles Upgrade-Paket! Wir fügen ein Inventar/Shop-System direkt ins Dashboard ein und bauen die Grundlage für Levels, Ränge und XP.
+
+Hier ist der erste Schritt: Wir passen deine dashboard.html an, um den neuen Button (neben dem Admin-Panel) und das Shop-Inventar-Modul (Modal) einzubauen.
+
+Außerdem bauen wir direkt eine kleine Anzeige für das aktuelle Level und XP unter den Willkommenstext.
+
+Kopiere den folgenden Code und ersetze damit deine komplette dashboard.html:
+
+HTML
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -12,6 +21,9 @@
         .invite-box { background: #333; padding: 15px; border-radius: 8px; max-width: 500px; margin: 25px auto; border: 2px solid #ff2e63; text-align: left; }
         .invite-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; }
         .admin-box { margin-top: 40px; border-top: 2px dashed #555; padding-top: 20px; }
+        
+        /* Level und Rang Anzeige */
+        .level-badge { display: inline-block; background: linear-gradient(135deg, #f1c40f, #e67e22); color: black; font-weight: bold; padding: 5px 12px; border-radius: 15px; font-size: 14px; margin-top: 5px; box-shadow: 0 0 10px rgba(241,196,15,0.5); }
         
         /* Code Button oben links */
         .code-btn {
@@ -58,6 +70,8 @@
             padding: 30px;
             border-radius: 12px;
             width: 380px;
+            max-height: 80vh;
+            overflow-y: auto;
             text-align: center;
             color: white;
             box-shadow: 0 0 20px rgba(0, 173, 181, 0.3);
@@ -68,6 +82,18 @@
             border-radius: 6px; padding: 10px; box-sizing: border-box; margin-top: 10px;
             font-size: 16px; text-align: center; font-family: inherit;
         }
+        
+        /* Shop & Inventar Modal Styles */
+        .shop-tabs { display: flex; justify-content: center; margin-bottom: 20px; gap: 10px; }
+        .shop-tab-btn { background: #444; color: #fff; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        .shop-tab-btn.active { background: #00adb5; }
+        .shop-item { background: #333; border: 1px solid #555; border-radius: 8px; padding: 10px; margin-bottom: 15px; text-align: left; display: flex; justify-content: space-between; align-items: center; }
+        .shop-item-info { flex: 1; }
+        .shop-item h4 { margin: 0 0 5px 0; font-size: 16px; }
+        .shop-item p { margin: 0; font-size: 12px; color: #aaa; }
+        .shop-btn { background: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; }
+        .shop-btn.equip { background: #3498db; }
+        .shop-btn.equipped { background: #f39c12; }
     </style>
 </head>
 <body>
@@ -85,6 +111,46 @@
             <div style="margin-top: 20px; display: flex; justify-content: space-between; gap: 10px;">
                 <button onclick="closeCodeModal()" class="btn" style="background: #555; margin:0; flex: 1;">Abbrechen</button>
                 <button onclick="submitCode()" class="btn" style="background: #f39c12; margin:0; flex: 1;">Einlösen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SHOP / INVENTAR MODAL -->
+    <div id="shopModal" class="modal-overlay">
+        <div class="modal-box" style="border-color: #e67e22; box-shadow: 0 0 20px rgba(230, 126, 34, 0.3);">
+            <h3 style="color: #e67e22; margin-top: 0;">🎒 Inventar & Shop</h3>
+            <div style="font-weight: bold; margin-bottom: 15px;">Münzen: <span id="coin-balance" style="color: #f1c40f;">{{ user_coins|default(0) }} 🪙</span></div>
+            
+            <div class="shop-tabs">
+                <button class="shop-tab-btn active" onclick="switchShopTab('shop')">🛒 Shop</button>
+                <button class="shop-tab-btn" onclick="switchShopTab('inventory')">🎒 Mein Inventar</button>
+            </div>
+
+            <div id="shop-view">
+                <!-- Shop Inhalte kommen aus der DB, hier als Platzhalter -->
+                <div class="shop-item">
+                    <div class="shop-item-info">
+                        <h4>Regenbogen Name</h4>
+                        <p>Dein Name leuchtet im Chat!</p>
+                    </div>
+                    <button class="shop-btn" onclick="buyItem('rainbow_name')">500 🪙</button>
+                </div>
+                <div class="shop-item">
+                    <div class="shop-item-info">
+                        <h4>Titel: "Der Zerstörer"</h4>
+                        <p>Ein cooler Titel neben deinem Namen.</p>
+                    </div>
+                    <button class="shop-btn" onclick="buyItem('title_destroyer')">250 🪙</button>
+                </div>
+            </div>
+
+            <div id="inventory-view" style="display: none;">
+                <!-- Inventar Inhalte -->
+                <p style="font-size: 12px; color: #aaa;">Du hast noch keine Items gekauft.</p>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button onclick="closeShopModal()" class="btn" style="background: #555; width: 100%;">Schließen</button>
             </div>
         </div>
     </div>
@@ -119,6 +185,7 @@
     </div>
     
     <h1>Willkommen, {{ name }}! 👋</h1>
+    <div class="level-badge">Lvl {{ user_level|default(1) }} - {{ user_rank|default('Rookie') }} ({{ user_xp|default(0) }} XP)</div>
     <p>Schön, dass du da bist. Was willst du machen?</p>
 
     <div style="margin: 30px 0;">
@@ -174,11 +241,14 @@
     </div>
     {% endif %}
 
-    {% if is_admin %}
+    <!-- Admin / Inventar Box unten -->
     <div class="admin-box">
-        <a href="/admin" class="btn" style="background: #e74c3c;">🛠️ Admin-Panel öffnen</a>
+        <button onclick="openShopModal()" class="btn" style="background: #e67e22;">🎒 Inventar & Shop</button>
+        
+        {% if is_admin %}
+        <a href="/admin" class="btn" style="background: #e74c3c;">🛠️ Admin-Panel</a>
+        {% endif %}
     </div>
-    {% endif %}
     
     <br><br>
     <a href="/logout" style="color: #ff2e63; text-decoration: none; font-weight: bold;">Abmelden</a>
@@ -209,6 +279,32 @@
         } catch (e) {
             alert("Verbindungsfehler.");
         }
+    }
+
+    // --- SHOP & INVENTAR MODAL STEUERUNG ---
+    function openShopModal() { 
+        document.getElementById('shopModal').style.display = 'flex'; 
+        // Hier könnte man später die aktuellen Shop/Inventar Daten per fetch() abfragen
+    }
+    function closeShopModal() { 
+        document.getElementById('shopModal').style.display = 'none'; 
+    }
+    function switchShopTab(tab) {
+        const tabs = document.querySelectorAll('.shop-tab-btn');
+        tabs.forEach(t => t.classList.remove('active'));
+        
+        if (tab === 'shop') {
+            tabs[0].classList.add('active');
+            document.getElementById('shop-view').style.display = 'block';
+            document.getElementById('inventory-view').style.display = 'none';
+        } else {
+            tabs[1].classList.add('active');
+            document.getElementById('shop-view').style.display = 'none';
+            document.getElementById('inventory-view').style.display = 'block';
+        }
+    }
+    function buyItem(itemId) {
+        alert("Kaufe Item: " + itemId + "\n(Funktion muss noch ins Backend eingebaut werden!)");
     }
 
     // --- SETTINGS MODAL STEUERUNG ---
