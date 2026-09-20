@@ -364,7 +364,7 @@ def shop_data():
     return jsonify({
         "coins": u.coins or 0,
         "inventory": inv,
-        "active_title": u.active_titles,
+        "active_title": active_titles,
         "active_color": u.active_color,
         "shop_items": filtered_shop_items
     })
