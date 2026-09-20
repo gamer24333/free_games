@@ -1457,15 +1457,5 @@ def tankroyale_delete_match(game_id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-        # Automatisches Hinzufügen der neuen Spalten zur bestehenden Datenbank
-        try:
-            db.session.execute(db.text('ALTER TABLE user_settings ADD COLUMN xp INTEGER DEFAULT 0'))
-            db.session.execute(db.text('ALTER TABLE user_settings ADD COLUMN coins INTEGER DEFAULT 0'))
-            db.session.execute(db.text('ALTER TABLE user_settings ADD COLUMN inventory TEXT DEFAULT \'[]\''))
-            db.session.execute(db.text('ALTER TABLE user_settings ADD COLUMN active_title VARCHAR(50)'))
-            db.session.execute(db.text('ALTER TABLE user_settings ADD COLUMN active_color VARCHAR(50)'))
-            db.session.commit()
-        except:
-            db.session.rollback() # Spalten existieren bereits
             
     app.run(debug=True)
