@@ -19,7 +19,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-
 # Feste Klassenliste
 KLASSEN_LISTE = [
     "Till", "Ben", "Matteo", "Louis", "Maxim", "Jonah P", "Jonah S", 
@@ -55,7 +54,6 @@ class AdminMessage(db.Model):
     target = db.Column(db.String(50), nullable=False) # 'alle' oder einzelner Name
     title = db.Column(db.String(100), nullable=False)
     message = db.Column(db.Text, nullable=False)
-    
 
 class UserSetting(db.Model):
     __tablename__ = 'user_settings'
@@ -65,7 +63,7 @@ class UserSetting(db.Model):
     last_seen = db.Column(db.DateTime, nullable=True)
     banned_until = db.Column(db.DateTime, nullable=True)
     playtime_total = db.Column(db.Integer, default=0)
-    
+    score_multiplier = db.Column(db.Integer, default=1)  # <-- NEU FÜR GEHEIMCODES
 
 class ChatMessage(db.Model):
     __tablename__ = 'chat_messages'
@@ -93,6 +91,7 @@ class GameScore(db.Model):
     doodle = db.Column(db.Integer, default=0)
     brickbreaker = db.Column(db.Integer, default=0)
     speedtyping = db.Column(db.Integer, default=0)
+    
     playtime_gd = db.Column(db.Integer, default=0)
     playtime_clicker = db.Column(db.Integer, default=0)
     playtime_flappy = db.Column(db.Integer, default=0)
@@ -121,7 +120,7 @@ class TankGame(db.Model):
     turn = db.Column(db.String(50), nullable=False)
     status = db.Column(db.String(50), default="eingeladen")
     last_shot = db.Column(db.String(100), default="") 
-    terrain = db.Column(db.Text, nullable=True) # Spalte für das zerstörbare Gelände
+    terrain = db.Column(db.Text, nullable=True)
 
 class RedeemedCode(db.Model):
     __tablename__ = 'redeemed_codes'
@@ -145,6 +144,12 @@ def get_admins_list():
         admin_names.append("Till")
     return admin_names
 
+def get_user_multiplier(username):
+    user = UserSetting.query.filter_by(username=username).first()
+    if user and user.score_multiplier:
+        return user.score_multiplier
+    return 1
+
 
 # --- ROUTEN ---
 
@@ -152,12 +157,10 @@ def get_admins_list():
 def update_last_seen():
     if 'username' in session:
         current_user = session['username']
-        # 1. Update in der SQL-Datenbank
         user = UserSetting.query.filter_by(username=current_user).first()
         if user:
             user.last_seen = datetime.utcnow()
             db.session.commit()
-        # 2. Update im RAM (für schnelle Live-Status Abfragen)
         last_active[current_user] = datetime.now()
 
 
@@ -187,8 +190,6 @@ def index():
     return redirect(url_for('dashboard')) if 'username' in session else redirect(url_for('login'))
 
 
-# Herzschlag-Schnittstelle für den Live-Online-Status im Chat
-@app.route('/api/ping', methods=['POST'])
 @app.route('/api/ping', methods=['POST'])
 def ping_user():
     if 'username' in session:
@@ -199,12 +200,11 @@ def ping_user():
         activity = data.get('activity', 'Im Portal')
         user_activities[current_user] = activity
         
-        # --- NEU: Spielzeit tracken ---
+        # --- Spielzeit tracken ---
         user = UserSetting.query.filter_by(username=current_user).first()
         if user:
             user.playtime_total = (user.playtime_total or 0) + 5
             
-            # Spezifische Spielzeit
             if activity.startswith("Spielt "):
                 game_name = activity.replace("Spielt ", "").lower()
                 score_entry = GameScore.query.filter_by(username=current_user).first()
@@ -228,12 +228,10 @@ def ping_user():
     return {"error": "Unauthorized"}, 401
 
 
-
 @app.route('/api/dashboard-stats')
 def dashboard_stats():
     if 'username' in session: 
         current_user = session['username']
-        
         global_chat_len = ChatMessage.query.filter_by(room='global').count()
         
         private_chats_stats = {}
@@ -243,16 +241,13 @@ def dashboard_stats():
                 private_chats_stats[schueler] = ChatMessage.query.filter_by(room=room_id).count()
                 
         aktive_grenze = datetime.now() - timedelta(seconds=15)
-        online_users = []
-        for username, last_seen_time in last_active.items():
-            if last_seen_time > aktive_grenze:
-                online_users.append(username)
+        online_users = [u for u, t in last_active.items() if t > aktive_grenze]
         
         return {
             "global_messages_count": global_chat_len,
             "private_messages_stats": private_chats_stats,
             "online_users": online_users,
-            "user_activities": user_activities  # <- NEU: Aktivitäten an den Client senden
+            "user_activities": user_activities
         }
     return {"error": "Nicht autorisiert"}, 401
 
@@ -268,13 +263,13 @@ def global_stats():
     def assign_points(game_attr, reverse=True, ignore_val=None):
         valid_scores = [s for s in all_scores if getattr(s, game_attr) is not None and getattr(s, game_attr) != ignore_val]
         valid_scores.sort(key=lambda x: getattr(x, game_attr), reverse=reverse)
-        for i, s in enumerate(valid_scores[:10]): # Nur Top 10 bekommen Punkte
+        for i, s in enumerate(valid_scores[:10]): 
             points[s.username] += (10 - i)
             
     assign_points('geometry_dash', ignore_val=0)
     assign_points('clicker', ignore_val=0)
     assign_points('flappy', ignore_val=-1)
-    assign_points('reaction', reverse=False, ignore_val=9999) # Bei Reaction ist weniger besser
+    assign_points('reaction', reverse=False, ignore_val=9999) 
     assign_points('snake', ignore_val=0)
     assign_points('crossy', ignore_val=0)
     assign_points('doodle', ignore_val=0)
@@ -283,9 +278,9 @@ def global_stats():
     
     efficiency_list = []
     for u in all_users:
-        total_min = max(1, (u.playtime_total or 0) / 60.0) # Verhindert Division durch 0
+        total_min = max(1, (u.playtime_total or 0) / 60.0)
         pts = points.get(u.username, 0)
-        eff = round(pts / (total_min / 10), 2) # Faktor für schönere Zahlen
+        eff = round(pts / (total_min / 10), 2) 
         
         efficiency_list.append({
             'name': u.username,
@@ -309,17 +304,18 @@ def redeem_code():
     if not code or code not in GEHEIME_CODES:
         return {"error": "Dieser Code ist ungültig oder existiert nicht!"}, 400
         
-    # Prüfen, ob der User den Code schon benutzt hat
     already_used = RedeemedCode.query.filter_by(username=me, code=code).first()
     if already_used:
         return {"error": "Du hast diesen Code bereits eingelöst!"}, 400
         
-    # Belohnung austeilen
     user = UserSetting.query.filter_by(username=me).first()
+    if not user:
+        return {"error": "Nutzer existiert nicht"}, 400
+
     belohnung = GEHEIME_CODES[code]
     
     if belohnung == "double_score":
-        user.score_multiplier = 2  # Setzt den Multiplikator auf x2
+        user.score_multiplier = 2  
         msg = "Code akzeptiert! Du hast ab sofort DOPPELTEN SCORE in den Spielen!"
     elif belohnung == "admin":
         user.is_admin = True
@@ -327,7 +323,6 @@ def redeem_code():
     else:
         msg = "Code akzeptiert!"
         
-    # Eintragen, dass der Code genutzt wurde
     db.session.add(RedeemedCode(username=me, code=code))
     db.session.commit()
     
@@ -381,8 +376,6 @@ def dashboard():
     
     me = session['username']
     
-    # --- NEU: Dynamisches Admin-Nachrichten System ---
-    # Prüfe, ob es eine aktive Nachricht für "alle" oder für "me" gibt
     admin_msg = AdminMessage.query.filter((AdminMessage.target == 'alle') | (AdminMessage.target == me)).order_by(AdminMessage.id.desc()).first()
     
     zeige_spezial_nachricht = False
@@ -394,7 +387,6 @@ def dashboard():
         zeige_spezial_nachricht = True
         spezial_titel = admin_msg.title
         spezial_text = admin_msg.message
-        # Die ID sorgt dafür, dass das Dashboard weiß, ob der Nutzer genau diese Nachricht schon weggedrückt hat
         spezial_nachricht_id = f"admin_msg_{admin_msg.id}"
     
     aktive_matches = []
@@ -419,20 +411,15 @@ def dashboard():
                            spezial_titel=spezial_titel,
                            spezial_text=spezial_text)
 
-
-# --- PIN ZURÜCKSETZEN ---
 @app.route('/api/change-pin', methods=['POST'])
 def change_pin():
-    if 'username' not in session:
-        return {"error": "Nicht autorisiert"}, 401
-    
+    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
     data = request.get_json(silent=True) or {}
     new_pin = str(data.get('new_pin', '')).strip()
     confirm_pin = str(data.get('confirm_pin', '')).strip()
     
     if not new_pin or len(new_pin) < 4:
         return {"error": "Der neue PIN muss mindestens 4 Zeichen lang sein!"}, 400
-    
     if new_pin != confirm_pin:
         return {"error": "Die beiden PINs stimmen nicht überein!"}, 400
         
@@ -442,7 +429,6 @@ def change_pin():
         user.pin = new_pin
         db.session.commit()
         return {"status": "success"}
-    
     return {"error": "Nutzer nicht gefunden"}, 404
 
 # --- ADMIN PANEL ---
@@ -450,26 +436,20 @@ def change_pin():
 def admin_panel():
     if 'username' not in session: return redirect(url_for('login'))
     me = session['username']
-    
     user = UserSetting.query.filter_by(username=me).first()
-    is_admin = True if (me == "Till" or (user and user.is_admin)) else False
-    if not is_admin:
-        return "Zugriff verweigert! ❌ Du bist kein Admin.", 403
+    if not (me == "Till" or (user and user.is_admin)): return "Zugriff verweigert!", 403
         
     all_users = UserSetting.query.all()
     pins_dict = {u.username: u.pin for u in all_users if u.pin}
     admins_list = get_admins_list()
-
     
     banned_users = {}
     for u in all_users:
         if u.banned_until and u.banned_until > datetime.utcnow():
-            if u.banned_until.year > 2090:
-                banned_users[u.username] = "Permanent (Für immer)"
-            else:
-                banned_users[u.username] = u.banned_until.strftime("%d.%m.%Y - %H:%M Uhr")
+            if u.banned_until.year > 2090: banned_users[u.username] = "Permanent (Für immer)"
+            else: banned_users[u.username] = u.banned_until.strftime("%d.%m.%Y - %H:%M Uhr")
     
-    return render_template('admin.html', pins=pins_dict, admins=admins_list, klassen_liste=KLASSEN_LISTE, banned_users=banned_users,)
+    return render_template('admin.html', pins=pins_dict, admins=admins_list, klassen_liste=KLASSEN_LISTE, banned_users=banned_users)
 
 @app.route('/admin/make-admin', methods=['POST'])
 def make_admin():
@@ -477,17 +457,14 @@ def make_admin():
     me = session['username']
     user = UserSetting.query.filter_by(username=me).first()
     if not (me == "Till" or (user and user.is_admin)): return "403", 403
-    
     neuer_admin = request.form.get('schueler')
     if neuer_admin in KLASSEN_LISTE:
         target_user = UserSetting.query.filter_by(username=neuer_admin).first()
         if not target_user:
             target_user = UserSetting(username=neuer_admin, is_admin=True)
             db.session.add(target_user)
-        else:
-            target_user.is_admin = True
+        else: target_user.is_admin = True
         db.session.commit()
-        
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/remove-admin/<schueler>', methods=['POST'])
@@ -496,13 +473,11 @@ def remove_admin(schueler):
     me = session['username']
     user = UserSetting.query.filter_by(username=me).first()
     if not (me == "Till" or (user and user.is_admin)): return "403", 403
-    
     if schueler != "Till":
         target_user = UserSetting.query.filter_by(username=schueler).first()
         if target_user:
             target_user.is_admin = False
             db.session.commit()
-        
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/reset-pin/<schueler>', methods=['POST'])
@@ -511,12 +486,10 @@ def admin_reset_pin(schueler):
     me = session['username']
     user = UserSetting.query.filter_by(username=me).first()
     if not (me == "Till" or (user and user.is_admin)): return "403", 403
-    
     target_user = UserSetting.query.filter_by(username=schueler).first()
     if target_user:
         target_user.pin = None
         db.session.commit()
-        
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/clear-chat', methods=['POST'])
@@ -525,58 +498,59 @@ def admin_clear_chat():
     me = session['username']
     user = UserSetting.query.filter_by(username=me).first()
     if not (me == "Till" or (user and user.is_admin)): return "403", 403
-    
     ChatMessage.query.filter_by(room='global').delete()
     system_msg = ChatMessage(room='global', sender='System', text='Der Chat wurde vom Admin aufgeräumt! 🧹')
     db.session.add(system_msg)
     db.session.commit()
-    
     return redirect(url_for('admin_panel'))
 
-# NEU: Route zum Bannen von Usern
 @app.route('/admin/ban', methods=['POST'])
 def admin_ban():
     if 'username' not in session: return "403", 403
     me = session['username']
     user = UserSetting.query.filter_by(username=me).first()
     if not (me == "Till" or (user and user.is_admin)): return "403", 403
-    
     schueler = request.form.get('schueler')
     dauer = request.form.get('dauer')
-    
     if schueler and schueler != "Till":
         target_user = UserSetting.query.filter_by(username=schueler).first()
         if not target_user:
             target_user = UserSetting(username=schueler)
             db.session.add(target_user)
-            
         now = datetime.utcnow()
-        if dauer == "1h":
-            target_user.banned_until = now + timedelta(hours=1)
-        elif dauer == "1d":
-            target_user.banned_until = now + timedelta(days=1)
-        elif dauer == "1w":
-            target_user.banned_until = now + timedelta(weeks=1)
-        elif dauer == "perm":
-            target_user.banned_until = now + timedelta(days=36500) # 100 Jahre
-            
+        if dauer == "1h": target_user.banned_until = now + timedelta(hours=1)
+        elif dauer == "1d": target_user.banned_until = now + timedelta(days=1)
+        elif dauer == "1w": target_user.banned_until = now + timedelta(weeks=1)
+        elif dauer == "perm": target_user.banned_until = now + timedelta(days=36500)
         db.session.commit()
-        
     return redirect(url_for('admin_panel'))
 
-# NEU: Route zum Entbannen von Usern
 @app.route('/admin/unban/<schueler>', methods=['POST'])
 def admin_unban(schueler):
     if 'username' not in session: return "403", 403
     me = session['username']
     user = UserSetting.query.filter_by(username=me).first()
     if not (me == "Till" or (user and user.is_admin)): return "403", 403
-    
     target_user = UserSetting.query.filter_by(username=schueler).first()
     if target_user:
         target_user.banned_until = None
         db.session.commit()
-        
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/send-message', methods=['POST'])
+def send_admin_message():
+    if 'username' not in session: return "403", 403
+    me = session['username']
+    user = UserSetting.query.filter_by(username=me).first()
+    if not (me == "Till" or (user and user.is_admin)): return "403", 403
+    target = request.form.get('target', 'alle')
+    title = request.form.get('title', 'Systemnachricht')
+    message = request.form.get('message', '').strip()
+    if message:
+        AdminMessage.query.filter_by(target=target).delete()
+        new_msg = AdminMessage(sender=me, target=target, title=title, message=message)
+        db.session.add(new_msg)
+        db.session.commit()
     return redirect(url_for('admin_panel'))
 
 # --- FEEDBACK SYSTEM ---
@@ -585,7 +559,6 @@ def submit_feedback():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
     msg = request.json.get('message', '').strip()
     if not msg: return {"error": "Leere Nachricht"}, 400
-    
     new_fb = Feedback(sender=session['username'], message=msg, is_read=False)
     db.session.add(new_fb)
     db.session.commit()
@@ -596,10 +569,7 @@ def get_admin_feedback():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
     me = session['username']
     user = UserSetting.query.filter_by(username=me).first()
-    is_admin = True if (me == "Till" or (user and user.is_admin)) else False
-    if not is_admin: return {"error": "Keine Rechte"}, 403
-    
-    # Alle ungelesenen Feedbacks abrufen
+    if not (me == "Till" or (user and user.is_admin)): return {"error": "Keine Rechte"}, 403
     unread = Feedback.query.filter_by(is_read=False).all()
     result = [{"id": f.id, "sender": f.sender, "message": f.message} for f in unread]
     return jsonify(result)
@@ -614,13 +584,10 @@ def mark_feedback_read(fb_id):
     return {"status": "success"}
 
 # --- CHAT ROUTEN ---
-
 @app.route('/chat')
 @app.route('/chat/<room>')
 def chat(room="global"):
     if 'username' not in session: return redirect(url_for('login'))
-
-    # Schnelles Fallback: Wer war laut Datenbank in den letzten 2 Minuten online?
     zwei_minuten_ago = datetime.utcnow() - timedelta(minutes=2)
     online_users = UserSetting.query.filter(UserSetting.last_seen >= zwei_minuten_ago).all()
     online_names = [u.username for u in online_users]
@@ -629,11 +596,9 @@ def chat(room="global"):
     chpartner = sorted([schueler for schueler in KLASSEN_LISTE if schueler != current_user])
     
     actual_room = room
-    if room != "global":
-        actual_room = get_private_room_name(current_user, room)
+    if room != "global": actual_room = get_private_room_name(current_user, room)
         
     db_messages = ChatMessage.query.filter_by(room=actual_room).order_by(ChatMessage.id.asc()).all()
-    # Begrenzung auf die letzten 150 Nachrichten
     db_messages = db_messages[-150:]
     raum_nachrichten = [{"name": m.sender, "text": m.text} for m in db_messages]
     
@@ -643,15 +608,11 @@ def chat(room="global"):
 @app.route('/chat/<room>/send', methods=['POST'])
 def send_message(room):
     if 'username' not in session: return {"error": "Login erforderlich"}, 401
-    
     nachricht_text = request.form.get('message', '').strip()
     if not nachricht_text: return {"status": "empty"}, 400
-    
     current_user = session['username']
     actual_room = room
-    if room != "global":
-        actual_room = get_private_room_name(current_user, room)
-        
+    if room != "global": actual_room = get_private_room_name(current_user, room)
     new_msg = ChatMessage(room=actual_room, sender=current_user, text=nachricht_text)
     db.session.add(new_msg)
     db.session.commit()
@@ -661,214 +622,286 @@ def send_message(room):
 def api_chat_messages(room):
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
     current_user = session['username']
-    
     actual_room = room
     if room != "global":
         partner = room
         actual_room = get_private_room_name(current_user, partner)
-        
         db_messages = ChatMessage.query.filter_by(room=actual_room).order_by(ChatMessage.id.asc()).all()
         total_msg_count = len(db_messages)
-        
         status_rec = ChatReadStatus.query.filter_by(room_id=actual_room, username=current_user).first()
         if not status_rec:
             status_rec = ChatReadStatus(room_id=actual_room, username=current_user, seen_count=total_msg_count)
             db.session.add(status_rec)
-        else:
-            status_rec.seen_count = total_msg_count
+        else: status_rec.seen_count = total_msg_count
         db.session.commit()
         
         partner_rec = ChatReadStatus.query.filter_by(room_id=actual_room, username=partner).first()
         partner_seen_count = partner_rec.seen_count if partner_rec else 0
-
-        # Nur die letzten 100 Nachrichten nehmen
         sliced_messages = db_messages[-150:]
-        offset = total_msg_count - len(sliced_messages)
         
         nachrichten = []
         for index, m in enumerate(db_messages):
             nachrichten.append({
-                "name": m.sender,
-                "text": m.text,
-                "gelesen": (index < partner_seen_count)
+                "name": m.sender, "text": m.text, "gelesen": (index < partner_seen_count)
             })
         return jsonify(nachrichten)
         
     db_messages = ChatMessage.query.filter_by(room='global').order_by(ChatMessage.id.asc()).all()
-    return jsonify([{"name": m.sender, "text": m.text} for m in db_messages])
+    return jsonify([{"name": m.sender, "text": m.text} for m in db_messages[-150:]])
 
 @app.route('/chat/<room>/delete/<int:msg_index>', methods=['POST'])
 def delete_message(room, msg_index):
-    if 'username' not in session: 
-        return redirect(url_for('login'))
-        
+    if 'username' not in session: return redirect(url_for('login'))
     current_user = session['username']
     admins = get_admins_list()
-    
     actual_room = room
-    if room != "global":
-        actual_room = get_private_room_name(current_user, room)
-        
+    if room != "global": actual_room = get_private_room_name(current_user, room)
     db_messages = ChatMessage.query.filter_by(room=actual_room).order_by(ChatMessage.id.asc()).all()
-    
-    # Auf die 100 im Browser gerenderten Nachrichten begrenzen
     sliced_messages = db_messages[-150:]
     
     if 0 <= msg_index < len(db_messages):
         target_msg = db_messages[msg_index]
-        
         if target_msg.sender == current_user or current_user in admins:
             db.session.delete(target_msg)
             db.session.commit()
-                
     return redirect(url_for('chat', room=room))
 
 # --- GAMES & LEADERBOARDS ---
-
 @app.route('/games')
 def games_menu():
     if 'username' not in session: return redirect(url_for('login'))
     me = session['username']
-    
     ttt_invites = TicTacToeGame.query.filter_by(gegner=me, status='eingeladen').all()
     aktive_einladungen = [{"id": i.game_id, "von": i.ersteller, "typ": "tictactoe"} for i in ttt_invites]
-    
     tank_invites = TankGame.query.filter_by(gegner=me, status='eingeladen').all()
-    for i in tank_invites:
-        aktive_einladungen.append({"id": i.game_id, "von": i.ersteller, "typ": "tankroyale"})
-            
+    for i in tank_invites: aktive_einladungen.append({"id": i.game_id, "von": i.ersteller, "typ": "tankroyale"})
     return render_template('games.html', einladungen=aktive_einladungen)
 
+# --- GEOMETRY DASH ---
 @app.route('/geometry-dash')
 def game():
     if 'username' not in session: return redirect(url_for('login'))
-    
     all_scores = GameScore.query.all()
     scores_dict = {s.username: s.geometry_dash for s in all_scores}
-    
-    vollstaendige_liste = [(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE]
-    leaderboard = sorted(vollstaendige_liste, key=lambda x: x[1], reverse=True)
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
     return render_template('geometry_dash.html', leaderboard=leaderboard)
     
-
-
-# --- GEOMETRY DASH ---
 @app.route('/api/submit-score', methods=['POST'])
 def submit_score():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
-    score = int(request.json.get('score', 0))
     current_user = session['username']
+    multiplier = get_user_multiplier(current_user)
+    score = int(request.json.get('score', 0)) * multiplier
     
     user_score = GameScore.query.filter_by(username=current_user).first()
-    if not user_score:
-        user_score = GameScore(username=current_user, geometry_dash=score)
-        db.session.add(user_score)
+    if not user_score: db.session.add(GameScore(username=current_user, geometry_dash=score))
     else:
         current_best = user_score.geometry_dash if user_score.geometry_dash is not None else 0
-        if score > current_best:
-            user_score.geometry_dash = score
-            
+        if score > current_best: user_score.geometry_dash = score
     db.session.commit()
     return {"status": "success"}
-
-# --- CLICKER ---
 
 # --- CLICKER ---
 @app.route('/clicker')
 def clicker_game():
     if 'username' not in session: return redirect(url_for('login'))
-    
-    # Alle Highscores aus der Datenbank holen
     all_scores = GameScore.query.all()
     scores_dict = {s.username: s.clicker for s in all_scores}
-    
-    # Rangliste für die Klassenliste erstellen (Standardwert: 0 Klicks)
-    vollstaendige_liste = [(s, scores_dict.get(s, 0) if scores_dict.get(s) is not None else 0) for s in KLASSEN_LISTE]
-    leaderboard = sorted(vollstaendige_liste, key=lambda x: x[1], reverse=True)
-    
-    # clicker.html (oder wie deine HTML-Datei heißt) mit dem Leaderboard laden
+    leaderboard = sorted([(s, scores_dict.get(s, 0) if scores_dict.get(s) is not None else 0) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
     return render_template('clicker.html', leaderboard=leaderboard)
     
 @app.route('/api/submit-clicker', methods=['POST'])
 def submit_clicker():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
-    score = int(request.json.get('score', 0))
     current_user = session['username']
+    multiplier = get_user_multiplier(current_user)
+    score = int(request.json.get('score', 0)) * multiplier
     
     user_score = GameScore.query.filter_by(username=current_user).first()
-    if not user_score:
-        user_score = GameScore(username=current_user, clicker=score)
-        db.session.add(user_score)
+    if not user_score: db.session.add(GameScore(username=current_user, clicker=score))
     else:
         current_best = user_score.clicker if user_score.clicker is not None else 0
-        if score > current_best:
-            user_score.clicker = score
-            
+        if score > current_best: user_score.clicker = score
     db.session.commit()
     return {"status": "success"}
 
+# --- FLAPPY BIRD ---
 @app.route('/flappy')
 def flappy_game():
     if 'username' not in session: return redirect(url_for('login'))
-    
     all_scores = GameScore.query.all()
     scores_dict = {s.username: s.flappy for s in all_scores}
-    
-    leaderboard_data = [(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE]
-    leaderboard = sorted(leaderboard_data, key=lambda x: x[1], reverse=True)
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
     return render_template('flappy.html', leaderboard=leaderboard)
 
-# --- FLAPPY BIRD ---
 @app.route('/api/submit-flappy', methods=['POST'])
 def submit_flappy():
     if 'username' not in session: return {"error": "401"}, 401
-    user = session['username']
-    val = int(request.json.get('score', 0))
+    current_user = session['username']
+    multiplier = get_user_multiplier(current_user)
+    val = int(request.json.get('score', 0)) * multiplier
     
-    user_score = GameScore.query.filter_by(username=user).first()
-    if not user_score:
-        user_score = GameScore(username=user, flappy=val)
-        db.session.add(user_score)
+    user_score = GameScore.query.filter_by(username=current_user).first()
+    if not user_score: db.session.add(GameScore(username=current_user, flappy=val))
     else:
         current_best = user_score.flappy if user_score.flappy is not None else -1
-        if val > current_best:
-            user_score.flappy = val
-            
+        if val > current_best: user_score.flappy = val
     db.session.commit()
     return {"status": "ok"}
 
+# --- REACTION TIME ---
 @app.route('/reaction')
 def reaction_game():
     if 'username' not in session: return redirect(url_for('login'))
-    
     all_scores = GameScore.query.all()
     scores_dict = {s.username: s.reaction for s in all_scores}
-    
-    leaderboard_data = [(s, scores_dict.get(s, 9999)) for s in KLASSEN_LISTE]
-    leaderboard = sorted(leaderboard_data, key=lambda x: x[1], reverse=False)
+    leaderboard = sorted([(s, scores_dict.get(s, 9999)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=False)
     return render_template('reaction.html', leaderboard=leaderboard)
 
-# --- REACTION TIME ---
 @app.route('/api/submit-reaction', methods=['POST'])
 def submit_reaction():
     if 'username' not in session: return {"error": "401"}, 401
-    user = session['username']
-    val = int(request.json.get('score', 9999))
+    current_user = session['username']
+    # Achtung: Bei Reaction Time ist WENIGER besser! Multiplikator teilt die Zeit.
+    multiplier = get_user_multiplier(current_user)
+    val = int(int(request.json.get('score', 9999)) / multiplier)
     
-    user_score = GameScore.query.filter_by(username=user).first()
-    if not user_score:
-        user_score = GameScore(username=user, reaction=val)
-        db.session.add(user_score)
+    user_score = GameScore.query.filter_by(username=current_user).first()
+    if not user_score: db.session.add(GameScore(username=current_user, reaction=val))
     else:
         current_best = user_score.reaction if user_score.reaction is not None else 9999
-        if val < current_best:
-            user_score.reaction = val
-            
+        if val < current_best: user_score.reaction = val
     db.session.commit()
     return {"status": "ok"}
-    
-# --- TIC-TAC-TOE ---
 
+# --- SNAKE ---
+@app.route('/snake')
+def snake_game():
+    if 'username' not in session: return redirect(url_for('login'))
+    all_scores = GameScore.query.all()
+    scores_dict = {s.username: (s.snake if s.snake is not None else 0) for s in all_scores}
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
+    return render_template('snake.html', leaderboard=leaderboard)
+
+@app.route('/api/submit-snake', methods=['POST'])
+def submit_snake():
+    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
+    current_user = session['username']
+    multiplier = get_user_multiplier(current_user)
+    score = int(request.json.get('score', 0)) * multiplier
+    
+    user_score = GameScore.query.filter_by(username=current_user).first()
+    if not user_score: db.session.add(GameScore(username=current_user, snake=score))
+    else:
+        current_best = user_score.snake if user_score.snake is not None else 0
+        if score > current_best: user_score.snake = score
+    db.session.commit()
+    return {"status": "success"}
+
+# --- CROSSY HUHN ---
+@app.route('/crossy')
+def crossy_game():
+    if 'username' not in session: return redirect(url_for('login'))
+    all_scores = GameScore.query.all()
+    scores_dict = {s.username: (s.crossy if s.crossy is not None else 0) for s in all_scores}
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
+    return render_template('crossy.html', leaderboard=leaderboard)
+
+@app.route('/api/submit-crossy', methods=['POST'])
+def submit_crossy():
+    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
+    current_user = session['username']
+    multiplier = get_user_multiplier(current_user)
+    score = int(request.json.get('score', 0)) * multiplier
+    
+    user_score = GameScore.query.filter_by(username=current_user).first()
+    if not user_score: db.session.add(GameScore(username=current_user, crossy=score))
+    else:
+        current_best = user_score.crossy if user_score.crossy is not None else 0
+        if score > current_best: user_score.crossy = score
+    db.session.commit()
+    return {"status": "success"}
+
+# --- NEON JUMP (Doodle) ---
+@app.route('/doodle')
+def doodle_game():
+    if 'username' not in session: return redirect(url_for('login'))
+    all_scores = GameScore.query.all()
+    scores_dict = {s.username: (s.doodle if s.doodle is not None else 0) for s in all_scores}
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
+    return render_template('doodle.html', leaderboard=leaderboard)
+
+@app.route('/api/submit-doodle', methods=['POST'])
+def submit_doodle():
+    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
+    current_user = session['username']
+    multiplier = get_user_multiplier(current_user)
+    score = int(request.json.get('score', 0)) * multiplier
+    
+    user_score = GameScore.query.filter_by(username=current_user).first()
+    if not user_score: db.session.add(GameScore(username=current_user, doodle=score))
+    else:
+        current_best = user_score.doodle if user_score.doodle is not None else 0
+        if score > current_best: user_score.doodle = score
+    db.session.commit()
+    return {"status": "success"}
+
+# --- BRICK BREAKER ---
+@app.route('/brickbreaker')
+def brickbreaker_game():
+    if 'username' not in session: return redirect(url_for('login'))
+    all_scores = GameScore.query.all()
+    scores_dict = {s.username: (s.brickbreaker if hasattr(s, 'brickbreaker') and s.brickbreaker is not None else 0) for s in all_scores}
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
+    return render_template('brickbreaker.html', leaderboard=leaderboard)
+
+@app.route('/api/submit-brickbreaker', methods=['POST'])
+def submit_brickbreaker():
+    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
+    current_user = session['username']
+    multiplier = get_user_multiplier(current_user)
+    score = int(request.json.get('score', 0)) * multiplier
+    
+    user_score = GameScore.query.filter_by(username=current_user).first()
+    if not user_score: db.session.add(GameScore(username=current_user, brickbreaker=score))
+    else:
+        current_best = getattr(user_score, 'brickbreaker', 0)
+        if current_best is None: current_best = 0
+        if score > current_best: user_score.brickbreaker = score
+    db.session.commit()
+    return {"status": "success"}
+
+# --- SPEED TYPING ---
+@app.route('/speedtyping')
+def speedtyping_game():
+    if 'username' not in session: return redirect(url_for('login'))
+    all_scores = GameScore.query.all()
+    scores_dict = {s.username: (getattr(s, 'speedtyping', 0) or 0) for s in all_scores}
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
+    return render_template('speedtyping.html', leaderboard=leaderboard)
+
+@app.route('/api/submit-speedtyping', methods=['POST'])
+def submit_speedtyping():
+    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
+    current_user = session['username']
+    multiplier = get_user_multiplier(current_user)
+    score = int(request.json.get('score', 0)) * multiplier
+    
+    user_score = GameScore.query.filter_by(username=current_user).first()
+    if not user_score: db.session.add(GameScore(username=current_user, speedtyping=score))
+    else:
+        current_best = getattr(user_score, 'speedtyping', 0)
+        if current_best is None: current_best = 0
+        if score > current_best: user_score.speedtyping = score
+    db.session.commit()
+    return {"status": "success"}
+
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    return redirect(url_for('login'))
+
+# --- TIC-TAC-TOE Multiplayer ---
 @app.route('/tictactoe')
 def tictactoe_menu():
     if 'username' not in session: return redirect(url_for('login'))
@@ -880,16 +913,10 @@ def tictactoe_invite():
     if 'username' not in session: return redirect(url_for('login'))
     gegner = request.form.get('gegner')
     me = session['username']
-    
     game_id = get_ttt_id(me, gegner)
     existing = TicTacToeGame.query.filter_by(game_id=game_id).first()
-    if existing:
-        db.session.delete(existing)
-    
-    new_game = TicTacToeGame(
-        game_id=game_id, ersteller=me, gegner=gegner,
-        board=", , , , , , , , ", turn=me, status="eingeladen"
-    )
+    if existing: db.session.delete(existing)
+    new_game = TicTacToeGame(game_id=game_id, ersteller=me, gegner=gegner, board=", , , , , , , , ", turn=me, status="eingeladen")
     db.session.add(new_game)
     db.session.commit()
     return redirect(url_for('tictactoe_game', game_id=game_id))
@@ -941,7 +968,6 @@ def tictactoe_resume(game_id):
         return {"status": "resumed"}
     return {"error": "Match nicht gefunden oder keine Rechte"}, 400
 
-
 @app.route('/tictactoe/game/<game_id>')
 def tictactoe_game(game_id):
     if 'username' not in session: return redirect(url_for('login'))
@@ -953,10 +979,7 @@ def ttt_status(game_id):
     if g:
         raw_board = g.board.split(',')
         cleaned_board = [cell.strip() for cell in raw_board]
-        return jsonify({
-            "ersteller": g.ersteller, "gegner": g.gegner,
-            "board": cleaned_board, "turn": g.turn, "status": g.status
-        })
+        return jsonify({"ersteller": g.ersteller, "gegner": g.gegner, "board": cleaned_board, "turn": g.turn, "status": g.status})
     return jsonify({})
 
 @app.route('/api/tictactoe/move/<game_id>', methods=['POST'])
@@ -964,7 +987,6 @@ def ttt_move(game_id):
     if 'username' not in session: return {"error": "Nicht eingeloggt"}, 401
     cell_index = int(request.json.get('cell'))
     me = session['username']
-    
     g = TicTacToeGame.query.filter_by(game_id=game_id).first()
     if g and g.status == "aktiv" and g.turn == me:
         board_list = [c.strip() for c in g.board.split(',')]
@@ -973,72 +995,47 @@ def ttt_move(game_id):
             board_list[cell_index] = zeichen
             g.board = ",".join(board_list)
             g.turn = g.gegner if me == g.ersteller else g.ersteller
-            
             win_conditions = [[0,1,2], [3,4,5], [6,7,8], [0,3,6], [1,4,7], [2,5,8], [0,4,8], [2,4,6]]
             for b in win_conditions:
                 if board_list[b[0]] == board_list[b[1]] == board_list[b[2]] != "":
                     g.status = f"gewonnen_{me}"
-            
             if "" not in board_list and "gewonnen" not in g.status:
                 g.status = "unentschieden"
-                
             db.session.commit()
             return {"status": "success"}
-            
     return {"status": "invalid_move"}, 400
 
 # --- TANK ROYALE MULTIPLAYER ---
-
 @app.route('/tankroyale')
 def tankroyale_menu():
-    if 'username' not in session: 
-        return redirect(url_for('login'))
+    if 'username' not in session: return redirect(url_for('login'))
     gegner_liste = sorted([s for s in KLASSEN_LISTE if s != session['username']])
     return render_template('tank_royale_menu.html', gegner_liste=gegner_liste)
 
 @app.route('/tankroyale/invite', methods=['POST'])
 def tankroyale_invite():
-    if 'username' not in session: 
-        return redirect(url_for('login'))
-    
+    if 'username' not in session: return redirect(url_for('login'))
     gegner = request.form.get('gegner')
-    # NEU: Schwierigkeitsgrad aus dem Formular holen (Standard ist 'medium')
     bot_difficulty = request.form.get('bot_difficulty', 'medium') 
     me = session['username']
-    
     game_id = f"{min(me, gegner)}_tank_{max(me, gegner)}"
     existing = TankGame.query.filter_by(game_id=game_id).first()
     if existing:
         db.session.delete(existing)
         db.session.commit() 
-    
-    # Gelände einmalig generieren (901 Punkte für Canvas-Breite 900)
     terrain_points = []
     for x in range(901):
         y = 400 + math.sin(x * 0.008) * 40 + math.cos(x * 0.02) * 10
         terrain_points.append(round(y, 2))
-    
     terrain_json = json.dumps(terrain_points)
-
-    new_game = TankGame(
-        game_id=game_id, 
-        ersteller=me, 
-        gegner=gegner,
-        state="100,100,80,620,100,100,3,2,3,2,-1,-1,0", 
-        turn=me, 
-        status="eingeladen",
-        terrain=terrain_json
-    )
+    new_game = TankGame(game_id=game_id, ersteller=me, gegner=gegner, state="100,100,80,620,100,100,3,2,3,2,-1,-1,0", turn=me, status="eingeladen", terrain=terrain_json)
     db.session.add(new_game)
     db.session.commit()
-    
-    # NEU: Den difficulty-Parameter an die URL anhängen
     return redirect(url_for('tankroyale_match', game_id=game_id, diff=bot_difficulty))
 
 @app.route('/tankroyale/accept/<game_id>', methods=['POST'])
 def tankroyale_accept(game_id):
-    if 'username' not in session: 
-        return redirect(url_for('login'))
+    if 'username' not in session: return redirect(url_for('login'))
     g = TankGame.query.filter_by(game_id=game_id).first()
     if g:
         g.status = "aktiv"
@@ -1047,8 +1044,7 @@ def tankroyale_accept(game_id):
 
 @app.route('/tankroyale/decline/<game_id>', methods=['POST'])
 def tankroyale_decline(game_id):
-    if 'username' not in session: 
-        return redirect(url_for('login'))
+    if 'username' not in session: return redirect(url_for('login'))
     g = TankGame.query.filter_by(game_id=game_id).first()
     if g:
         db.session.delete(g)
@@ -1057,47 +1053,32 @@ def tankroyale_decline(game_id):
 
 @app.route('/tankroyale/match/<game_id>')
 def tankroyale_match(game_id):
-    if 'username' not in session: 
-        return redirect(url_for('login'))
-    
+    if 'username' not in session: return redirect(url_for('login'))
     diff = request.args.get('diff', 'medium')
-    
-    # Den echten Gegner aus der Datenbank ermitteln
     game = TankGame.query.filter_by(game_id=game_id).first()
     gegner_name = "Computer-Bot 🤖"
     if game:
         me = session['username']
         gegner_name = game.gegner if game.ersteller == me else game.ersteller
-
     return render_template('tank_royale_match.html', gameId=game_id, me=session['username'], gegner=gegner_name, bot_difficulty=diff)
 
 @app.route('/api/tankroyale/status/<game_id>')
 def tank_status(game_id):
     g = TankGame.query.filter_by(game_id=game_id).first()
-    if not g: 
-        return {"status": "not_found"}, 404
-    
+    if not g: return {"status": "not_found"}, 404
     state_str = g.state or ""
     raw_parts = state_str.split(',') if state_str else []
-    
-    # Absolute Sicherheit bei beschädigten States im Client
     if len(raw_parts) < 13:
         default_parts = ["100", "100", "80", "620", "100", "100", "3", "2", "3", "2", "-1", "-1", "0"]
         for i in range(len(raw_parts)):
-            if raw_parts[i] and raw_parts[i] != "NaN":
-                default_parts[i] = raw_parts[i]
+            if raw_parts[i] and raw_parts[i] != "NaN": default_parts[i] = raw_parts[i]
         raw_parts = default_parts
         g.state = ",".join(raw_parts)
         db.session.commit()
-    
     def safe_int(val, default=0):
-        try:
-            return int(float(val))
-        except (ValueError, TypeError):
-            return default
-
+        try: return int(float(val))
+        except (ValueError, TypeError): return default
     terrain_data = json.loads(g.terrain) if g.terrain else []
-    
     return {
         "status": g.status or "aktiv",
         "turn": g.turn,
@@ -1113,312 +1094,83 @@ def tank_status(game_id):
     
 @app.route('/api/tankroyale/shoot/<game_id>', methods=['POST'])
 def tank_shoot(game_id):
-    if 'username' not in session: 
-        return {"error": "Nicht eingeloggt"}, 401
+    if 'username' not in session: return {"error": "Nicht eingeloggt"}, 401
     me = session['username']
-    
     data = request.json or {}
     angle = float(data.get('angle', 0))
     power = float(data.get('power', 0))
     hit = data.get('hit', 'none')
-    
-    # .lower() stellt sicher, dass "Triple", "TRIPLE" oder "triple" immer zu "triple" werden
     waffentyp = str(data.get('waffenTyp', 'standard')).lower().strip()
-    
     g = TankGame.query.filter_by(game_id=game_id).first()
     if g and g.status == "aktiv" and g.turn == me:
-        # Deformiertes Gelände aus dem Schuss-Post übernehmen
         if "updated_terrain" in data and data["updated_terrain"]:
             g.terrain = json.dumps(data["updated_terrain"])
-
         raw_parts = g.state.split(',') if g.state else []
-        
-        # Helfer für die String-Konvertierung, um NaN-Abstürze zu blockieren
         def safe_float_convert(val, default=0):
-            try:
-                return int(float(val))
-            except (ValueError, TypeError):
-                return default
-
-        if len(raw_parts) < 13:
-            st = [100, 100, int(g.p1_x or 80), int(g.p2_x or 620), 100, 100, 3, 2, 3, 2, -1, -1, 0]
-        else:
-            st = [safe_float_convert(x) for x in raw_parts]
+            try: return int(float(val))
+            except (ValueError, TypeError): return default
+        if len(raw_parts) < 13: st = [100, 100, int(g.p1_x or 80), int(g.p2_x or 620), 100, 100, 3, 2, 3, 2, -1, -1, 0]
+        else: st = [safe_float_convert(x) for x in raw_parts]
         
-        # X-Positionen updaten
-        if data.get('new_p1_x') is not None: 
-            st[2] = safe_float_convert(data.get('new_p1_x'))
-        if data.get('new_p2_x') is not None: 
-            st[3] = safe_float_convert(data.get('new_p2_x'))
+        if data.get('new_p1_x') is not None: st[2] = safe_float_convert(data.get('new_p1_x'))
+        if data.get('new_p2_x') is not None: st[3] = safe_float_convert(data.get('new_p2_x'))
         
-        # Benzinverbrauch synchronisieren
         if me == g.ersteller:
-            if data.get('new_p1_fuel') is not None: 
-                st[4] = safe_float_convert(data.get('new_p1_fuel'))
+            if data.get('new_p1_fuel') is not None: st[4] = safe_float_convert(data.get('new_p1_fuel'))
         else:
-            if data.get('new_p2_fuel') is not None: 
-                st[5] = safe_float_convert(data.get('new_p2_fuel'))
+            if data.get('new_p2_fuel') is not None: st[5] = safe_float_convert(data.get('new_p2_fuel'))
 
-        # --- EFFEKTE BERECHNEN ---
         if hit == "crate_collected":
             if me == g.ersteller:
-                st[0] = min(100, st[0] + 25) # Max HP Limitierung
-                st[4] = 100  # P1 Tank voll
-                st[6] += 1   # Berta +1
-                st[7] += 1   # Triple +1
+                st[0] = min(100, st[0] + 25) 
+                st[4] = 100  
+                st[6] += 1   
+                st[7] += 1   
             else:
-                st[1] = min(100, st[1] + 25) # Max HP Limitierung
-                st[5] = 100  # P2 Tank voll
+                st[1] = min(100, st[1] + 25) 
+                st[5] = 100  
                 st[8] += 1
                 st[9] += 1
-            st[12] = 0       # Kiste vom Feld nehmen
+            st[12] = 0       
         else:
-            # Schuss-Munition abziehen
             if me == g.ersteller:
-                if waffentyp == "berta": 
-                    st[6] = max(0, st[6] - 1)
-                elif waffentyp == "triple": 
-                    st[7] = max(0, st[7] - 1)
+                if waffentyp == "berta": st[6] = max(0, st[6] - 1)
+                elif waffentyp == "triple": st[7] = max(0, st[7] - 1)
             else:
-                if waffentyp == "berta": 
-                    st[8] = max(0, st[8] - 1)
-                elif waffentyp == "triple": 
-                    st[9] = max(0, st[9] - 1)
-
-            # Schaden ermitteln
+                if waffentyp == "berta": st[8] = max(0, st[8] - 1)
+                elif waffentyp == "triple": st[9] = max(0, st[9] - 1)
             schaden = 20
-            if waffentyp == "berta": 
-                schaden = 45
-            elif waffentyp == "triple": 
-                schaden = 18
+            if waffentyp == "berta": schaden = 45
+            elif waffentyp == "triple": schaden = 18
+            if hit == "p1": st[0] = max(0, st[0] - schaden)
+            elif hit == "p2": st[1] = max(0, st[1] - schaden)
 
-            # Treffer zuweisen (Sowohl direkter Panzertreffer "p1"/"p2" als auch "terrain"-Einschlag)
-            # Da im JS bei Geländetreffern "terrain" übergeben wird, ziehen wir Schaden ab, 
-            # wenn das Projektil in der Nähe gelandet ist (wird im JS geregelt, welches "p1" oder "p2" meldet)
-            if hit == "p1": 
-                st[0] = max(0, st[0] - schaden)
-            elif hit == "p2": 
-                st[1] = max(0, st[1] - schaden)
-
-        # Neue Kiste spawnen (35% Chance), falls aktuell keine da ist
         if st[12] == 0 and random.random() < 0.35:
             st[10] = random.randint(150, 750)
             st[11] = 0
             st[12] = 1
 
-        # DB-Felder aktualisieren
         g.p1_hp, g.p2_hp = st[0], st[1]
         g.p1_x, g.p2_x = st[2], st[3]
         g.state = ",".join(str(x) for x in st)
         g.last_shot = f"{angle},{power}"
         
-        # Spielende / Rundenwechsel
-        if st[0] <= 0:
-            g.status = f"gewonnen_{g.gegner}"
-        elif st[1] <= 0:
-            g.status = f"gewonnen_{g.ersteller}"
-        else:
-            g.turn = g.gegner if me == g.ersteller else g.ersteller
+        if st[0] <= 0: g.status = f"gewonnen_{g.gegner}"
+        elif st[1] <= 0: g.status = f"gewonnen_{g.ersteller}"
+        else: g.turn = g.gegner if me == g.ersteller else g.ersteller
             
         db.session.commit()
         return {"status": "success"}
-        
     return {"status": "invalid_move"}, 400
 
 @app.route('/tankroyale/delete-match/<game_id>', methods=['POST'])
 def tankroyale_delete_match(game_id):
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    
+    if 'username' not in session: return redirect(url_for('login'))
     match = TankGame.query.filter_by(game_id=game_id).first()
     if match:
         db.session.delete(match)
         db.session.commit()
-        
     return redirect(url_for('dashboard'))
-
-# --- SNAKE ---
-@app.route('/snake')
-def snake_game():
-    if 'username' not in session: return redirect(url_for('login'))
-    
-    all_scores = GameScore.query.all()
-    scores_dict = {s.username: (s.snake if s.snake is not None else 0) for s in all_scores}
-    
-    leaderboard_data = [(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE]
-    leaderboard = sorted(leaderboard_data, key=lambda x: x[1], reverse=True)
-    return render_template('snake.html', leaderboard=leaderboard)
-
-@app.route('/api/submit-snake', methods=['POST'])
-def submit_snake():
-    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
-    score = int(request.json.get('score', 0))
-    current_user = session['username']
-    
-    user_score = GameScore.query.filter_by(username=current_user).first()
-    if not user_score:
-        user_score = GameScore(username=current_user, snake=score)
-        db.session.add(user_score)
-    else:
-        current_best = user_score.snake if user_score.snake is not None else 0
-        if score > current_best:
-            user_score.snake = score
-            
-    db.session.commit()
-    return {"status": "success"}
-
-# --- CROSSY HUHN ---
-@app.route('/crossy')
-def crossy_game():
-    if 'username' not in session: return redirect(url_for('login'))
-    
-    all_scores = GameScore.query.all()
-    scores_dict = {s.username: (s.crossy if s.crossy is not None else 0) for s in all_scores}
-    
-    leaderboard_data = [(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE]
-    leaderboard = sorted(leaderboard_data, key=lambda x: x[1], reverse=True)
-    return render_template('crossy.html', leaderboard=leaderboard)
-
-@app.route('/api/submit-crossy', methods=['POST'])
-def submit_crossy():
-    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
-    score = int(request.json.get('score', 0))
-    current_user = session['username']
-    
-    user_score = GameScore.query.filter_by(username=current_user).first()
-    if not user_score:
-        user_score = GameScore(username=current_user, crossy=score)
-        db.session.add(user_score)
-    else:
-        current_best = user_score.crossy if user_score.crossy is not None else 0
-        if score > current_best:
-            user_score.crossy = score
-            
-    db.session.commit()
-    return {"status": "success"}
-
-# --- NEON JUMP (Doodle) ---
-@app.route('/doodle')
-def doodle_game():
-    if 'username' not in session: return redirect(url_for('login'))
-    
-    all_scores = GameScore.query.all()
-    scores_dict = {s.username: (s.doodle if s.doodle is not None else 0) for s in all_scores}
-    
-    leaderboard_data = [(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE]
-    leaderboard = sorted(leaderboard_data, key=lambda x: x[1], reverse=True)
-    return render_template('doodle.html', leaderboard=leaderboard)
-
-@app.route('/api/submit-doodle', methods=['POST'])
-def submit_doodle():
-    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
-    score = int(request.json.get('score', 0))
-    current_user = session['username']
-    
-    user_score = GameScore.query.filter_by(username=current_user).first()
-    if not user_score:
-        user_score = GameScore(username=current_user, doodle=score)
-        db.session.add(user_score)
-    else:
-        current_best = user_score.doodle if user_score.doodle is not None else 0
-        if score > current_best:
-            user_score.doodle = score
-            
-    db.session.commit()
-    return {"status": "success"}
-
-# --- BRICK BREAKER ---
-@app.route('/brickbreaker')
-def brickbreaker_game():
-    if 'username' not in session: return redirect(url_for('login'))
-    
-    all_scores = GameScore.query.all()
-    # Auslesen der Highscores (falls noch kein Eintrag, dann 0)
-    scores_dict = {s.username: (s.brickbreaker if hasattr(s, 'brickbreaker') and s.brickbreaker is not None else 0) for s in all_scores}
-    
-    leaderboard_data = [(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE]
-    leaderboard = sorted(leaderboard_data, key=lambda x: x[1], reverse=True)
-    return render_template('brickbreaker.html', leaderboard=leaderboard)
-
-@app.route('/api/submit-brickbreaker', methods=['POST'])
-def submit_brickbreaker():
-    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
-    score = int(request.json.get('score', 0))
-    current_user = session['username']
-    
-    user_score = GameScore.query.filter_by(username=current_user).first()
-    if not user_score:
-        user_score = GameScore(username=current_user, brickbreaker=score)
-        db.session.add(user_score)
-    else:
-        # Falls die Spalte neu ist und None enthält, fangen wir das hier ab
-        current_best = getattr(user_score, 'brickbreaker', 0)
-        if current_best is None: current_best = 0
-            
-        if score > current_best:
-            user_score.brickbreaker = score
-            
-    db.session.commit()
-    return {"status": "success"}
-
-# --- SPEED TYPING ---
-@app.route('/speedtyping')
-def speedtyping_game():
-    if 'username' not in session: return redirect(url_for('login'))
-    
-    all_scores = GameScore.query.all()
-    # Sicherstellen, dass kein Fehler geworfen wird, falls die Spalte mal leer ist
-    scores_dict = {s.username: (getattr(s, 'speedtyping', 0) or 0) for s in all_scores}
-    
-    leaderboard_data = [(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE]
-    leaderboard = sorted(leaderboard_data, key=lambda x: x[1], reverse=True)
-    return render_template('speedtyping.html', leaderboard=leaderboard)
-
-@app.route('/api/submit-speedtyping', methods=['POST'])
-def submit_speedtyping():
-    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
-    score = int(request.json.get('score', 0))
-    current_user = session['username']
-    
-    user_score = GameScore.query.filter_by(username=current_user).first()
-    if not user_score:
-        user_score = GameScore(username=current_user, speedtyping=score)
-        db.session.add(user_score)
-    else:
-        current_best = getattr(user_score, 'speedtyping', 0)
-        if current_best is None: current_best = 0
-            
-        if score > current_best:
-            user_score.speedtyping = score
-            
-    db.session.commit()
-    return {"status": "success"}
-
-@app.route('/logout')
-def logout():
-    session.pop('username', None)
-    return redirect(url_for('login'))
-
-@app.route('/admin/send-message', methods=['POST'])
-def send_admin_message():
-    if 'username' not in session: return "403", 403
-    me = session['username']
-    user = UserSetting.query.filter_by(username=me).first()
-    if not (me == "Till" or (user and user.is_admin)): return "403", 403
-    
-    target = request.form.get('target', 'alle')
-    title = request.form.get('title', 'Systemnachricht')
-    message = request.form.get('message', '').strip()
-    
-    if message:
-        # Lösche zuerst alte Systemnachrichten für dieses Ziel, damit sie sich nicht stauen
-        AdminMessage.query.filter_by(target=target).delete()
-        
-        new_msg = AdminMessage(sender=me, target=target, title=title, message=message)
-        db.session.add(new_msg)
-        db.session.commit()
-        
-    return redirect(url_for('admin_panel'))
 
 if __name__ == '__main__':
     with app.app_context():
