@@ -33,6 +33,12 @@ KLASSEN_LISTE = [
 last_active = {}
 user_activities = {}
 
+# --- GEHEIMCODES ---
+GEHEIME_CODES = {
+    "TILLISTDERBESTEADMIN": "double_score",
+    "HACKER": "admin"  # Macht den User direkt zum Admin
+}
+
 # --- DATENBANK MODELLE (TABELLEN) ---
 
 class Feedback(db.Model):
@@ -116,6 +122,12 @@ class TankGame(db.Model):
     status = db.Column(db.String(50), default="eingeladen")
     last_shot = db.Column(db.String(100), default="") 
     terrain = db.Column(db.Text, nullable=True) # Spalte für das zerstörbare Gelände
+
+class RedeemedCode(db.Model):
+    __tablename__ = 'redeemed_codes'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    username = db.Column(db.String(50), nullable=False)
+    code = db.Column(db.String(50), nullable=False)
 
 
 # --- HILFSFUNKTIONEN ---
@@ -287,6 +299,40 @@ def global_stats():
     
     return render_template('stats.html', efficiency=efficiency_list, scores=scores_dict)
 
+
+@app.route('/api/redeem-code', methods=['POST'])
+def redeem_code():
+    if 'username' not in session: return {"error": "Nicht eingeloggt"}, 401
+    me = session['username']
+    code = request.json.get('code', '').strip().upper()
+    
+    if not code or code not in GEHEIME_CODES:
+        return {"error": "Dieser Code ist ungültig oder existiert nicht!"}, 400
+        
+    # Prüfen, ob der User den Code schon benutzt hat
+    already_used = RedeemedCode.query.filter_by(username=me, code=code).first()
+    if already_used:
+        return {"error": "Du hast diesen Code bereits eingelöst!"}, 400
+        
+    # Belohnung austeilen
+    user = UserSetting.query.filter_by(username=me).first()
+    belohnung = GEHEIME_CODES[code]
+    
+    if belohnung == "double_score":
+        user.score_multiplier = 2  # Setzt den Multiplikator auf x2
+        msg = "Code akzeptiert! Du hast ab sofort DOPPELTEN SCORE in den Spielen!"
+    elif belohnung == "admin":
+        user.is_admin = True
+        msg = "Code akzeptiert! Du bist jetzt Admin!"
+    else:
+        msg = "Code akzeptiert!"
+        
+    # Eintragen, dass der Code genutzt wurde
+    db.session.add(RedeemedCode(username=me, code=code))
+    db.session.commit()
+    
+    return {"status": "success", "message": msg}
+    
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
