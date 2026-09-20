@@ -50,6 +50,10 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
+        // Responsive Zoom-Faktor für Handys/Tablets (verhindert, dass die Map zu kompakt wirkt)
+        const isMobile = window.innerWidth < 900;
+        const zoom = isMobile ? Math.max(0.55, window.innerWidth / 1100) : 1.0;
+
         const myName = "{{ me }}";
         const mapSize = 3000;
         
@@ -66,24 +70,24 @@
         let isBoosting = false;
         let keys = {w: false, a: false, s: false, d: false};
 
-        // 1. Maus
+        // 1. Maus (berücksichtigt den Zoom)
         window.addEventListener('mousemove', (e) => {
             if(Object.values(keys).includes(true)) return; // WASD hat Vorrang
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
-            targetAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+            targetAngle = Math.atan2((e.clientY - centerY) / zoom, (e.clientX - centerX) / zoom);
         });
 
-        // 2. Touch (iPad)
+        // 2. Touch (iPad / Handy - berücksichtigt den Zoom)
         canvas.addEventListener('touchstart', (e) => {
             const touch = e.touches[0];
-            targetAngle = Math.atan2(touch.clientY - canvas.height/2, touch.clientX - canvas.width/2);
+            targetAngle = Math.atan2((touch.clientY - canvas.height/2) / zoom, (touch.clientX - canvas.width/2) / zoom);
         }, {passive: false});
 
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault(); // Stoppt das Scrollen auf Touch-Geräten
             const touch = e.touches[0];
-            targetAngle = Math.atan2(touch.clientY - canvas.height/2, touch.clientX - canvas.width/2);
+            targetAngle = Math.atan2((touch.clientY - canvas.height/2) / zoom, (touch.clientX - canvas.width/2) / zoom);
         }, {passive: false});
 
         // 3. Tastatur (WASD + Boost auf E oder Leertaste)
@@ -129,16 +133,16 @@
             if (keys.a) dx -= 1; if (keys.d) dx += 1;
             if (dx !== 0 || dy !== 0) targetAngle = Math.atan2(dy, dx);
 
-            // Bewegung glätten
+            // Bewegung glätten (FPS-unabhängig durch feste Zeiteinheit)
             let angleDiff = targetAngle - myAngle;
             while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
             while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-            myAngle += angleDiff * 0.15;
+            myAngle += angleDiff * 0.25;
 
-            // --- BOOST LOGIK ---
-            let speed = 4 + (100 / (myScore + 100));
+            // --- FPS-UNABHÄNGIGE GESCHWINDIGKEIT ---
+            let speed = 250 + (4000 / (myScore + 100)); // Pixel pro Sekunde
             if (isBoosting && myScore > 15) {
-                speed *= 1.8; // Fast doppelt so schnell!
+                speed *= 1.8; 
                 boostCostTracker += 0.3; 
                 if (boostCostTracker >= 1) {
                     myScore -= 1; // Kostet Punkte
@@ -146,9 +150,12 @@
                 }
             }
             
+            // Bewegung pro Frame basierend auf festem Timestep (1/60 Sekunde)
+            const stepDist = speed * (1 / 60);
+
             const head = myBody[0];
-            let newX = head[0] + Math.cos(myAngle) * speed;
-            let newY = head[1] + Math.sin(myAngle) * speed;
+            let newX = head[0] + Math.cos(myAngle) * stepDist;
+            let newY = head[1] + Math.sin(myAngle) * stepDist;
 
             if (newX < 0) newX = 0; if (newX > mapSize) newX = mapSize;
             if (newY < 0) newY = 0; if (newY > mapSize) newY = mapSize;
@@ -195,11 +202,15 @@
         function drawGame() {
             if (isDead) return;
 
-            const camX = myBody[0][0] - canvas.width / 2;
-            const camY = myBody[0][1] - canvas.height / 2;
+            // Kamera-Berechnung unter Berücksichtigung des Zoom-Faktors
+            const viewWidth = canvas.width / zoom;
+            const viewHeight = canvas.height / zoom;
+            const camX = myBody[0][0] - viewWidth / 2;
+            const camY = myBody[0][1] - viewHeight / 2;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.save();
+            ctx.scale(zoom, zoom); // Wendet den Handy-/Desktop-Zoom an
             ctx.translate(-camX, -camY);
 
             ctx.strokeStyle = "#222"; ctx.lineWidth = 2;
@@ -225,7 +236,6 @@
                 ctx.lineJoin = "round";
                 ctx.strokeStyle = color;
                 
-                // Leuchten, wenn geboostet wird (nur für den eigenen Spieler im Moment visualisiert)
                 if(name === myName && isBoosting && score > 15) { ctx.shadowBlur = 15; ctx.shadowColor = color; }
                 
                 ctx.beginPath();
@@ -234,7 +244,7 @@
                 ctx.stroke();
                 ctx.shadowBlur = 0;
 
-                // --- ÜBERRASCHUNG: AUGEN RENDERN ---
+                // Augen rendern
                 let headAng = 0;
                 if(body.length > 1) headAng = Math.atan2(body[0][1] - body[1][1], body[0][0] - body[1][0]);
                 
@@ -244,11 +254,11 @@
                 const leftEyeX = body[0][0] + Math.cos(headAng - 0.8) * eyeDist;
                 const leftEyeY = body[0][1] + Math.sin(headAng - 0.8) * eyeDist;
 
-                ctx.fillStyle = "white"; // Weißes Auge
+                ctx.fillStyle = "white"; 
                 ctx.beginPath(); ctx.arc(rightEyeX, rightEyeY, eyeR, 0, Math.PI*2); ctx.fill();
                 ctx.beginPath(); ctx.arc(leftEyeX, leftEyeY, eyeR, 0, Math.PI*2); ctx.fill();
                 
-                ctx.fillStyle = "black"; // Pupille schaut nach vorne
+                ctx.fillStyle = "black"; 
                 ctx.beginPath(); ctx.arc(rightEyeX + Math.cos(headAng)*eyeR*0.4, rightEyeY + Math.sin(headAng)*eyeR*0.4, eyeR*0.5, 0, Math.PI*2); ctx.fill();
                 ctx.beginPath(); ctx.arc(leftEyeX + Math.cos(headAng)*eyeR*0.4, leftEyeY + Math.sin(headAng)*eyeR*0.4, eyeR*0.5, 0, Math.PI*2); ctx.fill();
 
@@ -258,7 +268,7 @@
                 ctx.textAlign = "center";
                 ctx.fillText(name, body[0][0], body[0][1] - r - 15);
 
-                // --- ÜBERRASCHUNG 2: KRONE FÜR PLATZ 1 ---
+                // Krone für Platz 1
                 if (leaderboard.length > 0 && leaderboard[0][0] === name) {
                     ctx.font = "24px Arial";
                     ctx.fillText("👑", body[0][0], body[0][1] - r - 30);
@@ -279,8 +289,6 @@
                 lbHtml += `<div ${isMe}>${index+1}. ${item[0]} ${index===0 ? '👑' : ''} - ${item[1]}</div>`;
             });
             document.getElementById('lb-list').innerHTML = lbHtml;
-
-            requestAnimationFrame(() => { updateLocal(); drawGame(); });
         }
 
         async function syncServer(sendingDeath = false) {
@@ -298,10 +306,40 @@
             } catch (e) { console.log(e); }
         }
 
-        setInterval(() => { if(!isDead) syncServer(false); }, 100);
-        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+        // --- DER PERFEKTE FPS-UNABHÄNGIGE GAME-LOOP (AKKUMULATOR-MUSTER) ---
+        let lastTime = performance.now();
+        let timeAccumulator = 0;
+        const STEP_TIME = 1 / 60; // Feste 60 Updates pro Sekunde
 
-        updateLocal(); drawGame();
+        function gameLoop(timestamp) {
+            if (!timestamp) timestamp = performance.now();
+            let dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            if (dt > 0.25) dt = 0.25; // Tab-Wechsel-Schutz
+            timeAccumulator += dt;
+
+            // Physik/Logik läuft exakt im 60-Hz-Takt – völlig egal, ob der Bildschirm 60 oder 120 Hz hat!
+            while (timeAccumulator >= STEP_TIME) {
+                updateLocal();
+                timeAccumulator -= STEP_TIME;
+            }
+
+            // Rendern läuft butterweich mit der maximalen Monitor-Bildrate
+            drawGame();
+
+            if (!isDead) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        setInterval(() => { if(!isDead) syncServer(false); }, 100);
+        window.addEventListener('resize', () => { 
+            canvas.width = window.innerWidth; 
+            canvas.height = window.innerHeight; 
+        });
+
+        requestAnimationFrame(gameLoop);
     </script>
 </body>
 </html>
