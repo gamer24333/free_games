@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Neon Brick Breaker - Endless</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1a2e; color: white; margin: 0; padding-top: 20px;}
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1a2e; color: white; margin: 0; padding-top: 20px; touch-action: none; }
         
         /* Layout: Spiel und Rangliste nebeneinander aufteilen */
         .game-layout { 
@@ -71,7 +71,7 @@
                 <button id="fullscreenBtn" class="fullscreen-toggle-btn" onclick="toggleFullscreen()">📺 Vollbildmodus</button>
             </div>
             <canvas id="gameCanvas" width="800" height="600"></canvas>
-            <p style="margin: 10px 0; color: #ccc;"><b>Maus</b> oder <b>A/D</b> zum Bewegen. <b>Klick/Leertaste</b> zum Starten.<br><b>P / ESC</b> für Pause.</p>
+            <p style="margin: 10px 0; color: #ccc;"><b>Maus / Touch</b> oder <b>A/D</b> zum Bewegen. <b>Klick/Leertaste</b> zum Starten.<br><b>P / ESC</b> für Pause.</p>
             <div style="display:flex; justify-content: center; gap: 15px; font-size: 14px; margin-bottom: 10px;">
                 <span style="color:#39ff14;">🟩 Normal (+10)</span>
                 <span style="color:#f39c12;">🟧 Hart (+20)</span>
@@ -185,7 +185,7 @@
             }
         }
 
-        // --- STEUERUNG ---
+        // --- STEUERUNG (Tastatur, Maus & Touch) ---
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') { togglePause(); return; }
             if (e.key === 'a' || e.key === 'ArrowLeft') leftPressed = true;
@@ -196,6 +196,8 @@
             if (e.key === 'a' || e.key === 'ArrowLeft') leftPressed = false;
             if (e.key === 'd' || e.key === 'ArrowRight') rightPressed = false;
         });
+
+        // Maus-Steuerung
         canvas.addEventListener('mousemove', (e) => {
             if (!gameStarted || isPaused) return;
             let rect = canvas.getBoundingClientRect();
@@ -203,6 +205,27 @@
             paddle.x = mouseX - paddle.w / 2;
         });
         canvas.addEventListener('mousedown', startGame);
+
+        // Touch-Steuerung (Handy / iPad)
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!gameStarted) {
+                startGame();
+            }
+            updateTouchPaddle(e);
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            updateTouchPaddle(e);
+        }, { passive: false });
+
+        function updateTouchPaddle(e) {
+            if (!gameStarted || isPaused) return;
+            let rect = canvas.getBoundingClientRect();
+            let touchX = (e.touches[0].clientX - rect.left) * (canvas.width / rect.width);
+            paddle.x = touchX - paddle.w / 2;
+        }
 
         function startGame() {
             if (isGameOver) { resetGame(); return; }
@@ -221,10 +244,15 @@
             else playMusic();
         }
 
-        // --- KOLLISION & PHYSIK ---
+        // --- KOLLISION & PHYSIK (Sicher vor Wand- & Paddle-Bugs) ---
         function updatePhysics() {
-            if (leftPressed && paddle.x > 0) paddle.x -= paddle.dx;
-            if (rightPressed && paddle.x + paddle.w < canvas.width) paddle.x += paddle.dx;
+            // Paddle Bewegung per Tastatur
+            if (leftPressed) paddle.x -= paddle.dx;
+            if (rightPressed) paddle.x += paddle.dx;
+
+            // Paddle Bildschirm-Begrenzung
+            if (paddle.x < 0) paddle.x = 0;
+            if (paddle.x + paddle.w > canvas.width) paddle.x = canvas.width - paddle.w;
 
             if (ball.fireballTimer > 0) {
                 ball.fireballTimer--;
@@ -236,21 +264,38 @@
             ball.x += ball.dx;
             ball.y += ball.dy;
 
-            if (ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) ball.dx = -ball.dx;
-            if (ball.y - ball.radius < 0) ball.dy = -ball.dy;
+            // Wände-Kollision mit Positions-Klammerung (verhindert Feststecken in Wänden)
+            if (ball.x - ball.radius < 0) {
+                ball.x = ball.radius;
+                ball.dx = -ball.dx;
+            } else if (ball.x + ball.radius > canvas.width) {
+                ball.x = canvas.width - ball.radius;
+                ball.dx = -ball.dx;
+            }
 
+            if (ball.y - ball.radius < 0) {
+                ball.y = ball.radius;
+                ball.dy = -ball.dy;
+            }
+
+            // Game Over wenn Boden berührt
             if (ball.y + ball.radius > canvas.height) {
                 triggerGameOver();
             }
 
-            if (ball.y + ball.radius > paddle.y && ball.y - ball.radius < paddle.y + paddle.h &&
-                ball.x > paddle.x && ball.x < paddle.x + paddle.w) {
-                ball.dy = -Math.abs(ball.dy);
+            // Paddle-Kollision mit Snapping (verhindert Durchrutschen/Festbuggen im Paddle)
+            if (ball.y + ball.radius >= paddle.y && ball.y - ball.radius <= paddle.y + paddle.h &&
+                ball.x >= paddle.x && ball.x <= paddle.x + paddle.w && ball.dy > 0) {
+                
+                ball.y = paddle.y - ball.radius; // Sofort exakt auf das Paddle setzen
+                ball.dy = -Math.abs(ball.dy);    // Immer nach oben abprallen lassen
+                
                 let hitPoint = ball.x - (paddle.x + paddle.w / 2);
                 ball.dx = hitPoint * 0.15;
                 normalizeBallVelocity();
             }
 
+            // Kollision mit Ziegeln (Bricks)
             for (let i = bricks.length - 1; i >= 0; i--) {
                 let b = bricks[i];
                 if (ball.x + ball.radius > b.x && ball.x - ball.radius < b.x + b.w &&
@@ -350,7 +395,7 @@
             if (!gameStarted && !isGameOver) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#e94560'; ctx.font = 'bold 30px Arial'; ctx.textAlign = 'center';
-                ctx.fillText('KLICKE UM ZU STARTEN', canvas.width / 2, canvas.height / 2);
+                ctx.fillText('KLICKE ODER TIPPE UM ZU STARTEN', canvas.width / 2, canvas.height / 2);
                 ctx.textAlign = 'left';
             } else if (isPaused) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -373,11 +418,9 @@
             let dt = (timestamp - lastTime) / 1000;
             lastTime = timestamp;
 
-            // Verhindert Ruckler, wenn der Tab gewechselt wird
             if (dt > 0.25) dt = 0.25;
             timeAccumulator += dt;
 
-            // Die Physik läuft jetzt strikt in konstanten 60 Schritten pro Sekunde
             while (timeAccumulator >= STEP_TIME) {
                 if (gameStarted && !isPaused && !isGameOver) {
                     updatePhysics();
@@ -385,7 +428,6 @@
                 timeAccumulator -= STEP_TIME;
             }
 
-            // Das Zeichnen läuft butterweich mit der maximalen Monitor-Bildrate
             draw();
             requestAnimationFrame(loop);
         }
@@ -440,12 +482,13 @@
 
         initBricks();
         requestAnimationFrame(loop);
-        // Sendet alle 5 Sekunden einen Ping an den Server, um die Spielzeit zu zählen
+
+        // Sendet alle 5 Sekunden einen Ping an den Server
         setInterval(() => {
             fetch('/api/ping', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ activity: "Spielt BrickBreaker" }) // <-- Hier den Spielnamen anpassen!
+                body: JSON.stringify({ activity: "Spielt BrickBreaker" })
             }).catch(e => console.log(e));
         }, 5000);
     </script>
