@@ -406,6 +406,10 @@
     setInterval(checkSidebarUpdates, 4000);
     checkSidebarUpdates();
 
+    // 💡 HIER ERGÄNZEN: Nachrichten sofort beim Laden holen und alle 3 Sekunden aktualisieren
+    loadMessages();
+    setInterval(loadMessages, 3000);
+
     // --- AKTIVITÄTS-PING AN DEN SERVER ---
 async function sendHeartbeat() {
         try {
