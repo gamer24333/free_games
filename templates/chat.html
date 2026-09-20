@@ -98,7 +98,7 @@
 
 <script>
     const currentRoom = "{{ room }}";
-    const totalLoadedMessages = {{ nachrichten|length }};
+    
     const currentUsername = "{{ session['username'] }}";
     const adminList = {{ admins|tojson }};
     
@@ -107,14 +107,7 @@
     const messageInput = document.getElementById('messageInput');
     const emojiButtons = document.querySelectorAll('.emoji-btn');
 
-    if (currentRoom === "global") {
-        localStorage.setItem('last_seen_messages_global', totalLoadedMessages);
-    } else {
-        let localPrivateStorage = JSON.parse(localStorage.getItem('last_seen_messages_private') || '{}');
-        localPrivateStorage[currentRoom] = totalLoadedMessages;
-        localStorage.setItem('last_seen_messages_private', JSON.stringify(localPrivateStorage));
-    }
-        
+    
     function scrollToBottom() {
         chatBox.scrollTop = chatBox.scrollHeight;
     }
@@ -203,6 +196,15 @@
                 
                 const rawNachrichten = await response.json();
                 const nachrichten = rawNachrichten.slice(-150); 
+
+                // 💡 HIER WIRD DER ZÄHLER JETZT KORREKT AKTUALISIERT:
+                if (currentRoom === "global") {
+                    localStorage.setItem('last_seen_messages_global', rawNachrichten.length);
+                } else {
+                    let localPrivateStorage = JSON.parse(localStorage.getItem('last_seen_messages_private') || '{}');
+                    localPrivateStorage[currentRoom] = rawNachrichten.length;
+                    localStorage.setItem('last_seen_messages_private', JSON.stringify(localPrivateStorage));
+                }
                 
                 const wasAtBottom = chatBox.scrollHeight - chatBox.clientHeight <= chatBox.scrollTop + 50;
                 
