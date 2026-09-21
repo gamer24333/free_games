@@ -118,13 +118,14 @@ class UserSetting(db.Model):
     banned_until = db.Column(db.DateTime, nullable=True)
     playtime_total = db.Column(db.Integer, default=0)
     score_multiplier = db.Column(db.Integer, default=1)  
-    
-    # NEUE SPALTEN (XP, Coins, Inventar)
     xp = db.Column(db.Integer, default=0)
     coins = db.Column(db.Integer, default=0)
     inventory = db.Column(db.Text, default='[]')
     active_title = db.Column(db.Text, default='[]')
     active_color = db.Column(db.String(50), nullable=True)
+    last_daily_claim = db.Column(db.DateTime, nullable=True)
+    login_streak = db.Column(db.Integer, default=0)
+    achievements = db.Column(db.Text, default='[]')
 
 class ChatMessage(db.Model):
     __tablename__ = 'chat_messages'
@@ -533,6 +534,92 @@ def redeem_code():
     db.session.commit()
     
     return {"status": "success", "message": msg}
+
+# --- DAILY LOGIN BONUS ---
+@app.route('/api/daily-bonus', methods=['POST'])
+def daily_bonus():
+    if 'username' not in session: return {"error": "Nicht eingeloggt"}, 401
+    u = UserSetting.query.filter_by(username=session['username']).first()
+    
+    now = datetime.utcnow()
+    # Wenn noch nie abgeholt oder letzter Abruf vor einem Tag war
+    if not u.last_daily_claim or (now - u.last_daily_claim).days >= 1:
+        # Check ob Streak gerissen ist (mehr als 2 Tage her)
+        if u.last_daily_claim and (now - u.last_daily_claim).days > 2:
+            u.login_streak = 1
+        else:
+            u.login_streak = (u.login_streak or 0) + 1
+            
+        belohnung = 10 + (u.login_streak * 5) # Jeder Tag in Folge gibt 5 Coins mehr
+        if belohnung > 100: belohnung = 100 # Maximal 100 Coins pro Tag
+        
+        u.coins = (u.coins or 0) + belohnung
+        u.last_daily_claim = now
+        db.session.commit()
+        return {"status": "success", "coins": belohnung, "streak": u.login_streak}
+    
+    return {"error": "Du hast deinen Bonus heute schon abgeholt! Komm morgen wieder."}, 400
+
+
+# --- TRADING SYSTEM (COINS SENDEN) ---
+@app.route('/api/trade/coins', methods=['POST'])
+def trade_coins():
+    if 'username' not in session: return {"error": "401"}, 401
+    sender = session['username']
+    data = request.json or {}
+    empfaenger = data.get('target')
+    betrag = int(data.get('amount', 0))
+    
+    if betrag <= 0: return {"error": "Betrag muss größer als 0 sein!"}, 400
+    if sender == empfaenger: return {"error": "Du kannst dir nicht selbst Coins schicken!"}, 400
+    if empfaenger not in KLASSEN_LISTE: return {"error": "Empfänger existiert nicht!"}, 400
+    
+    sender_u = UserSetting.query.filter_by(username=sender).first()
+    if (sender_u.coins or 0) < betrag: return {"error": "Du hast nicht genug Coins!"}, 400
+    
+    empfaenger_u = UserSetting.query.filter_by(username=empfaenger).first()
+    if not empfaenger_u:
+        empfaenger_u = UserSetting(username=empfaenger)
+        db.session.add(empfaenger_u)
+        
+    sender_u.coins -= betrag
+    empfaenger_u.coins = (empfaenger_u.coins or 0) + betrag
+    db.session.commit()
+    return {"status": "success", "new_balance": sender_u.coins}
+
+
+# --- GLÜCKSRAD ---
+@app.route('/gluecksrad')
+def wheel_page():
+    if 'username' not in session: return redirect(url_for('login'))
+    me = session['username']
+    user = UserSetting.query.filter_by(username=me).first()
+    return render_template('gluecksrad.html', name=me, coins=(user.coins if user else 0))
+
+@app.route('/api/spin-wheel', methods=['POST'])
+def spin_wheel():
+    if 'username' not in session: return {"error": "401"}, 401
+    u = UserSetting.query.filter_by(username=session['username']).first()
+    
+    einsatz = 15
+    if (u.coins or 0) < einsatz: return {"error": f"Du brauchst {einsatz} Münzen zum Drehen!"}, 400
+    
+    u.coins -= einsatz
+    
+    # Chancen-Verteilung
+    rand = random.random()
+    if rand < 0.40: gewinn, text = 0, "Niete! 😭"
+    elif rand < 0.70: gewinn, text = 20, "20 Münzen! 🪙"
+    elif rand < 0.90: gewinn, text = 50, "50 Münzen! 💰"
+    elif rand < 0.98: gewinn, text = 100, "JACKPOT! 100 Münzen! 💎"
+    else: 
+        gewinn, text = 0, "XP-Boost! +50 XP 🌟"
+        u.xp = (u.xp or 0) + 50
+        
+    u.coins += gewinn
+    db.session.commit()
+    
+    return {"status": "success", "text": text, "new_balance": u.coins}
     
 
 @app.route('/login', methods=['GET', 'POST'])
