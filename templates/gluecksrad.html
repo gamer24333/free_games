@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Glücksrad</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 40px; }
-        .btn { display: inline-block; padding: 12px 25px; background: #9b59b6; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; font-size: 18px; margin-top: 20px;}
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 30px; }
+        .btn { display: inline-block; padding: 12px 25px; background: #9b59b6; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; font-size: 18px; margin-top: 15px;}
         .btn:hover { background: #8e44ad; }
         
         .wheel-container {
-            margin: 50px auto;
-            width: 250px;
-            height: 250px;
+            margin: 30px auto;
+            width: 280px;
+            height: 280px;
             border-radius: 50%;
-            border: 5px solid #f1c40f;
+            border: 6px solid #f1c40f;
             background: conic-gradient(
                 #e74c3c 0deg 72deg,
                 #3498db 72deg 144deg,
@@ -24,29 +24,33 @@
             );
             position: relative;
             transition: transform 3s cubic-bezier(0.25, 0.1, 0.25, 1);
-            box-shadow: 0 0 30px rgba(241, 196, 15, 0.5);
+            box-shadow: 0 0 30px rgba(241, 196, 15, 0.4);
         }
-
-        /* Beschriftungen auf den Rad-Segmenten */
+        
+        /* Sauber zentrierte Beschriftungen auf den Segmenten */
         .wheel-label {
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 80px;
-            height: 30px;
-            margin-top: -15px;
-            margin-left: -40px;
+            width: 90px;
+            height: 40px;
+            margin-top: -20px;
+            margin-left: -45px;
             text-align: center;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: bold;
             color: white;
             text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
             pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
-        
+
         .pointer {
             position: absolute;
-            top: -20px;
+            top: -24px;
             left: 50%;
             transform: translateX(-50%);
             width: 0;
@@ -55,31 +59,57 @@
             border-right: 15px solid transparent;
             border-top: 30px solid white;
             z-index: 10;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
         }
 
-        #result { margin-top: 30px; font-size: 24px; font-weight: bold; color: #f1c40f; height: 30px; }
+        /* Box für die Gewinnchancen */
+        .odds-box {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 10px;
+            max-width: 320px;
+            margin: 20px auto;
+            padding: 15px;
+            text-align: left;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .odds-box h3 { margin-top: 0; font-size: 15px; color: #f1c40f; text-align: center; border-bottom: 1px solid #444; padding-bottom: 8px; }
+        .odd-item { display: flex; justify-content: space-between; font-size: 13px; margin: 6px 0; color: #ccc; }
+
+        #result { margin-top: 20px; font-size: 22px; font-weight: bold; color: #f1c40f; height: 30px; }
     </style>
 </head>
 <body>
 
     <a href="/welcome" class="btn" style="position: absolute; top: 20px; left: 20px; font-size: 14px; background: #555;">⬅ Zurück</a>
 
-    <h1 style="color: #9b59b6;">🎰 Das Glücksrad</h1>
+    <h1 style="color: #9b59b6; margin-top: 40px;">🎰 Das Glücksrad</h1>
     <p>Einsatz: <b>15 Münzen</b> pro Drehung. Deine Münzen: <span id="coinBalance" style="color: #f1c40f;">{{ coins }} 🪙</span></p>
 
-    <div style="position: relative; width: 250px; margin: 0 auto;">
+    <div style="position: relative; width: 280px; margin: 0 auto;">
         <div class="pointer"></div>
         <div class="wheel-container" id="wheel">
-            <div class="wheel-label" style="transform: rotate(36deg) translate(70px) rotate(90deg);">Niete 😭</div>
-            <div class="wheel-label" style="transform: rotate(108deg) translate(70px) rotate(90deg);">20 🪙</div>
-            <div class="wheel-label" style="transform: rotate(180deg) translate(70px) rotate(90deg);">50 🪙</div>
-            <div class="wheel-label" style="transform: rotate(252deg) translate(70px) rotate(90deg);">JACKPOT 💎</div>
-            <div class="wheel-label" style="transform: rotate(324deg) translate(70px) rotate(90deg);">+50 XP 🌟</div>
+            <!-- Beschriftungen mit integrierten Wahrscheinlichkeiten -->
+            <div class="wheel-label" style="transform: rotate(36deg) translate(80px) rotate(90deg);"><span>Niete</span><span style="font-size: 10px; color: #ff9999;">40%</span></div>
+            <div class="wheel-label" style="transform: rotate(108deg) translate(80px) rotate(90deg);"><span>20 🪙</span><span style="font-size: 10px; color: #99ccff;">30%</span></div>
+            <div class="wheel-label" style="transform: rotate(180deg) translate(80px) rotate(90deg);"><span>50 🪙</span><span style="font-size: 10px; color: #99ff99;">20%</span></div>
+            <div class="wheel-label" style="transform: rotate(252deg) translate(80px) rotate(90deg);"><span>JACKPOT</span><span style="font-size: 10px; color: #ffee55;">8%</span></div>
+            <div class="wheel-label" style="transform: rotate(324deg) translate(80px) rotate(90deg);"><span>+50 XP</span><span style="font-size: 10px; color: #dda0dd;">2%</span></div>
         </div>
     </div>
 
     <button class="btn" id="spinBtn" onclick="spinWheel()">Drehen (15 🪙)</button>
     <div id="result"></div>
+
+    <!-- Übersicht der Gewinnchancen -->
+    <div class="odds-box">
+        <h3>📊 Gewinnchancen</h3>
+        <div class="odd-item"><span>😭 Niete (0 🪙)</span> <strong>40%</strong></div>
+        <div class="odd-item"><span>🪙 20 Münzen</span> <strong>30%</strong></div>
+        <div class="odd-item"><span>💰 50 Münzen</span> <strong>20%</strong></div>
+        <div class="odd-item"><span>💎 Jackpot (100 🪙)</span> <strong>8%</strong></div>
+        <div class="odd-item"><span>🌟 XP-Boost (+50 XP)</span> <strong>2%</strong></div>
+    </div>
 
     <script>
         let currentRotation = 0;
@@ -106,14 +136,12 @@
                 isSpinning = true;
                 document.getElementById('spinBtn').style.opacity = '0.5';
 
-                // Visuelle Rotation (Extra Rotationen + ein Zufallswinkel)
                 const extraSpins = 360 * 5; 
                 const randomOffset = Math.floor(Math.random() * 360);
                 currentRotation += extraSpins + randomOffset;
                 
                 wheel.style.transform = `rotate(${currentRotation}deg)`;
 
-                // Warten bis die Animation fertig ist (3 Sekunden)
                 setTimeout(() => {
                     resultDiv.textContent = data.text;
                     coinSpan.textContent = data.new_balance + " 🪙";
