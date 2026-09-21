@@ -41,15 +41,26 @@ last_active = {}
 user_activities = {}
 
 # --- SHOP ITEMS ---
+
 SHOP_ITEMS = {
+    # Titel
     "title_destroyer": {"id": "title_destroyer", "type": "title", "name": "Titel: Der Zerstörer", "desc": "Ein bedrohlicher Titel im Chat.", "price": 250, "value": "Der Zerstörer"},
     "title_king": {"id": "title_king", "type": "title", "name": "Titel: King", "desc": "Zeig allen, wer der Boss ist.", "price": 500, "value": "King"},
+    
+    # Farben (Skins)
     "color_gold": {"id": "color_gold", "type": "color", "name": "Name: Gold", "desc": "Dein Name leuchtet Gold.", "price": 300, "value": "#f1c40f"},
     "color_rainbow": {"id": "color_rainbow", "type": "color", "name": "Name: Regenbogen", "desc": "Bunter Chat-Name!", "price": 800, "value": "rainbow"},
     "color_neon": {"id": "color_neon", "type": "color", "name": "Name: Neon Cyan", "desc": "Helles Hacker-Blau.", "price": 300, "value": "#00adb5"},
+    
+    # Admin Exklusiv
     "title_admin": {"id": "title_admin", "type": "title", "name": "Titel: Admin", "desc": "Offizieller Admin-Titel.", "price": 0, "value": "Admin", "admin_only": True},
     "title_crown": {"id": "title_crown", "type": "title", "name": "Titel: Krone", "desc": "Das Zeichen des Bosses.", "price": 0, "value": "👑", "admin_only": True},
-    "color_purple": {"id": "color_purple", "type": "color", "name": "Name: Admin Lila", "desc": "Die Admin-Farbe.", "price": 0, "value": "#9b59b6", "admin_only": True}
+    "color_purple": {"id": "color_purple", "type": "color", "name": "Name: Admin Lila", "desc": "Die Admin-Farbe.", "price": 0, "value": "#9b59b6", "admin_only": True},
+    
+    # NEU: Spiel-Upgrades (Die werden nur gekauft und können passiv im Spiel geprüft werden)
+    "upg_snake_life": {"id": "upg_snake_life", "type": "upgrade", "name": "Snake: Extra Leben", "desc": "Du kannst 1x pro Runde eine Wand berühren, ohne zu sterben.", "price": 1000, "value": "snake_life"},
+    "upg_brick_fire": {"id": "upg_brick_fire", "type": "upgrade", "name": "BrickBreaker: Feuerball", "desc": "Dein Ball zerstört beim Start Blöcke sofort ohne abzuprallen.", "price": 1200, "value": "brick_fire"},
+    "upg_slither_boost": {"id": "upg_slither_boost", "type": "upgrade", "name": "Slither: Sprint-Boost", "desc": "Verliere weniger Punkte, wenn du boostest.", "price": 1500, "value": "slither_boost"}
 }
 
 # --- SLITHER.IO RAM-SPEICHER ---
