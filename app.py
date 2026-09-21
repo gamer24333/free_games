@@ -101,7 +101,8 @@ GEHEIME_CODES = {
     "TILLISTDERBESTEADMIN": "double_score",
     "HACKER": "admin",
     "REICHTUM": "1000_coins",
-    "ESREGNETMÜNZEN": "100_coins" # NEUER CODE
+    "ESREGNETMÜNZEN": "100_coins", # NEUER CODE
+    "WHEELXP": "100_xp"
 }
 
 # --- DATENBANK MODELLE (TABELLEN) ---
@@ -525,21 +526,30 @@ def redeem_code():
         return {"error": "Nutzer existiert nicht"}, 400
 
     belohnung = GEHEIME_CODES[code]
-    
+    msg = "Code akzeptiert!"
+
+    # Fester Admin/Score-Bonus
     if belohnung == "double_score":
         user.score_multiplier = 2  
         msg = "Code akzeptiert! Du hast ab sofort DOPPELTEN SCORE in den Spielen!"
     elif belohnung == "admin":
         user.is_admin = True
         msg = "Code akzeptiert! Du bist jetzt Admin!"
-    elif belohnung == "1000_coins":
-        user.coins = (user.coins or 0) + 1000
-        msg = "Code akzeptiert! +1000 Münzen für den Shop!"
-    elif belohnung == "100_coins": # NEUER CODE LOGIC
-        user.coins = (user.coins or 0) + 100
-        msg = "Es regnet Münzen! +100 Münzen für dich!"
     else:
-        msg = "Code akzeptiert!"
+        # Dynamisches Parsen für alles mit "_" (z.B. "1000_coins" oder "100_xp")
+        try:
+            teile = belohnung.split("_", 1)
+            menge = int(teile[0])  # Die Zahl (z.B. 1000 oder 100)
+            typ = teile[1]         # Die Art (z.B. "coins" oder "xp")
+            
+            if typ == "coins":
+                user.coins = (user.coins or 0) + menge
+                msg = f"Code akzeptiert! +{menge} Münzen für den Shop! 🪙"
+            elif typ == "xp":
+                user.xp = (user.xp or 0) + menge
+                msg = f"Code akzeptiert! +{menge} XP für dich! 🌟"
+        except Exception:
+            msg = "Code eingelöst!"
         
     db.session.add(RedeemedCode(username=me, code=code))
     db.session.commit()
