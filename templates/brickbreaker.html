@@ -7,7 +7,6 @@
     <style>
         body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1a2e; color: white; margin: 0; padding-top: 20px; touch-action: none; }
         
-        /* Layout: Spiel und Rangliste nebeneinander aufteilen */
         .game-layout { 
             display: flex; 
             flex-direction: row; 
@@ -53,7 +52,6 @@
         }
         .fullscreen-toggle-btn:hover { background: #e94560; }
 
-        /* Vollbild Styles */
         .game-wrapper:fullscreen { width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; background: #000; border: none; flex-direction: column; }
         .game-wrapper:fullscreen canvas { width: 95vw; height: auto; max-height: 85vh; border: 4px solid #e94560; aspect-ratio: 4/3; }
         .game-wrapper:fullscreen .fullscreen-toggle-btn { position: absolute; top: 20px; right: 20px; z-index: 99999; }
@@ -99,7 +97,12 @@
         const wrapper = document.getElementById('gameWrapper');
         const fsBtn = document.getElementById('fullscreenBtn');
 
-        // --- WEB AUDIO API ---
+        // --- SHOP UPGRADES LADEN ---
+        let hasFireUpgrade = false;
+        fetch('/api/shop/data').then(r=>r.json()).then(data=>{
+            if(data.inventory && data.inventory.includes('upg_brick_fire')) hasFireUpgrade = true;
+        }).catch(e=>console.log(e));
+
         let audioCtx = null;
         let audioBuffer = null;
         let audioSource = null;
@@ -134,7 +137,6 @@
             }
         }
 
-        // --- SPIEL-VARIABLEN ---
         let score = 0;
         let gameStarted = false;
         let isGameOver = false;
@@ -145,7 +147,7 @@
 
         let lastTime = performance.now();
         let timeAccumulator = 0;
-        const STEP_TIME = 1 / 60; // Fester 60-Hz-Takt für die Physik
+        const STEP_TIME = 1 / 60;
 
         const paddle = { x: 350, y: 550, w: 120, h: 15, dx: 7 };
         const ball = { x: 400, y: 535, radius: 8, dx: 0, dy: 0, baseSpeed: 5.5, currentSpeed: 5.5, fireballTimer: 0 };
@@ -156,7 +158,6 @@
         let leftPressed = false;
         let rightPressed = false;
 
-        // --- HINDERNISSE (Bricks) ---
         function generateRow(yOffset) {
             let row = [];
             for (let c = 0; c < brickConfig.cols; c++) {
@@ -185,7 +186,6 @@
             }
         }
 
-        // --- STEUERUNG (Tastatur, Maus & Touch) ---
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') { togglePause(); return; }
             if (e.key === 'a' || e.key === 'ArrowLeft') leftPressed = true;
@@ -197,7 +197,6 @@
             if (e.key === 'd' || e.key === 'ArrowRight') rightPressed = false;
         });
 
-        // Maus-Steuerung
         canvas.addEventListener('mousemove', (e) => {
             if (!gameStarted || isPaused) return;
             let rect = canvas.getBoundingClientRect();
@@ -206,12 +205,9 @@
         });
         canvas.addEventListener('mousedown', startGame);
 
-        // Touch-Steuerung (Handy / iPad)
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            if (!gameStarted) {
-                startGame();
-            }
+            if (!gameStarted) { startGame(); }
             updateTouchPaddle(e);
         }, { passive: false });
 
@@ -234,6 +230,11 @@
                 ball.dx = 4 * (Math.random() > 0.5 ? 1 : -1);
                 ball.dy = -ball.currentSpeed;
                 playMusic();
+                
+                // SHOP UPGRADE: Start mit Feuerball
+                if (hasFireUpgrade) {
+                    triggerFireball();
+                }
             }
         }
 
@@ -244,13 +245,10 @@
             else playMusic();
         }
 
-        // --- KOLLISION & PHYSIK (Sicher vor Wand- & Paddle-Bugs) ---
         function updatePhysics() {
-            // Paddle Bewegung per Tastatur
             if (leftPressed) paddle.x -= paddle.dx;
             if (rightPressed) paddle.x += paddle.dx;
 
-            // Paddle Bildschirm-Begrenzung
             if (paddle.x < 0) paddle.x = 0;
             if (paddle.x + paddle.w > canvas.width) paddle.x = canvas.width - paddle.w;
 
@@ -264,7 +262,6 @@
             ball.x += ball.dx;
             ball.y += ball.dy;
 
-            // Wände-Kollision mit Positions-Klammerung (verhindert Feststecken in Wänden)
             if (ball.x - ball.radius < 0) {
                 ball.x = ball.radius;
                 ball.dx = -ball.dx;
@@ -278,24 +275,21 @@
                 ball.dy = -ball.dy;
             }
 
-            // Game Over wenn Boden berührt
             if (ball.y + ball.radius > canvas.height) {
                 triggerGameOver();
             }
 
-            // Paddle-Kollision mit Snapping (verhindert Durchrutschen/Festbuggen im Paddle)
             if (ball.y + ball.radius >= paddle.y && ball.y - ball.radius <= paddle.y + paddle.h &&
                 ball.x >= paddle.x && ball.x <= paddle.x + paddle.w && ball.dy > 0) {
                 
-                ball.y = paddle.y - ball.radius; // Sofort exakt auf das Paddle setzen
-                ball.dy = -Math.abs(ball.dy);    // Immer nach oben abprallen lassen
+                ball.y = paddle.y - ball.radius;
+                ball.dy = -Math.abs(ball.dy);  
                 
                 let hitPoint = ball.x - (paddle.x + paddle.w / 2);
                 ball.dx = hitPoint * 0.15;
                 normalizeBallVelocity();
             }
 
-            // Kollision mit Ziegeln (Bricks)
             for (let i = bricks.length - 1; i >= 0; i--) {
                 let b = bricks[i];
                 if (ball.x + ball.radius > b.x && ball.x - ball.radius < b.x + b.w &&
@@ -349,7 +343,6 @@
             ball.dy = (ball.dy / speed) * ball.currentSpeed;
         }
 
-        // --- ZEICHNEN ---
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -449,7 +442,7 @@
                     let currentRunId = runId;
                     setTimeout(() => { if (runId === currentRunId && isGameOver) window.location.reload(); }, 2000);
                 }
-            } catch (e) { console.error("Score Error:", e); }
+            } catch (e) {}
         }
 
         function resetGame() {
@@ -483,18 +476,13 @@
         initBricks();
         requestAnimationFrame(loop);
 
-        // --- AFK Detection (Anti-Farm System) ---
         let isAFK = false;
         let afkTimer;
-        
-        // Reset timer if the user moves the mouse, clicks, or presses a key
         function resetAFK() {
             isAFK = false;
             clearTimeout(afkTimer);
-            // If the user does nothing for 2 minutes (120,000 ms), they are AFK
             afkTimer = setTimeout(() => {
                 isAFK = true;
-                console.log("User is now AFK");
             }, 120000); 
         }
 
@@ -502,20 +490,13 @@
         window.addEventListener('keydown', resetAFK);
         window.addEventListener('mousedown', resetAFK);
         window.addEventListener('touchstart', resetAFK);
-        
-        // Start the timer immediately
         resetAFK();
 
-        // --- Ping Request to the Server ---
         setInterval(() => {
-            // Replace "Spielt BrickBreaker" with the actual activity for each page
-            let currentActivity = "Spielt BrickBreaker"; 
-            
             fetch('/api/ping', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // We now send the isAFK flag to the server!
-                body: JSON.stringify({ activity: currentActivity, is_afk: isAFK }) 
+                body: JSON.stringify({ activity: "Spielt BrickBreaker", is_afk: isAFK }) 
             }).catch(e => console.log(e));
         }, 5000);
     </script>
