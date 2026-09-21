@@ -41,7 +41,6 @@ last_active = {}
 user_activities = {}
 
 # --- SHOP ITEMS ---
-# --- SHOP ITEMS ---
 SHOP_ITEMS = {
     "title_destroyer": {"id": "title_destroyer", "type": "title", "name": "Titel: Der Zerstörer", "desc": "Ein bedrohlicher Titel im Chat.", "price": 250, "value": "Der Zerstörer"},
     "title_king": {"id": "title_king", "type": "title", "name": "Titel: King", "desc": "Zeig allen, wer der Boss ist.", "price": 500, "value": "King"},
@@ -90,7 +89,8 @@ for i in range(3):
 GEHEIME_CODES = {
     "TILLISTDERBESTEADMIN": "double_score",
     "HACKER": "admin",
-    "REICHTUM": "1000_coins"
+    "REICHTUM": "1000_coins",
+    "ESREGNETMÜNZEN": "100_coins" # NEUER CODE
 }
 
 # --- DATENBANK MODELLE (TABELLEN) ---
@@ -257,11 +257,6 @@ def check_if_banned():
                 db.session.commit()
 
 
-@app.route('/')
-def index():
-    return redirect(url_for('dashboard')) if 'username' in session else redirect(url_for('login'))
-
-
 @app.route('/api/ping', methods=['POST'])
 def ping_user():
     if 'username' in session:
@@ -270,38 +265,45 @@ def ping_user():
         
         data = request.get_json(silent=True) or {}
         activity = data.get('activity', 'Im Portal')
-        user_activities[current_user] = activity
+        is_afk = data.get('is_afk', False) # <--- NEU: Überprüft auf AFK Status
         
-        # --- Spielzeit & XP/Coins tracken ---
-        user = UserSetting.query.filter_by(username=current_user).first()
-        if user:
-            user.playtime_total = (user.playtime_total or 0) + 5
-            
-            # NEU: XP und Coins generieren
-            user.xp = (user.xp or 0) + 2  # 2 XP pro Ping
-            # Alle 25 Pings gibt es 1 Coin (um Inflation zu stoppen)
-            if (user.playtime_total % 25) == 0: 
-                user.coins = (user.coins or 0) + 1
-
-            if activity.startswith("Spielt "):
-                game_name = activity.replace("Spielt ", "").lower()
-                score_entry = GameScore.query.filter_by(username=current_user).first()
-                if not score_entry:
-                    score_entry = GameScore(username=current_user)
-                    db.session.add(score_entry)
+        # Activity Label updaten (zeigt z.B. "Im Portal (AFK)")
+        if is_afk:
+             user_activities[current_user] = f"{activity} (AFK)"
+        else:
+             user_activities[current_user] = activity
+        
+        # --- Spielzeit & XP/Coins tracken (NUR WENN NICHT AFK) ---
+        if not is_afk:
+            user = UserSetting.query.filter_by(username=current_user).first()
+            if user:
+                user.playtime_total = (user.playtime_total or 0) + 5
                 
-                if game_name == "geometry dash": score_entry.playtime_gd = (score_entry.playtime_gd or 0) + 5
-                elif game_name == "clicker": score_entry.playtime_clicker = (score_entry.playtime_clicker or 0) + 5
-                elif game_name == "flappy bird": score_entry.playtime_flappy = (score_entry.playtime_flappy or 0) + 5
-                elif game_name == "reaction": score_entry.playtime_reaction = (score_entry.playtime_reaction or 0) + 5
-                elif game_name == "snake": score_entry.playtime_snake = (score_entry.playtime_snake or 0) + 5
-                elif game_name == "crossy": score_entry.playtime_crossy = (score_entry.playtime_crossy or 0) + 5
-                elif game_name == "neon jump": score_entry.playtime_doodle = (score_entry.playtime_doodle or 0) + 5
-                elif game_name == "brickbreaker": score_entry.playtime_brickbreaker = (score_entry.playtime_brickbreaker or 0) + 5
-                elif game_name == "speedtyping": score_entry.playtime_speedtyping = (score_entry.playtime_speedtyping or 0) + 5
-                elif game_name == "slither": score_entry.playtime_slither = (score_entry.playtime_slither or 0) + 5
-            
-            db.session.commit()
+                # XP und Coins generieren
+                user.xp = (user.xp or 0) + 2  # 2 XP pro Ping
+                # Alle 25 Pings gibt es 1 Coin
+                if (user.playtime_total % 25) == 0: 
+                    user.coins = (user.coins or 0) + 1
+
+                if activity.startswith("Spielt "):
+                    game_name = activity.replace("Spielt ", "").lower()
+                    score_entry = GameScore.query.filter_by(username=current_user).first()
+                    if not score_entry:
+                        score_entry = GameScore(username=current_user)
+                        db.session.add(score_entry)
+                    
+                    if game_name == "geometry dash": score_entry.playtime_gd = (score_entry.playtime_gd or 0) + 5
+                    elif game_name == "clicker": score_entry.playtime_clicker = (score_entry.playtime_clicker or 0) + 5
+                    elif game_name == "flappy bird": score_entry.playtime_flappy = (score_entry.playtime_flappy or 0) + 5
+                    elif game_name == "reaction": score_entry.playtime_reaction = (score_entry.playtime_reaction or 0) + 5
+                    elif game_name == "snake": score_entry.playtime_snake = (score_entry.playtime_snake or 0) + 5
+                    elif game_name == "crossy": score_entry.playtime_crossy = (score_entry.playtime_crossy or 0) + 5
+                    elif game_name == "neon jump": score_entry.playtime_doodle = (score_entry.playtime_doodle or 0) + 5
+                    elif game_name == "brickbreaker": score_entry.playtime_brickbreaker = (score_entry.playtime_brickbreaker or 0) + 5
+                    elif game_name == "speedtyping": score_entry.playtime_speedtyping = (score_entry.playtime_speedtyping or 0) + 5
+                    elif game_name == "slither": score_entry.playtime_slither = (score_entry.playtime_slither or 0) + 5
+                
+                db.session.commit()
             
         return {"status": "success"}
     return {"error": "Unauthorized"}, 401
@@ -509,6 +511,9 @@ def redeem_code():
     elif belohnung == "1000_coins":
         user.coins = (user.coins or 0) + 1000
         msg = "Code akzeptiert! +1000 Münzen für den Shop!"
+    elif belohnung == "100_coins": # NEUER CODE LOGIC
+        user.coins = (user.coins or 0) + 100
+        msg = "Es regnet Münzen! +100 Münzen für dich!"
     else:
         msg = "Code akzeptiert!"
         
