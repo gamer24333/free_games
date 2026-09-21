@@ -201,7 +201,6 @@
     </div>
 
     <script>
-        // Zwingt den Browser, sofort auf Tasteneingaben zu hören!
         window.focus();
         const canvas = document.getElementById('snakeCanvas');
         const ctx = canvas.getContext('2d');
@@ -211,11 +210,15 @@
         
         let lastTime = performance.now();
         let timeAccumulator = 0;
-        const STEP_TIME = 0.12; // 120 Millisekunden pro Schritt (als Sekunden)
-        
+        const STEP_TIME = 0.12; 
 
-        // Hintergrundmusik einrichten
-       // Hintergrundmusik einrichten (Web Audio API)
+        // --- SHOP UPGRADES LADEN ---
+        let hasSnakeLife = false;
+        let lifeUsed = false;
+        fetch('/api/shop/data').then(r=>r.json()).then(data=>{
+            if(data.inventory && data.inventory.includes('upg_snake_life')) hasSnakeLife = true;
+        }).catch(e=>console.log(e));
+
         let audioCtx = null;
         let audioBuffer = null;
         let audioSource = null;
@@ -223,7 +226,6 @@
         async function playMusic() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             if (audioCtx.state === 'suspended') await audioCtx.resume();
-
             if (!audioBuffer) {
                 try {
                     let response = await fetch('/static/snake.mp3');
@@ -231,7 +233,6 @@
                     audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                 } catch (e) { console.error("Audio Fehler:", e); return; }
             }
-
             if (!audioSource && gameStarted && !isPaused && !isGameOver) {
                 audioSource = audioCtx.createBufferSource();
                 audioSource.buffer = audioBuffer;
@@ -256,8 +257,7 @@
         const tileCount = canvas.width / gridSize;
 
         let snake = [];
-        let dx = 0;
-        let dy = 0;
+        let dx = 0; let dy = 0;
         let score = 0;
         let fruit = { x: 5, y: 5, type: 'normal' };
         
@@ -265,9 +265,8 @@
         let gameStarted = false;
         let isPaused = false;
         
-        let nextDx = 0;
-        let nextDy = 0;
-        let fruitTimer = 0; // Zähler für despawnende Früchte
+        let nextDx = 0; let nextDy = 0;
+        let fruitTimer = 0; 
 
         function resetGame() {
             snake = [
@@ -279,17 +278,16 @@
             nextDx = 1; nextDy = 0;
             score = 0;
             scoreEl.textContent = score;
+            lifeUsed = false; // Upgrade für den nächsten Versuch zurücksetzen
             
             isGameOver = false;
             gameStarted = false;
             isPaused = false;
             
             spawnFruit();
-            
             stopMusic();
         }
 
-        // --- VOLLBILD LOGIK ---
         function toggleFullscreen() {
             if (!document.fullscreenElement) {
                 if (gameContainer.requestFullscreen) { gameContainer.requestFullscreen(); }
@@ -305,19 +303,10 @@
             if (!document.fullscreenElement) fullscreenLink.textContent = "📺 [F] Vollbild";
         });
 
-        // --- STEUERUNG ---
         window.addEventListener('keydown', e => {
             const validKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "a", "s", "d", "W", "A", "S", "D", " ", "p", "P", "Escape", "f", "F"];
-            
             if (validKeys.includes(e.key)) { e.preventDefault(); }
-
-            // Vollbild
-            if (e.key === 'f' || e.key === 'F') {
-                toggleFullscreen();
-                return;
-            }
-
-            // Pause
+            if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); return; }
             if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
                 if (gameStarted && !isGameOver) {
                     isPaused = !isPaused;
@@ -326,14 +315,13 @@
                 }
                 return;
             }
-
-            if (isPaused) return; // Keine Richtungseingaben im Pause-Menü
+            if (isPaused) return; 
 
             if (isGameOver && validKeys.includes(e.key)) {
-            resetGame();
-            gameStarted = true;
-            playMusic();
-            return;
+                resetGame();
+                gameStarted = true;
+                playMusic();
+                return;
             }
 
             if (!gameStarted && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "a", "s", "d", "W", "A", "S", "D"].includes(e.key)) {
@@ -359,7 +347,7 @@
         });
 
         function spawnFruit() {
-            fruitTimer = 0; // Timer zurücksetzen
+            fruitTimer = 0; 
             fruit.x = Math.floor(Math.random() * tileCount);
             fruit.y = Math.floor(Math.random() * tileCount);
             
@@ -378,25 +366,43 @@
         function update() {
             if (!gameStarted || isGameOver || isPaused) return;
 
-            // Timer für Giftfrucht (42 Ticks * 120ms = ca. 5 Sekunden)
             if (fruit.type === 'poison') {
                 fruitTimer++;
                 if (fruitTimer >= 42) {
-                    spawnFruit(); // Gift verschwindet, neue Frucht spawnt
+                    spawnFruit(); 
                 }
             }
 
-            dx = nextDx;
-            dy = nextDy;
-
+            dx = nextDx; dy = nextDy;
             const head = { x: snake[0].x + dx, y: snake[0].y + dy };
 
+            // --- KOLLISION CHECK (WÄNDE & SELBST) ---
+            let collidedWithWall = false;
             if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
-                triggerGameOver(); return;
+                collidedWithWall = true;
             }
 
+            let collidedWithSelf = false;
             for (let i = 0; i < snake.length; i++) {
                 if (head.x === snake[i].x && head.y === snake[i].y) {
+                    collidedWithSelf = true; break;
+                }
+            }
+
+            // EXTRA LEBEN LOGIK
+            if (collidedWithWall || collidedWithSelf) {
+                if (hasSnakeLife && !lifeUsed) {
+                    lifeUsed = true; // Leben aufgebraucht für diese Runde
+                    
+                    if (collidedWithWall) {
+                        // Auf die andere Seite teleportieren (Wrap-Around)
+                        if (head.x < 0) head.x = tileCount - 1;
+                        if (head.x >= tileCount) head.x = 0;
+                        if (head.y < 0) head.y = tileCount - 1;
+                        if (head.y >= tileCount) head.y = 0;
+                    }
+                    // Bei Selbst-Kollision lassen wir den Tod für diesen einen Tick ausfallen
+                } else {
                     triggerGameOver(); return;
                 }
             }
@@ -404,9 +410,7 @@
             snake.unshift(head);
 
             if (head.x === fruit.x && head.y === fruit.y) {
-                if (fruit.type === 'normal') {
-                    score += 10;
-                } 
+                if (fruit.type === 'normal') { score += 10; } 
                 else if (fruit.type === 'gold') {
                     score += 20;
                     snake.push({...snake[snake.length - 1]}); 
@@ -430,25 +434,18 @@
             ctx.fillStyle = '#111';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            ctx.strokeStyle = '#181818';
-            ctx.lineWidth = 1;
+            ctx.strokeStyle = '#181818'; ctx.lineWidth = 1;
             for (let i = 0; i < tileCount; i++) {
-                ctx.beginPath();
-                ctx.moveTo(i * gridSize, 0); ctx.lineTo(i * gridSize, canvas.height);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(0, i * gridSize); ctx.lineTo(canvas.width, i * gridSize);
-                ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(i * gridSize, 0); ctx.lineTo(i * gridSize, canvas.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i * gridSize); ctx.lineTo(canvas.width, i * gridSize); ctx.stroke();
             }
 
-            // Frucht zeichnen
             let fx = fruit.x * gridSize;
             let fy = fruit.y * gridSize;
             
-            // Wenn der Giftapfel fast despawnt (ab Tick 30), lass ihn blinken!
             let drawFruit = true;
             if (fruit.type === 'poison' && fruitTimer > 30) {
-                if (fruitTimer % 2 === 0) drawFruit = false; // Blink-Effekt
+                if (fruitTimer % 2 === 0) drawFruit = false;
             }
 
             if (drawFruit) {
@@ -461,26 +458,24 @@
                 ctx.fill();
                 
                 ctx.strokeStyle = fruit.type === 'poison' ? '#76ff03' : '#795548';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(fx + gridSize / 2, fy + 3);
-                ctx.lineTo(fx + gridSize / 2 + 3, fy + 1);
-                ctx.stroke();
+                ctx.lineWidth = 2; ctx.beginPath();
+                ctx.moveTo(fx + gridSize / 2, fy + 3); ctx.lineTo(fx + gridSize / 2 + 3, fy + 1); ctx.stroke();
             }
 
-            // Schlange zeichnen
             snake.forEach((part, index) => {
                 let px = part.x * gridSize;
                 let py = part.y * gridSize;
                 
-                ctx.fillStyle = index === 0 ? '#39ff14' : '#00adb5';
+                // Falls das Leben verbraucht wurde, flackert die Schlange leicht orange
+                if (lifeUsed && index > 0 && Math.random() > 0.8) {
+                    ctx.fillStyle = '#f39c12';
+                } else {
+                    ctx.fillStyle = index === 0 ? '#39ff14' : '#00adb5';
+                }
                 
                 ctx.beginPath();
-                if (ctx.roundRect) {
-                    ctx.roundRect(px + 1, py + 1, gridSize - 2, gridSize - 2, 6);
-                } else {
-                    ctx.rect(px + 1, py + 1, gridSize - 2, gridSize - 2);
-                }
+                if (ctx.roundRect) ctx.roundRect(px + 1, py + 1, gridSize - 2, gridSize - 2, 6);
+                else ctx.rect(px + 1, py + 1, gridSize - 2, gridSize - 2);
                 ctx.fill();
 
                 if (index === 0) {
@@ -496,46 +491,29 @@
                 }
             });
 
-            // Pause Overlay
             if (isPaused) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#ff9f43';
-                ctx.font = 'bold 36px Arial';
-                ctx.textAlign = 'center';
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ff9f43'; ctx.font = 'bold 36px Arial'; ctx.textAlign = 'center';
                 ctx.fillText('PAUSIERT', canvas.width / 2, canvas.height / 2 - 10);
-                ctx.fillStyle = '#fff';
-                ctx.font = '16px Arial';
+                ctx.fillStyle = '#fff'; ctx.font = '16px Arial';
                 ctx.fillText('Drücke ESC oder P zum Weiterpielen', canvas.width / 2, canvas.height / 2 + 25);
                 ctx.textAlign = 'left';
             }
 
-            // Start-Overlay
             if (!gameStarted && !isGameOver && !isPaused) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#39ff14';
-                ctx.font = 'bold 20px Arial';
-                ctx.textAlign = 'center';
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.75)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#39ff14'; ctx.font = 'bold 20px Arial'; ctx.textAlign = 'center';
                 ctx.fillText('Pfeiltasten oder WASD', canvas.width / 2, canvas.height / 2 - 10);
-                ctx.fillStyle = '#fff';
-                ctx.font = '14px Arial';
+                ctx.fillStyle = '#fff'; ctx.font = '14px Arial';
                 ctx.fillText('zum Starten', canvas.width / 2, canvas.height / 2 + 20);
                 ctx.textAlign = 'left';
             }
 
-            // Game-Over Overlay
             if (isGameOver) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                ctx.fillStyle = '#ff2e63';
-                ctx.font = 'bold 28px Arial';
-                ctx.textAlign = 'center';
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ff2e63'; ctx.font = 'bold 28px Arial'; ctx.textAlign = 'center';
                 ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 15);
-                
-                ctx.fillStyle = '#fff';
-                ctx.font = '15px Arial';
+                ctx.fillStyle = '#fff'; ctx.font = '15px Arial';
                 ctx.fillText('Drücke eine Taste für Neustart', canvas.width / 2, canvas.height / 2 + 25);
                 ctx.textAlign = 'left';
             }
@@ -544,66 +522,43 @@
         async function triggerGameOver() {
             isGameOver = true;
             stopMusic(); 
-
             try {
                 await fetch('/api/submit-snake', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ score: score })
                 });
-            } catch(e) {
-                console.error("Fehler beim Speichern des Scores", e);
-            }
+            } catch(e) {}
         }
 
        resetGame();
         
         function loop(timestamp) {
             if (!timestamp) timestamp = performance.now();
-            
-            // Vergangene Zeit berechnen (in Sekunden)
             let deltaTime = (timestamp - lastTime) / 1000;
             lastTime = timestamp;
-            
-            // Limitieren, falls der Tab verlassen wurde (verhindert den "Death of a thousand steps")
             if (deltaTime > 0.25) deltaTime = 0.25;
             
-            // Zeit ansammeln
             timeAccumulator += deltaTime;
-            
-            // Solange genug Zeit für einen Schritt angesammelt wurde, mache einen Schritt
             while (timeAccumulator >= STEP_TIME) {
-                update(); // Hier springt die Schlange ein Feld weiter
+                update(); 
                 timeAccumulator -= STEP_TIME;
             }
-            
-            // Das Zeichnen passiert immer, so flüssig der Monitor es hergibt
             draw();
-            
             requestAnimationFrame(loop);
         }
         
         requestAnimationFrame(loop);
-        // Fokus-Fix: Hört sofort auf die Tastatur
-        window.onload = function() {
-            window.focus();
-        };
-        document.addEventListener('click', function() {
-            window.focus();
-        });
+        window.onload = function() { window.focus(); };
+        document.addEventListener('click', function() { window.focus(); });
 
-        // --- AFK Detection (Anti-Farm System) ---
         let isAFK = false;
         let afkTimer;
-        
-        // Reset timer if the user moves the mouse, clicks, or presses a key
         function resetAFK() {
             isAFK = false;
             clearTimeout(afkTimer);
-            // If the user does nothing for 2 minutes (120,000 ms), they are AFK
             afkTimer = setTimeout(() => {
                 isAFK = true;
-                console.log("User is now AFK");
             }, 120000); 
         }
 
@@ -611,20 +566,13 @@
         window.addEventListener('keydown', resetAFK);
         window.addEventListener('mousedown', resetAFK);
         window.addEventListener('touchstart', resetAFK);
-        
-        // Start the timer immediately
         resetAFK();
 
-        // --- Ping Request to the Server ---
         setInterval(() => {
-            // Replace "Spielt BrickBreaker" with the actual activity for each page
-            let currentActivity = "Spielt Snake"; 
-            
             fetch('/api/ping', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // We now send the isAFK flag to the server!
-                body: JSON.stringify({ activity: currentActivity, is_afk: isAFK }) 
+                body: JSON.stringify({ activity: "Spielt Snake", is_afk: isAFK }) 
             }).catch(e => console.log(e));
         }, 5000);
     </script>
