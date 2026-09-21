@@ -156,7 +156,8 @@
         <button onclick="openFeedbackModal()" class="btn" style="background: #9b59b6;">💡 Feedback</button>
         
         <a href="/gluecksrad" class="btn" style="background: #8e44ad;">🎰 Glücksrad</a>
-        <button onclick="claimDaily()" class="btn" style="background: #f1c40f; color: black;">🎁 Daily Bonus</button>
+        <!-- NEUER LINK ZUR DAILY BONUS SEITE -->
+        <a href="/daily" class="btn" style="background: #f1c40f; color: black;">🎁 Daily Bonus</a>
         <button onclick="openTradeModal()" class="btn" style="background: #1abc9c;">💸 Trading</button>
     </div>
 
@@ -292,16 +293,7 @@
         } catch (e) { console.error(e); }
     }
 
-    // --- DAILY BONUS & TRADING ---
-    async function claimDaily() {
-        try {
-            const res = await fetch('/api/daily-bonus', { method: 'POST' });
-            const data = await res.json();
-            if (res.ok) alert(`🎁 Bonus abgeholt!\nDu hast ${data.coins} Coins bekommen!\nDein Streak: ${data.streak} Tage 🔥`);
-            else alert("❌ " + data.error);
-        } catch (e) { alert("Verbindungsfehler."); }
-    }
-
+    // --- TRADING ---
     function openTradeModal() { document.getElementById('tradeModal').style.display = 'flex'; }
     
     async function sendCoins() {
