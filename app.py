@@ -708,6 +708,7 @@ def dashboard():
                            user_rank=rank, 
                            user_xp=(user.xp if user else 0), 
                            user_coins=(user.coins if user else 0),
+                           partner=chpartner,
                            zeige_spezial_nachricht=zeige_spezial_nachricht,
                            spezial_nachricht_id=spezial_nachricht_id,
                            spezial_titel=spezial_titel,
