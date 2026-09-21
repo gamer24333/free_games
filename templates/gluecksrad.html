@@ -15,37 +15,17 @@
             height: 280px;
             border-radius: 50%;
             border: 6px solid #f1c40f;
+            /* Exakte Segment-Grössen passend zu den Wahrscheinlichkeiten im Backend */
             background: conic-gradient(
-                #e74c3c 0deg 72deg,
-                #3498db 72deg 144deg,
-                #2ecc71 144deg 216deg,
-                #f1c40f 216deg 288deg,
-                #9b59b6 288deg 360deg
+                #e74c3c 0deg 144deg,
+                #3498db 144deg 252deg,
+                #2ecc71 252deg 324deg,
+                #f1c40f 324deg 352.8deg,
+                #9b59b6 352.8deg 360deg
             );
             position: relative;
             transition: transform 3s cubic-bezier(0.25, 0.1, 0.25, 1);
             box-shadow: 0 0 30px rgba(241, 196, 15, 0.4);
-        }
-        
-        /* Sauber zentrierte Beschriftungen auf den Segmenten */
-        .wheel-label {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 90px;
-            height: 40px;
-            margin-top: -20px;
-            margin-left: -45px;
-            text-align: center;
-            font-size: 13px;
-            font-weight: bold;
-            color: white;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
-            pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
         }
 
         .pointer {
@@ -62,19 +42,20 @@
             filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
         }
 
-        /* Box für die Gewinnchancen */
+        /* Übersicht / Legende der Gewinnchancen */
         .odds-box {
             background: #2a2a2a;
             border: 1px solid #444;
             border-radius: 10px;
-            max-width: 320px;
+            max-width: 340px;
             margin: 20px auto;
             padding: 15px;
             text-align: left;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
         .odds-box h3 { margin-top: 0; font-size: 15px; color: #f1c40f; text-align: center; border-bottom: 1px solid #444; padding-bottom: 8px; }
-        .odd-item { display: flex; justify-content: space-between; font-size: 13px; margin: 6px 0; color: #ccc; }
+        .odd-item { display: flex; align-items: center; justify-content: space-between; font-size: 13px; margin: 8px 0; color: #ccc; }
+        .color-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; margin-right: 8px; flex-shrink: 0; }
 
         #result { margin-top: 20px; font-size: 22px; font-weight: bold; color: #f1c40f; height: 30px; }
     </style>
@@ -88,27 +69,20 @@
 
     <div style="position: relative; width: 280px; margin: 0 auto;">
         <div class="pointer"></div>
-        <div class="wheel-container" id="wheel">
-            <!-- Beschriftungen mit integrierten Wahrscheinlichkeiten -->
-            <div class="wheel-label" style="transform: rotate(36deg) translate(80px) rotate(90deg);"><span>Niete</span><span style="font-size: 10px; color: #ff9999;">40%</span></div>
-            <div class="wheel-label" style="transform: rotate(108deg) translate(80px) rotate(90deg);"><span>20 🪙</span><span style="font-size: 10px; color: #99ccff;">30%</span></div>
-            <div class="wheel-label" style="transform: rotate(180deg) translate(80px) rotate(90deg);"><span>50 🪙</span><span style="font-size: 10px; color: #99ff99;">20%</span></div>
-            <div class="wheel-label" style="transform: rotate(252deg) translate(80px) rotate(90deg);"><span>JACKPOT</span><span style="font-size: 10px; color: #ffee55;">8%</span></div>
-            <div class="wheel-label" style="transform: rotate(324deg) translate(80px) rotate(90deg);"><span>+50 XP</span><span style="font-size: 10px; color: #dda0dd;">2%</span></div>
-        </div>
+        <div class="wheel-container" id="wheel"></div>
     </div>
 
     <button class="btn" id="spinBtn" onclick="spinWheel()">Drehen (15 🪙)</button>
     <div id="result"></div>
 
-    <!-- Übersicht der Gewinnchancen -->
+    <!-- Übersicht der Gewinnchancen mit Farbmarkierung -->
     <div class="odds-box">
-        <h3>📊 Gewinnchancen</h3>
-        <div class="odd-item"><span>😭 Niete (0 🪙)</span> <strong>40%</strong></div>
-        <div class="odd-item"><span>🪙 20 Münzen</span> <strong>30%</strong></div>
-        <div class="odd-item"><span>💰 50 Münzen</span> <strong>20%</strong></div>
-        <div class="odd-item"><span>💎 Jackpot (100 🪙)</span> <strong>8%</strong></div>
-        <div class="odd-item"><span>🌟 XP-Boost (+50 XP)</span> <strong>2%</strong></div>
+        <h3>📊 Segmente & Gewinnchancen</h3>
+        <div class="odd-item"><span style="display: flex; align-items: center;"><span class="color-dot" style="background: #e74c3c;"></span>😭 Niete (0 🪙)</span> <strong>40%</strong></div>
+        <div class="odd-item"><span style="display: flex; align-items: center;"><span class="color-dot" style="background: #3498db;"></span>🪙 20 Münzen</span> <strong>30%</strong></div>
+        <div class="odd-item"><span style="display: flex; align-items: center;"><span class="color-dot" style="background: #2ecc71;"></span>💰 50 Münzen</span> <strong>20%</strong></div>
+        <div class="odd-item"><span style="display: flex; align-items: center;"><span class="color-dot" style="background: #f1c40f;"></span>💎 Jackpot (100 🪙)</span> <strong>8%</strong></div>
+        <div class="odd-item"><span style="display: flex; align-items: center;"><span class="color-dot" style="background: #9b59b6;"></span>🌟 XP-Boost (+50 XP)</span> <strong>2%</strong></div>
     </div>
 
     <script>
