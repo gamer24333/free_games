@@ -696,6 +696,9 @@ def dashboard():
     is_admin = True if (me == "Till" or (user and user.is_admin)) else False
     
     lvl, rank = get_level_info(user.xp if user else 0)
+
+    # NEU: Partner-Liste für das Trading-Dropdown übergeben
+    chpartner = sorted([s for s in KLASSEN_LISTE if s != me])
     
     return render_template('dashboard.html', 
                            name=me, 
