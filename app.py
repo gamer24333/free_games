@@ -606,20 +606,24 @@ def spin_wheel():
     
     u.coins -= einsatz
     
-    # Chancen-Verteilung
+    # Chancen-Verteilung mit Segment-Zuordnung für das Rad
     rand = random.random()
-    if rand < 0.40: gewinn, text = 0, "Niete! 😭"
-    elif rand < 0.70: gewinn, text = 20, "20 Münzen! 🪙"
-    elif rand < 0.90: gewinn, text = 50, "50 Münzen! 💰"
-    elif rand < 0.98: gewinn, text = 100, "JACKPOT! 100 Münzen! 💎"
+    if rand < 0.40: 
+        gewinn, text, segment = 0, "Niete! 😭", "niete"
+    elif rand < 0.70: 
+        gewinn, text, segment = 20, "20 Münzen! 🪙", "20coins"
+    elif rand < 0.90: 
+        gewinn, text, segment = 50, "50 Münzen! 💰", "50coins"
+    elif rand < 0.98: 
+        gewinn, text, segment = 100, "JACKPOT! 100 Münzen! 💎", "jackpot"
     else: 
-        gewinn, text = 0, "XP-Boost! +50 XP 🌟"
+        gewinn, text, segment = 0, "XP-Boost! +50 XP 🌟", "xp"
         u.xp = (u.xp or 0) + 50
         
     u.coins += gewinn
     db.session.commit()
     
-    return {"status": "success", "text": text, "new_balance": u.coins}
+    return {"status": "success", "text": text, "new_balance": u.coins, "segment": segment}
     
 
 @app.route('/login', methods=['GET', 'POST'])
