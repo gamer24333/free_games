@@ -129,8 +129,13 @@
             <h3 style="color: #1abc9c; margin-top: 0;">💸 Coins versenden</h3>
             <p style="font-size: 13px; color: #aaa;">Schicke einem Klassenkameraden Münzen!</p>
             
-            <input type="text" id="tradeTarget" placeholder="Name des Empfängers (Exakt eingeben!)">
-            <input type="number" id="tradeAmount" placeholder="Anzahl Coins" style="margin-top: 10px;">
+            <select id="tradeTarget">
+                <option value="">-- Empfänger wählen --</option>
+                {% for schueler in partner %}
+                    <option value="{{ schueler }}">{{ schueler }}</option>
+                {% endfor %}
+            </select>
+            <input type="number" id="tradeAmount" placeholder="Anzahl Coins" min="1" style="margin-top: 10px;">
             
             <div style="margin-top: 15px; display: flex; gap: 10px;">
                 <button onclick="document.getElementById('tradeModal').style.display='none'" class="btn" style="background: #555; flex: 1;">Abbrechen</button>
@@ -143,7 +148,7 @@
     <div class="level-badge">Lvl {{ user_level|default(1) }} - {{ user_rank|default('Rookie') }} ({{ user_xp|default(0) }} XP)</div>
     <p>Schön, dass du da bist. Was willst du machen?</p>
 
-    <!-- HIER SIND DIE NEUEN BUTTONS FÜR DAS UPDATE -->
+    <!-- BUTTONS -->
     <div style="margin: 30px auto; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 800px;">
         <a href="/chat" class="btn" style="background: #3498db;">💬 Chat & DM <span id="chatBadge" class="badge">0</span></a>
         <a href="/games" class="btn" style="background: #2ecc71;">🎮 Spiele</a>
@@ -287,7 +292,7 @@
         } catch (e) { console.error(e); }
     }
 
-    // --- NEU: DAILY BONUS & TRADING ---
+    // --- DAILY BONUS & TRADING ---
     async function claimDaily() {
         try {
             const res = await fetch('/api/daily-bonus', { method: 'POST' });
@@ -300,10 +305,11 @@
     function openTradeModal() { document.getElementById('tradeModal').style.display = 'flex'; }
     
     async function sendCoins() {
-        const target = document.getElementById('tradeTarget').value.trim();
-        const amount = document.getElementById('tradeAmount').value;
+        const target = document.getElementById('tradeTarget').value;
+        const amount = parseInt(document.getElementById('tradeAmount').value);
         
-        if (!target || !amount) return alert("Bitte wähle einen Empfänger und einen Betrag!");
+        if (!target) return alert("Bitte wähle einen Empfänger aus!");
+        if (isNaN(amount) || amount <= 0) return alert("Bitte gib eine gültige Anzahl an Coins ein (nur positive Zahlen größer als 0)!");
         
         const res = await fetch('/api/trade/coins', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
