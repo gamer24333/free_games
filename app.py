@@ -560,6 +560,21 @@ def daily_bonus():
     
     return {"error": "Du hast deinen Bonus heute schon abgeholt! Komm morgen wieder."}, 400
 
+@app.route('/daily')
+def daily_page():
+    if 'username' not in session: return redirect(url_for('login'))
+    user = UserSetting.query.filter_by(username=session['username']).first()
+    
+    now = datetime.utcnow()
+    can_claim = True
+    
+    # Prüfen, ob der Bonus in den letzten 24h schon abgeholt wurde
+    if user.last_daily_claim and (now - user.last_daily_claim).days < 1:
+        can_claim = False
+        
+    streak = user.login_streak or 0
+    return render_template('daily_bonus.html', streak=streak, can_claim=can_claim, coins=(user.coins or 0))
+
 
 # --- TRADING SYSTEM (COINS SENDEN) ---
 @app.route('/api/trade/coins', methods=['POST'])
