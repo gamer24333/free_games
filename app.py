@@ -257,6 +257,11 @@ def check_if_banned():
                 db.session.commit()
 
 
+@app.route('/')
+def index():
+    return redirect(url_for('login'))
+
+
 @app.route('/api/ping', methods=['POST'])
 def ping_user():
     if 'username' in session:
