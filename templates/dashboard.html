@@ -1,3 +1,10 @@
+Das sieht schon richtig gut aus! Du hast die alten Shop-Modals im HTML schon entfernt, aber unten im <script>-Bereich hingen noch die alten Shop-Funktionen fest. Außerdem fehlten noch die neuen Buttons für das Glücksrad, Trading und den Daily Bonus.
+
+Ich habe deine Datei jetzt komplett aufgeräumt, die alten Shop-Skripte gelöscht und alle neuen Funktionen für das Update eingebaut.
+
+Kopiere diesen gesamten Code und ersetze damit den kompletten Inhalt deiner dashboard.html:
+
+HTML
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -7,7 +14,7 @@
     <style>
         body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 60px; position: relative; }
         .btn { display: inline-block; padding: 15px 30px; margin: 10px; background: #00adb5; color: white; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold; position: relative; cursor: pointer; border: none; }
-        .btn:hover { background: #007c82; }
+        .btn:hover { background: #007c82; filter: brightness(1.1); }
         .badge { background: #ff2e63; color: white; border-radius: 50%; padding: 3px 8px; font-size: 12px; position: absolute; top: -8px; right: -8px; display: none; box-shadow: 0 0 8px rgba(255,46,99,0.6); }
         .invite-box { background: #333; padding: 15px; border-radius: 8px; max-width: 500px; margin: 25px auto; border: 2px solid #ff2e63; text-align: left; }
         .invite-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; }
@@ -68,23 +75,11 @@
             box-shadow: 0 0 20px rgba(0, 173, 181, 0.3);
         }
         .modal-box.gold { border-color: #f39c12; box-shadow: 0 0 20px rgba(243, 156, 18, 0.3); }
-        .modal-box input, .modal-box textarea {
+        .modal-box input, .modal-box textarea, .modal-box select {
             width: 100%; background: #333; color: white; border: 1px solid #555;
             border-radius: 6px; padding: 10px; box-sizing: border-box; margin-top: 10px;
             font-size: 16px; text-align: center; font-family: inherit;
         }
-        
-        /* Shop & Inventar Modal Styles */
-        .shop-tabs { display: flex; justify-content: center; margin-bottom: 20px; gap: 10px; }
-        .shop-tab-btn { background: #444; color: #fff; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
-        .shop-tab-btn.active { background: #00adb5; }
-        .shop-item { background: #333; border: 1px solid #555; border-radius: 8px; padding: 10px; margin-bottom: 15px; text-align: left; display: flex; justify-content: space-between; align-items: center; }
-        .shop-item-info { flex: 1; }
-        .shop-item h4 { margin: 0 0 5px 0; font-size: 16px; }
-        .shop-item p { margin: 0; font-size: 12px; color: #aaa; }
-        .shop-btn { background: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; }
-        .shop-btn.equip { background: #3498db; }
-        .shop-btn.equipped { background: #f39c12; }
     </style>
 </head>
 <body>
@@ -134,22 +129,37 @@
             </div>
         </div>
     </div>
+
+    <!-- TRADING MODAL -->
+    <div id="tradeModal" class="modal-overlay">
+        <div class="modal-box" style="border-color: #1abc9c;">
+            <h3 style="color: #1abc9c; margin-top: 0;">💸 Coins versenden</h3>
+            <p style="font-size: 13px; color: #aaa;">Schicke einem Klassenkameraden Münzen!</p>
+            
+            <input type="text" id="tradeTarget" placeholder="Name des Empfängers (Exakt eingeben!)">
+            <input type="number" id="tradeAmount" placeholder="Anzahl Coins" style="margin-top: 10px;">
+            
+            <div style="margin-top: 15px; display: flex; gap: 10px;">
+                <button onclick="document.getElementById('tradeModal').style.display='none'" class="btn" style="background: #555; flex: 1;">Abbrechen</button>
+                <button onclick="sendCoins()" class="btn" style="background: #1abc9c; flex: 1;">Senden</button>
+            </div>
+        </div>
+    </div>
     
     <h1>Willkommen, {{ name }}! 👋</h1>
     <div class="level-badge">Lvl {{ user_level|default(1) }} - {{ user_rank|default('Rookie') }} ({{ user_xp|default(0) }} XP)</div>
     <p>Schön, dass du da bist. Was willst du machen?</p>
 
-    <div style="margin: 30px 0;">
-        <a href="/chat" class="btn" style="background: #3498db;">
-            💬 Klassen-Chat & DM
-            <span id="chatBadge" class="badge">0</span>
-        </a>
-        
-        <a href="/games" class="btn" style="background: #2ecc71;">🎮 Spiele-Zentrale</a>
-
+    <!-- HIER SIND DIE NEUEN BUTTONS FÜR DAS UPDATE -->
+    <div style="margin: 30px auto; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 800px;">
+        <a href="/chat" class="btn" style="background: #3498db;">💬 Chat & DM <span id="chatBadge" class="badge">0</span></a>
+        <a href="/games" class="btn" style="background: #2ecc71;">🎮 Spiele</a>
+        <a href="/stats" class="btn" style="background: #e67e22;">👑 Ranglisten</a>
         <button onclick="openFeedbackModal()" class="btn" style="background: #9b59b6;">💡 Feedback</button>
         
-        <a href="/stats" class="btn" style="background: #e67e22;">👑 Ranglisten & Zeit</a>
+        <a href="/gluecksrad" class="btn" style="background: #8e44ad;">🎰 Glücksrad</a>
+        <button onclick="claimDaily()" class="btn" style="background: #f1c40f; color: black;">🎁 Daily Bonus</button>
+        <button onclick="openTradeModal()" class="btn" style="background: #1abc9c;">💸 Trading</button>
     </div>
 
     {% if einladungen %}
@@ -232,8 +242,6 @@
         }
     }
 
-    // --- SHOP & INVENTAR MODAL STEUERUNG ---
-    
     // --- SETTINGS MODAL STEUERUNG ---
     function openSettingsModal() { document.getElementById('settingsModal').style.display = 'flex'; }
     function closeSettingsModal() { 
@@ -286,6 +294,39 @@
         } catch (e) { console.error(e); }
     }
 
+    // --- NEU: DAILY BONUS & TRADING ---
+    async function claimDaily() {
+        try {
+            const res = await fetch('/api/daily-bonus', { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) alert(`🎁 Bonus abgeholt!\nDu hast ${data.coins} Coins bekommen!\nDein Streak: ${data.streak} Tage 🔥`);
+            else alert("❌ " + data.error);
+        } catch (e) { alert("Verbindungsfehler."); }
+    }
+
+    function openTradeModal() { document.getElementById('tradeModal').style.display = 'flex'; }
+    
+    async function sendCoins() {
+        const target = document.getElementById('tradeTarget').value.trim();
+        const amount = document.getElementById('tradeAmount').value;
+        
+        if (!target || !amount) return alert("Bitte wähle einen Empfänger und einen Betrag!");
+        
+        const res = await fetch('/api/trade/coins', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target: target, amount: amount })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert(`✅ Du hast ${amount} Coins an ${target} gesendet!`);
+            document.getElementById('tradeModal').style.display = 'none';
+            document.getElementById('tradeTarget').value = '';
+            document.getElementById('tradeAmount').value = '';
+        } else {
+            alert("❌ " + data.error);
+        }
+    }
+
     // --- CHAT NOTIFICATIONS (Polling) ---
     let lastKnownMessageCount = 0;
     async function checkNewMessages() {
@@ -330,73 +371,6 @@
 
     setInterval(checkNewMessages, 5000);
     checkNewMessages();
-
-        // --- SHOP & INVENTAR MODAL STEUERUNG ---
-    async function openShopModal() { 
-        document.getElementById('shopModal').style.display = 'flex'; 
-        await loadShopData();
-    }
-    
-    function closeShopModal() { document.getElementById('shopModal').style.display = 'none'; }
-    
-    async function loadShopData() {
-        const res = await fetch('/api/shop/data');
-        const data = await res.json();
-        
-        document.getElementById('coin-balance').textContent = data.coins + " 🪙";
-        
-        const shopView = document.getElementById('shop-view');
-        const invView = document.getElementById('inventory-view');
-        shopView.innerHTML = ''; invView.innerHTML = '';
-        
-        let hasInv = false;
-        for (const [id, item] of Object.entries(data.shop_items)) {
-            const isOwned = data.inventory.includes(id);
-            const isEquipped = Array.isArray(data.active_title) ? data.active_title.includes(item.value) : (data.active_title === item.value || data.active_color === item.value);
-            
-            // Item für Shop
-            if (!isOwned) {
-                shopView.innerHTML += `
-                <div class="shop-item">
-                    <div class="shop-item-info">
-                        <h4>${item.name}</h4><p>${item.desc}</p>
-                    </div>
-                    <button class="shop-btn" onclick="buyItem('${id}')">${item.price} 🪙</button>
-                </div>`;
-            }
-            // Item für Inventar
-            if (isOwned) {
-                hasInv = true;
-                invView.innerHTML += `
-                <div class="shop-item">
-                    <div class="shop-item-info">
-                        <h4>${item.name}</h4><p>${item.desc}</p>
-                    </div>
-                    <button class="shop-btn ${isEquipped ? 'equipped' : 'equip'}" onclick="equipItem('${id}')">
-                        ${isEquipped ? 'Ausgerüstet' : 'Ausrüsten'}
-                    </button>
-                </div>`;
-            }
-        }
-        if (shopView.innerHTML === '') shopView.innerHTML = '<p>Du hast bereits alles gekauft!</p>';
-        if (!hasInv) invView.innerHTML = '<p>Dein Inventar ist leer.</p>';
-    }
-
-    async function buyItem(itemId) {
-        const res = await fetch('/api/shop/buy', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId })
-        });
-        const data = await res.json();
-        if (res.ok) { alert("Erfolgreich gekauft!"); loadShopData(); } 
-        else { alert("❌ " + data.error); }
-    }
-
-    async function equipItem(itemId) {
-        const res = await fetch('/api/shop/equip', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId })
-        });
-        if (res.ok) { loadShopData(); }
-    }
     </script>
 </body>
 </html>
