@@ -16,6 +16,10 @@
         /* Level und Rang Anzeige */
         .level-badge { display: inline-block; background: linear-gradient(135deg, #f1c40f, #e67e22); color: black; font-weight: bold; padding: 5px 12px; border-radius: 15px; font-size: 14px; margin-top: 5px; box-shadow: 0 0 10px rgba(241,196,15,0.5); }
         
+        /* Kleiner Info-Button neben dem Rang */
+        .info-btn { background: #333; color: #aaa; border: 1px solid #555; border-radius: 50%; width: 26px; height: 26px; cursor: pointer; font-weight: bold; margin-left: 8px; display: inline-flex; justify-content: center; align-items: center; transition: 0.2s; }
+        .info-btn:hover { background: #f1c40f; color: black; border-color: #f1c40f; transform: scale(1.1); }
+
         /* Code Button oben links */
         .code-btn {
             position: fixed;
@@ -73,6 +77,12 @@
             border-radius: 6px; padding: 10px; box-sizing: border-box; margin-top: 10px;
             font-size: 16px; text-align: center; font-family: inherit;
         }
+        
+        /* Rangliste im Modal */
+        .rank-list { text-align: left; margin-top: 15px; color: #ccc; font-size: 14px; line-height: 1.6; padding: 0; list-style: none; }
+        .rank-list li { margin-bottom: 12px; background: #333; padding: 10px; border-radius: 8px; border-left: 4px solid #555; }
+        .rank-list strong { color: #f1c40f; font-size: 16px; }
+        .rank-list .reward { display: block; font-size: 12px; color: #2ecc71; margin-top: 3px; }
     </style>
 </head>
 <body>
@@ -143,9 +153,52 @@
             </div>
         </div>
     </div>
+
+    <!-- RANG INFOS MODAL -->
+    <div id="rankModal" class="modal-overlay">
+        <div class="modal-box gold">
+            <h3 style="color: #f1c40f; margin-top: 0;">🏆 Die Level-Ränge</h3>
+            <p style="font-size: 13px; color: #aaa;">Sammle XP durch das Spielen von Minigames, um aufzusteigen!</p>
+            
+            <ul class="rank-list">
+                <li style="border-color: #95a5a6;">
+                    <strong>Rookie (Level 1 - 9)</strong>
+                    <span class="reward">🎁 Belohnung: Zugang zum Portal</span>
+                </li>
+                <li style="border-color: #2ecc71;">
+                    <strong>Amateur (Level 10 - 19)</strong>
+                    <span class="reward">🎁 Belohnung: Zeig allen, dass du kein Anfänger bist!</span>
+                </li>
+                <li style="border-color: #3498db;">
+                    <strong>Profi (Level 20 - 29)</strong>
+                    <span class="reward">🎁 Belohnung: Du fällst auf dem Leaderboard auf.</span>
+                </li>
+                <li style="border-color: #e67e22;">
+                    <strong>Meister (Level 30 - 39)</strong>
+                    <span class="reward">🎁 Belohnung: Wahre Meisterklasse in den Minigames!</span>
+                </li>
+                <li style="border-color: #e74c3c;">
+                    <strong>Großmeister (Level 40 - 49)</strong>
+                    <span class="reward">🎁 Belohnung: Fast an der Spitze. Jeder kennt deinen Namen.</span>
+                </li>
+                <li style="border-color: #f1c40f; background: rgba(241, 196, 15, 0.1);">
+                    <strong>Legende (Level 50+) 👑</strong>
+                    <span class="reward">🎁 Belohnung: Unendlicher Ruhm & Legenden-Status im Chat!</span>
+                </li>
+            </ul>
+            
+            <button onclick="closeRankModal()" class="btn" style="background: #555; width: 100%; margin: 15px 0 0 0; box-sizing: border-box;">Schließen</button>
+        </div>
+    </div>
     
     <h1>Willkommen, {{ name }}! 👋</h1>
-    <div class="level-badge">Lvl {{ user_level|default(1) }} - {{ user_rank|default('Rookie') }} ({{ user_xp|default(0) }} XP)</div>
+    
+    <!-- LEVEL UND RANG ANZEIGE MIT INFO-BUTTON -->
+    <div style="display: flex; justify-content: center; align-items: center; margin-top: 5px;">
+        <div class="level-badge">Lvl {{ user_level|default(1) }} - {{ user_rank|default('Rookie') }} ({{ user_xp|default(0) }} XP)</div>
+        <button class="info-btn" onclick="openRankModal()" title="Alle Ränge ansehen">ℹ️</button>
+    </div>
+    
     <p>Schön, dass du da bist. Was willst du machen?</p>
 
     <!-- BUTTONS -->
@@ -156,7 +209,6 @@
         <button onclick="openFeedbackModal()" class="btn" style="background: #9b59b6;">💡 Feedback</button>
         
         <a href="/gluecksrad" class="btn" style="background: #8e44ad;">🎰 Glücksrad</a>
-        <!-- NEUER LINK ZUR DAILY BONUS SEITE -->
         <a href="/daily" class="btn" style="background: #f1c40f; color: black;">🎁 Daily Bonus</a>
         <button onclick="openTradeModal()" class="btn" style="background: #1abc9c;">💸 Trading</button>
     </div>
@@ -214,6 +266,10 @@
     <a href="/logout" style="color: #ff2e63; text-decoration: none; font-weight: bold;">Abmelden</a>
 
     <script>
+    // --- RANG MODAL STEUERUNG ---
+    function openRankModal() { document.getElementById('rankModal').style.display = 'flex'; }
+    function closeRankModal() { document.getElementById('rankModal').style.display = 'none'; }
+
     // --- CODE MODAL STEUERUNG ---
     function openCodeModal() { document.getElementById('codeModal').style.display = 'flex'; }
     function closeCodeModal() { 
