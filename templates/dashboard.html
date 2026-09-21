@@ -106,46 +106,6 @@
         </div>
     </div>
 
-    <!-- SHOP / INVENTAR MODAL -->
-    <div id="shopModal" class="modal-overlay">
-        <div class="modal-box" style="border-color: #e67e22; box-shadow: 0 0 20px rgba(230, 126, 34, 0.3);">
-            <h3 style="color: #e67e22; margin-top: 0;">🎒 Inventar & Shop</h3>
-            <div style="font-weight: bold; margin-bottom: 15px;">Münzen: <span id="coin-balance" style="color: #f1c40f;">{{ user_coins|default(0) }} 🪙</span></div>
-            
-            <div class="shop-tabs">
-                <button class="shop-tab-btn active" onclick="switchShopTab('shop')">🛒 Shop</button>
-                <button class="shop-tab-btn" onclick="switchShopTab('inventory')">🎒 Mein Inventar</button>
-            </div>
-
-            <div id="shop-view">
-                <!-- Shop Inhalte kommen aus der DB, hier als Platzhalter -->
-                <div class="shop-item">
-                    <div class="shop-item-info">
-                        <h4>Regenbogen Name</h4>
-                        <p>Dein Name leuchtet im Chat!</p>
-                    </div>
-                    <button class="shop-btn" onclick="buyItem('rainbow_name')">500 🪙</button>
-                </div>
-                <div class="shop-item">
-                    <div class="shop-item-info">
-                        <h4>Titel: "Der Zerstörer"</h4>
-                        <p>Ein cooler Titel neben deinem Namen.</p>
-                    </div>
-                    <button class="shop-btn" onclick="buyItem('title_destroyer')">250 🪙</button>
-                </div>
-            </div>
-
-            <div id="inventory-view" style="display: none;">
-                <!-- Inventar Inhalte -->
-                <p style="font-size: 12px; color: #aaa;">Du hast noch keine Items gekauft.</p>
-            </div>
-
-            <div style="margin-top: 20px;">
-                <button onclick="closeShopModal()" class="btn" style="background: #555; width: 100%;">Schließen</button>
-            </div>
-        </div>
-    </div>
-
     <!-- SETTINGS / PIN MODAL -->
     <div id="settingsModal" class="modal-overlay">
         <div class="modal-box">
@@ -234,7 +194,7 @@
 
     <!-- Admin / Inventar Box unten -->
     <div class="admin-box">
-        <button onclick="openShopModal()" class="btn" style="background: #e67e22;">🎒 Inventar & Shop</button>
+        <a href="/shop" class="btn" style="background: #e67e22;">🎒 Inventar & Shop</a>
         
         {% if is_admin %}
         <a href="/admin" class="btn" style="background: #e74c3c;">🛠️ Admin-Panel</a>
@@ -273,31 +233,7 @@
     }
 
     // --- SHOP & INVENTAR MODAL STEUERUNG ---
-    function openShopModal() { 
-        document.getElementById('shopModal').style.display = 'flex'; 
-        // Hier könnte man später die aktuellen Shop/Inventar Daten per fetch() abfragen
-    }
-    function closeShopModal() { 
-        document.getElementById('shopModal').style.display = 'none'; 
-    }
-    function switchShopTab(tab) {
-        const tabs = document.querySelectorAll('.shop-tab-btn');
-        tabs.forEach(t => t.classList.remove('active'));
-        
-        if (tab === 'shop') {
-            tabs[0].classList.add('active');
-            document.getElementById('shop-view').style.display = 'block';
-            document.getElementById('inventory-view').style.display = 'none';
-        } else {
-            tabs[1].classList.add('active');
-            document.getElementById('shop-view').style.display = 'none';
-            document.getElementById('inventory-view').style.display = 'block';
-        }
-    }
-    function buyItem(itemId) {
-        alert("Kaufe Item: " + itemId + "\n(Funktion muss noch ins Backend eingebaut werden!)");
-    }
-
+    
     // --- SETTINGS MODAL STEUERUNG ---
     function openSettingsModal() { document.getElementById('settingsModal').style.display = 'flex'; }
     function closeSettingsModal() { 
