@@ -89,6 +89,15 @@
         let currentRotation = 0;
         let isSpinning = false;
 
+        // Grad-Bereiche für die jeweiligen Segmente im Rad
+        const segmentAngles = {
+            'niete': {min: 15, max: 129},
+            '20coins': {min: 159, max: 237},
+            '50coins': {min: 267, max: 309},
+            'jackpot': {min: 329, max: 347},
+            'xp': {min: 354, max: 358}
+        };
+
         async function spinWheel() {
             if (isSpinning) return;
             
@@ -110,9 +119,18 @@
                 isSpinning = true;
                 document.getElementById('spinBtn').style.opacity = '0.5';
 
+                // Ziel-Bereich basierend auf dem vom Server ermittelten Gewinn ermitteln
+                const range = segmentAngles[data.segment] || {min: 15, max: 129};
+                const targetAngle = Math.floor(Math.random() * (range.max - range.min + 1)) + range.min;
+
+                // Berechnung der exakten Rad-Rotation, damit der Zeiger genau auf diesen Winkel zeigt
+                const targetMod = (360 - targetAngle) % 360;
+                const currentMod = currentRotation % 360;
+                let diff = targetMod - currentMod;
+                if (diff <= 0) diff += 360;
+
                 const extraSpins = 360 * 5; 
-                const randomOffset = Math.floor(Math.random() * 360);
-                currentRotation += extraSpins + randomOffset;
+                currentRotation += extraSpins + diff;
                 
                 wheel.style.transform = `rotate(${currentRotation}deg)`;
 
