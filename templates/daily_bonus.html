@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Bonus</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 50px; }
+        .btn { display: inline-block; padding: 15px 30px; background: #f1c40f; color: black; text-decoration: none; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; font-size: 18px; margin-top: 20px;}
+        .btn:hover:not(:disabled) { background: #d4ac0d; }
+        .btn:disabled { background: #555 !important; color: #aaa !important; cursor: not-allowed; box-shadow: none; }
+        
+        .streak-box { background: #333; border: 2px dashed #f1c40f; border-radius: 12px; max-width: 550px; margin: 30px auto; padding: 25px; box-shadow: 0 0 15px rgba(241,196,15,0.1); }
+        .streak-number { font-size: 45px; color: #f1c40f; font-weight: bold; margin: 15px 0; text-shadow: 0 0 10px rgba(241,196,15,0.5); }
+        
+        .days-grid { display: flex; justify-content: center; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
+        .day-card { background: #2a2a2a; border: 1px solid #444; border-radius: 8px; padding: 15px 10px; width: 75px; text-align: center; }
+        .day-card.active { border-color: #f1c40f; background: #3b3319; box-shadow: 0 0 15px rgba(241,196,15,0.3); }
+        .day-title { font-size: 13px; color: #aaa; margin-bottom: 8px; }
+        .day-reward { font-size: 16px; font-weight: bold; color: #f1c40f; }
+    </style>
+</head>
+<body>
+
+    <a href="/welcome" class="btn" style="position: absolute; top: 20px; left: 20px; font-size: 14px; padding: 10px 15px; margin:0; background: #555; color: white;">⬅ Zurück</a>
+    
+    <h1 style="color: #f1c40f; margin-top: 30px;">🎁 Täglicher Login-Bonus</h1>
+    <p>Deine Münzen: <strong id="coinBalance" style="color: #f1c40f;">{{ coins }}</strong> 🪙</p>
+    
+    <div class="streak-box">
+        <h3 style="margin-top: 0; color: #ccc;">Dein aktueller Streak</h3>
+        <div class="streak-number" id="streakDisplay">{{ streak }} 🔥</div>
+        <p style="color: #aaa; font-size: 14px; line-height: 1.5;">Logge dich jeden Tag ein, um deinen Streak aufzubauen. <br>Alle 5 Tage gibt es einen fetten <b>+50 Coins Jackpot!</b></p>
+        
+        <div class="days-grid">
+            <div class="day-card">
+                <div class="day-title">Tag 1</div>
+                <div class="day-reward">15 🪙</div>
+            </div>
+            <div class="day-card">
+                <div class="day-title">Tag 2</div>
+                <div class="day-reward">20 🪙</div>
+            </div>
+            <div class="day-card">
+                <div class="day-title">Tag 3</div>
+                <div class="day-reward">25 🪙</div>
+            </div>
+            <div class="day-card">
+                <div class="day-title">Tag 4</div>
+                <div class="day-reward">30 🪙</div>
+            </div>
+            <div class="day-card active">
+                <div class="day-title" style="color: #e67e22; font-weight: bold;">Tag 5 🌟</div>
+                <div class="day-reward">85+ 💎</div>
+            </div>
+        </div>
+    </div>
+
+    {% if can_claim %}
+        <button id="claimBtn" class="btn" onclick="claimDaily()">Bonus jetzt abholen! 🎁</button>
+    {% else %}
+        <button id="claimBtn" class="btn" disabled>Schon abgeholt! ⏳</button>
+        <p style="color: #aaa; font-size: 14px; margin-top: 15px;">Komm morgen wieder für deinen nächsten Bonus.</p>
+    {% endif %}
+    
+    <script>
+        async function claimDaily() {
+            const btn = document.getElementById('claimBtn');
+            btn.disabled = true;
+            btn.textContent = "Wird abgeholt...";
+            
+            try {
+                const res = await fetch('/api/daily-bonus', { method: 'POST' });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    alert(`🎁 Bonus erfolgreich abgeholt!\nDu hast ${data.coins} Coins bekommen!\nDein Streak: ${data.streak} Tage 🔥`);
+                    document.getElementById('streakDisplay').textContent = data.streak + " 🔥";
+                    
+                    let currentCoins = parseInt(document.getElementById('coinBalance').textContent) || 0;
+                    document.getElementById('coinBalance').textContent = currentCoins + data.coins;
+                    
+                    btn.textContent = "Schon abgeholt! ⏳";
+                    
+                    // Text drunter hinzufügen
+                    const p = document.createElement('p');
+                    p.style.color = '#aaa';
+                    p.style.fontSize = '14px';
+                    p.style.marginTop = '15px';
+                    p.textContent = "Komm morgen wieder für deinen nächsten Bonus.";
+                    btn.parentNode.insertBefore(p, btn.nextSibling);
+
+                } else {
+                    alert("❌ " + data.error);
+                    btn.textContent = "Schon abgeholt! ⏳";
+                }
+            } catch (e) { 
+                alert("Verbindungsfehler."); 
+                btn.disabled = false;
+                btn.textContent = "Bonus jetzt abholen! 🎁";
+            }
+        }
+    </script>
+</body>
+</html>
