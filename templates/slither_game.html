@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Class-Slither Arena</title>
     <style>
-        body { margin: 0; padding: 0; overflow: hidden; background: #111; color: white; font-family: Arial, sans-serif; touch-action: none; /* WICHTIG FÜR IPAD: Verhindert Scrollen */ }
+        body { margin: 0; padding: 0; overflow: hidden; background: #111; color: white; font-family: Arial, sans-serif; touch-action: none; }
         canvas { display: block; }
         
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
@@ -14,7 +14,6 @@
         
         #score-display { position: absolute; bottom: 20px; left: 20px; font-size: 24px; font-weight: bold; background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 30px; pointer-events: none; }
         
-        /* Neuer Boost Button für iPad/Handy */
         #mobile-boost { position: absolute; bottom: 30px; right: 30px; width: 80px; height: 80px; background: rgba(255, 46, 99, 0.8); border-radius: 50%; border: 3px solid #ff2e63; color: white; font-weight: bold; font-size: 14px; display: flex; justify-content: center; align-items: center; pointer-events: all; user-select: none; box-shadow: 0 0 15px #ff2e63; cursor: pointer; }
         #mobile-boost:active { background: #ff2e63; transform: scale(0.95); }
 
@@ -50,13 +49,18 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
-        // Responsive Zoom-Faktor für Handys/Tablets (verhindert, dass die Map zu kompakt wirkt)
         const isMobile = window.innerWidth < 900;
         const zoom = isMobile ? Math.max(0.55, window.innerWidth / 1100) : 1.0;
 
         const myName = "{{ me }}";
         const mapSize = 3000;
         
+        // --- SHOP UPGRADES LADEN ---
+        let hasBoostUpgrade = false;
+        fetch('/api/shop/data').then(r=>r.json()).then(data=>{
+            if(data.inventory && data.inventory.includes('upg_slither_boost')) hasBoostUpgrade = true;
+        }).catch(e=>console.log(e));
+
         const colors = ["#ff2e63", "#00adb5", "#2ecc71", "#f1c40f", "#9b59b6", "#e67e22"];
         const myColor = colors[Math.floor(Math.random() * colors.length)];
 
@@ -65,32 +69,28 @@
         let myAngle = 0;
         let isDead = false;
         
-        // --- STEUERUNG (MAUS & TOUCH & WASD) ---
         let targetAngle = 0;
         let isBoosting = false;
         let keys = {w: false, a: false, s: false, d: false};
 
-        // 1. Maus (berücksichtigt den Zoom)
         window.addEventListener('mousemove', (e) => {
-            if(Object.values(keys).includes(true)) return; // WASD hat Vorrang
+            if(Object.values(keys).includes(true)) return; 
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
             targetAngle = Math.atan2((e.clientY - centerY) / zoom, (e.clientX - centerX) / zoom);
         });
 
-        // 2. Touch (iPad / Handy - berücksichtigt den Zoom)
         canvas.addEventListener('touchstart', (e) => {
             const touch = e.touches[0];
             targetAngle = Math.atan2((touch.clientY - canvas.height/2) / zoom, (touch.clientX - canvas.width/2) / zoom);
         }, {passive: false});
 
         canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault(); // Stoppt das Scrollen auf Touch-Geräten
+            e.preventDefault(); 
             const touch = e.touches[0];
             targetAngle = Math.atan2((touch.clientY - canvas.height/2) / zoom, (touch.clientX - canvas.width/2) / zoom);
         }, {passive: false});
 
-        // 3. Tastatur (WASD + Boost auf E oder Leertaste)
         window.addEventListener('keydown', (e) => {
             const k = e.key.toLowerCase();
             if(k === 'w' || k === 'arrowup') keys.w = true;
@@ -108,7 +108,6 @@
             if(k === 'e' || k === ' ') isBoosting = false;
         });
 
-        // 4. Boost Button (Touch & Klick)
         const boostBtn = document.getElementById('mobile-boost');
         boostBtn.addEventListener('mousedown', () => isBoosting = true);
         boostBtn.addEventListener('mouseup', () => isBoosting = false);
@@ -127,30 +126,29 @@
         function updateLocal() {
             if (isDead) return;
 
-            // WASD Winkel berechnen
             let dx = 0, dy = 0;
             if (keys.w) dy -= 1; if (keys.s) dy += 1;
             if (keys.a) dx -= 1; if (keys.d) dx += 1;
             if (dx !== 0 || dy !== 0) targetAngle = Math.atan2(dy, dx);
 
-            // Bewegung glätten (FPS-unabhängig durch feste Zeiteinheit)
             let angleDiff = targetAngle - myAngle;
             while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
             while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
             myAngle += angleDiff * 0.25;
 
-            // --- FPS-UNABHÄNGIGE GESCHWINDIGKEIT ---
-            let speed = 250 + (4000 / (myScore + 100)); // Pixel pro Sekunde
+            let speed = 250 + (4000 / (myScore + 100)); 
+            
+            // --- SHOP UPGRADE LOGIK FÜR BOOST ---
             if (isBoosting && myScore > 15) {
                 speed *= 1.8; 
-                boostCostTracker += 0.3; 
+                // Wenn Upgrade vorhanden, kostet der Boost nur 0.15 statt 0.3 pro Tick!
+                boostCostTracker += hasBoostUpgrade ? 0.15 : 0.3; 
                 if (boostCostTracker >= 1) {
-                    myScore -= 1; // Kostet Punkte
+                    myScore -= 1;
                     boostCostTracker -= 1;
                 }
             }
             
-            // Bewegung pro Frame basierend auf festem Timestep (1/60 Sekunde)
             const stepDist = speed * (1 / 60);
 
             const head = myBody[0];
@@ -202,7 +200,6 @@
         function drawGame() {
             if (isDead) return;
 
-            // Kamera-Berechnung unter Berücksichtigung des Zoom-Faktors
             const viewWidth = canvas.width / zoom;
             const viewHeight = canvas.height / zoom;
             const camX = myBody[0][0] - viewWidth / 2;
@@ -210,7 +207,7 @@
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.save();
-            ctx.scale(zoom, zoom); // Wendet den Handy-/Desktop-Zoom an
+            ctx.scale(zoom, zoom);
             ctx.translate(-camX, -camY);
 
             ctx.strokeStyle = "#222"; ctx.lineWidth = 2;
@@ -244,7 +241,6 @@
                 ctx.stroke();
                 ctx.shadowBlur = 0;
 
-                // Augen rendern
                 let headAng = 0;
                 if(body.length > 1) headAng = Math.atan2(body[0][1] - body[1][1], body[0][0] - body[1][0]);
                 
@@ -262,13 +258,11 @@
                 ctx.beginPath(); ctx.arc(rightEyeX + Math.cos(headAng)*eyeR*0.4, rightEyeY + Math.sin(headAng)*eyeR*0.4, eyeR*0.5, 0, Math.PI*2); ctx.fill();
                 ctx.beginPath(); ctx.arc(leftEyeX + Math.cos(headAng)*eyeR*0.4, leftEyeY + Math.sin(headAng)*eyeR*0.4, eyeR*0.5, 0, Math.PI*2); ctx.fill();
 
-                // Name
                 ctx.fillStyle = "white";
                 ctx.font = "14px Arial";
                 ctx.textAlign = "center";
                 ctx.fillText(name, body[0][0], body[0][1] - r - 15);
 
-                // Krone für Platz 1
                 if (leaderboard.length > 0 && leaderboard[0][0] === name) {
                     ctx.font = "24px Arial";
                     ctx.fillText("👑", body[0][0], body[0][1] - r - 30);
@@ -303,29 +297,26 @@
                     const data = await res.json();
                     otherPlayers = data.players; bots = data.bots; foods = data.food; leaderboard = data.leaderboard;
                 }
-            } catch (e) { console.log(e); }
+            } catch (e) {}
         }
 
-        // --- DER PERFEKTE FPS-UNABHÄNGIGE GAME-LOOP (AKKUMULATOR-MUSTER) ---
         let lastTime = performance.now();
         let timeAccumulator = 0;
-        const STEP_TIME = 1 / 60; // Feste 60 Updates pro Sekunde
+        const STEP_TIME = 1 / 60; 
 
         function gameLoop(timestamp) {
             if (!timestamp) timestamp = performance.now();
             let dt = (timestamp - lastTime) / 1000;
             lastTime = timestamp;
 
-            if (dt > 0.25) dt = 0.25; // Tab-Wechsel-Schutz
+            if (dt > 0.25) dt = 0.25; 
             timeAccumulator += dt;
 
-            // Physik/Logik läuft exakt im 60-Hz-Takt – völlig egal, ob der Bildschirm 60 oder 120 Hz hat!
             while (timeAccumulator >= STEP_TIME) {
                 updateLocal();
                 timeAccumulator -= STEP_TIME;
             }
 
-            // Rendern läuft butterweich mit der maximalen Monitor-Bildrate
             drawGame();
 
             if (!isDead) {
@@ -341,7 +332,6 @@
 
         requestAnimationFrame(gameLoop);
 
-        
     </script>
 </body>
 </html>
