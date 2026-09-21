@@ -606,15 +606,15 @@ def spin_wheel():
     
     u.coins -= einsatz
     
-    # Chancen-Verteilung mit Segment-Zuordnung für das Rad
+    # Neue, ausbalancierte Chancen-Verteilung
     rand = random.random()
-    if rand < 0.40: 
+    if rand < 0.60: 
         gewinn, text, segment = 0, "Niete! 😭", "niete"
-    elif rand < 0.70: 
+    elif rand < 0.85: 
         gewinn, text, segment = 20, "20 Münzen! 🪙", "20coins"
-    elif rand < 0.90: 
+    elif rand < 0.95: 
         gewinn, text, segment = 50, "50 Münzen! 💰", "50coins"
-    elif rand < 0.98: 
+    elif rand < 0.99: 
         gewinn, text, segment = 100, "JACKPOT! 100 Münzen! 💎", "jackpot"
     else: 
         gewinn, text, segment = 0, "XP-Boost! +50 XP 🌟", "xp"
