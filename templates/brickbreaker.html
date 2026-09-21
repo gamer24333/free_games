@@ -483,12 +483,39 @@
         initBricks();
         requestAnimationFrame(loop);
 
-        // Sendet alle 5 Sekunden einen Ping an den Server
+        // --- AFK Detection (Anti-Farm System) ---
+        let isAFK = false;
+        let afkTimer;
+        
+        // Reset timer if the user moves the mouse, clicks, or presses a key
+        function resetAFK() {
+            isAFK = false;
+            clearTimeout(afkTimer);
+            // If the user does nothing for 2 minutes (120,000 ms), they are AFK
+            afkTimer = setTimeout(() => {
+                isAFK = true;
+                console.log("User is now AFK");
+            }, 120000); 
+        }
+
+        window.addEventListener('mousemove', resetAFK);
+        window.addEventListener('keydown', resetAFK);
+        window.addEventListener('mousedown', resetAFK);
+        window.addEventListener('touchstart', resetAFK);
+        
+        // Start the timer immediately
+        resetAFK();
+
+        // --- Ping Request to the Server ---
         setInterval(() => {
+            // Replace "Spielt BrickBreaker" with the actual activity for each page
+            let currentActivity = "Spielt BrickBreaker"; 
+            
             fetch('/api/ping', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ activity: "Spielt BrickBreaker" })
+                // We now send the isAFK flag to the server!
+                body: JSON.stringify({ activity: currentActivity, is_afk: isAFK }) 
             }).catch(e => console.log(e));
         }, 5000);
     </script>
