@@ -26,6 +26,23 @@
             transition: transform 3s cubic-bezier(0.25, 0.1, 0.25, 1);
             box-shadow: 0 0 30px rgba(241, 196, 15, 0.5);
         }
+
+        /* Beschriftungen auf den Rad-Segmenten */
+        .wheel-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 80px;
+            height: 30px;
+            margin-top: -15px;
+            margin-left: -40px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
+            pointer-events: none;
+        }
         
         .pointer {
             position: absolute;
@@ -52,7 +69,13 @@
 
     <div style="position: relative; width: 250px; margin: 0 auto;">
         <div class="pointer"></div>
-        <div class="wheel-container" id="wheel"></div>
+        <div class="wheel-container" id="wheel">
+            <div class="wheel-label" style="transform: rotate(36deg) translate(70px) rotate(90deg);">Niete 😭</div>
+            <div class="wheel-label" style="transform: rotate(108deg) translate(70px) rotate(90deg);">20 🪙</div>
+            <div class="wheel-label" style="transform: rotate(180deg) translate(70px) rotate(90deg);">50 🪙</div>
+            <div class="wheel-label" style="transform: rotate(252deg) translate(70px) rotate(90deg);">JACKPOT 💎</div>
+            <div class="wheel-label" style="transform: rotate(324deg) translate(70px) rotate(90deg);">+50 XP 🌟</div>
+        </div>
     </div>
 
     <button class="btn" id="spinBtn" onclick="spinWheel()">Drehen (15 🪙)</button>
