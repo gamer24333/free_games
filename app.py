@@ -487,6 +487,13 @@ def global_stats():
     
     return render_template('stats.html', efficiency=efficiency_list, scores=scores_dict)
 
+@app.route('/shop')
+def shop_page():
+    if 'username' not in session: return redirect(url_for('login'))
+    me = session['username']
+    user = UserSetting.query.filter_by(username=me).first()
+    return render_template('shop.html', name=me, user_coins=(user.coins if user else 0))
+
 
 @app.route('/api/redeem-code', methods=['POST'])
 def redeem_code():
