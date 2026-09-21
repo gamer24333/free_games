@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glücksrad</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 40px; }
+        .btn { display: inline-block; padding: 12px 25px; background: #9b59b6; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; font-size: 18px; margin-top: 20px;}
+        .btn:hover { background: #8e44ad; }
+        
+        .wheel-container {
+            margin: 50px auto;
+            width: 250px;
+            height: 250px;
+            border-radius: 50%;
+            border: 5px solid #f1c40f;
+            background: conic-gradient(
+                #e74c3c 0deg 72deg,
+                #3498db 72deg 144deg,
+                #2ecc71 144deg 216deg,
+                #f1c40f 216deg 288deg,
+                #9b59b6 288deg 360deg
+            );
+            position: relative;
+            transition: transform 3s cubic-bezier(0.25, 0.1, 0.25, 1);
+            box-shadow: 0 0 30px rgba(241, 196, 15, 0.5);
+        }
+        
+        .pointer {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid white;
+            z-index: 10;
+        }
+
+        #result { margin-top: 30px; font-size: 24px; font-weight: bold; color: #f1c40f; height: 30px; }
+    </style>
+</head>
+<body>
+
+    <a href="/welcome" class="btn" style="position: absolute; top: 20px; left: 20px; font-size: 14px; background: #555;">⬅ Zurück</a>
+
+    <h1 style="color: #9b59b6;">🎰 Das Glücksrad</h1>
+    <p>Einsatz: <b>15 Münzen</b> pro Drehung. Deine Münzen: <span id="coinBalance" style="color: #f1c40f;">{{ coins }} 🪙</span></p>
+
+    <div style="position: relative; width: 250px; margin: 0 auto;">
+        <div class="pointer"></div>
+        <div class="wheel-container" id="wheel"></div>
+    </div>
+
+    <button class="btn" id="spinBtn" onclick="spinWheel()">Drehen (15 🪙)</button>
+    <div id="result"></div>
+
+    <script>
+        let currentRotation = 0;
+        let isSpinning = false;
+
+        async function spinWheel() {
+            if (isSpinning) return;
+            
+            const resultDiv = document.getElementById('result');
+            const wheel = document.getElementById('wheel');
+            const coinSpan = document.getElementById('coinBalance');
+            
+            resultDiv.textContent = "";
+
+            try {
+                const res = await fetch('/api/spin-wheel', { method: 'POST' });
+                const data = await res.json();
+                
+                if (!res.ok) {
+                    alert("❌ " + data.error);
+                    return;
+                }
+
+                isSpinning = true;
+                document.getElementById('spinBtn').style.opacity = '0.5';
+
+                // Visuelle Rotation (Extra Rotationen + ein Zufallswinkel)
+                const extraSpins = 360 * 5; 
+                const randomOffset = Math.floor(Math.random() * 360);
+                currentRotation += extraSpins + randomOffset;
+                
+                wheel.style.transform = `rotate(${currentRotation}deg)`;
+
+                // Warten bis die Animation fertig ist (3 Sekunden)
+                setTimeout(() => {
+                    resultDiv.textContent = data.text;
+                    coinSpan.textContent = data.new_balance + " 🪙";
+                    isSpinning = false;
+                    document.getElementById('spinBtn').style.opacity = '1';
+                }, 3000);
+
+            } catch (e) {
+                alert("Verbindungsfehler.");
+            }
+        }
+    </script>
+</body>
+</html>
