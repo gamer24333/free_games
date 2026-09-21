@@ -5,19 +5,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Glücksrad</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 30px; }
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 30px; user-select: none; }
         .btn { display: inline-block; padding: 12px 25px; background: #9b59b6; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; font-size: 18px; margin-top: 15px;}
         .btn:hover { background: #8e44ad; }
         
-        .wheel-container {
+        .wheel-area {
+            position: relative;
+            width: 320px;
+            height: 320px;
             margin: 30px auto;
+        }
+
+        /* Der verborgene Code, der hinter dem Rad liegt */
+        .hidden-code-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1a1a1a;
+            border: 2px dashed #9b59b6;
+            padding: 20px;
+            border-radius: 12px;
+            width: 200px;
+            text-align: center;
+            box-shadow: 0 0 15px rgba(155, 89, 182, 0.3);
+            z-index: 1;
+        }
+
+        .wheel-wrapper {
+            position: absolute;
+            top: 0;
+            left: 20px;
+            width: 280px;
+            height: 280px;
+            z-index: 5;
+            cursor: grab;
+            touch-action: none;
+            transition: transform 0.2s ease-out;
+        }
+        .wheel-wrapper:active { cursor: grabbing; }
+
+        .wheel-container {
             width: 280px;
             height: 280px;
             border-radius: 50%;
             border: 6px solid #f1c40f;
-            /* Exakte Segment-Grössen passend zu den neuen Wahrscheinlichkeiten */
             background: conic-gradient(
-                #e74c3c 0deg 216deg,     /* Niete: 60% */
+                #e74c3c 0deg 216deg,      /* Niete: 60% */
                 #3498db 216deg 306deg,   /* 20 Münzen: 25% */
                 #2ecc71 306deg 342deg,   /* 50 Münzen: 10% */
                 #f1c40f 342deg 356.4deg, /* Jackpot: 4% */
@@ -67,15 +101,26 @@
     <h1 style="color: #9b59b6; margin-top: 40px;">🎰 Das Glücksrad</h1>
     <p>Einsatz: <b>15 Münzen</b> pro Drehung. Deine Münzen: <span id="coinBalance" style="color: #f1c40f;">{{ coins }} 🪙</span></p>
 
-    <div style="position: relative; width: 280px; margin: 0 auto;">
-        <div class="pointer"></div>
-        <div class="wheel-container" id="wheel"></div>
+    <!-- Rad & Versteckter Code Bereich -->
+    <div class="wheel-area">
+        <!-- Versteckter Code darunter -->
+        <div class="hidden-code-box">
+            <span style="font-size: 12px; color: #aaa;">✨ Gefunden! ✨</span>
+            <p style="margin: 5px 0 2px 0; font-size: 13px; color: #ccc;">Geheimer XP-Code:</p>
+            <b style="color: #f1c40f; font-size: 16px; letter-spacing: 1px; user-select: all;">WHEELXP</b>
+        </div>
+
+        <!-- Verschiebbares Rad -->
+        <div class="wheel-wrapper" id="wheelWrapper">
+            <div class="pointer"></div>
+            <div class="wheel-container" id="wheel"></div>
+        </div>
     </div>
 
     <button class="btn" id="spinBtn" onclick="spinWheel()">Drehen (15 🪙)</button>
     <div id="result"></div>
 
-    <!-- Übersicht der neuen Gewinnchancen -->
+    <!-- Übersicht der Gewinnchancen -->
     <div class="odds-box">
         <h3>📊 Segmente & Gewinnchancen</h3>
         <div class="odd-item"><span style="display: flex; align-items: center;"><span class="color-dot" style="background: #e74c3c;"></span>😭 Niete (0 🪙)</span> <strong>60%</strong></div>
@@ -89,7 +134,33 @@
         let currentRotation = 0;
         let isSpinning = false;
 
-        // Angepasste Grad-Bereiche für die neuen Segmentgrößen
+        // Verschiebe-Logik per Maus / Touch (Drag & Drop fürs Rad)
+        const wheelWrapper = document.getElementById('wheelWrapper');
+        let isDragging = false;
+        let startX = 0;
+        let currentX = 0;
+
+        wheelWrapper.addEventListener('pointerdown', (e) => {
+            isDragging = true;
+            startX = e.clientX - currentX;
+            wheelWrapper.setPointerCapture(e.pointerId);
+        });
+
+        wheelWrapper.addEventListener('pointermove', (e) => {
+            if (!isDragging) return;
+            currentX = e.clientX - startX;
+            // Begrenzung, damit man es nicht komplett aus dem Bildschirm zieht
+            if (currentX < -130) currentX = -130;
+            if (currentX > 130) currentX = 130;
+            wheelWrapper.style.transform = `translateX(${currentX}px)`;
+        });
+
+        wheelWrapper.addEventListener('pointerup', (e) => {
+            isDragging = false;
+            wheelWrapper.releasePointerCapture(e.pointerId);
+        });
+
+        // Angepasste Grad-Bereiche für die Segmentgrößen
         const segmentAngles = {
             'niete': {min: 10, max: 200},
             '20coins': {min: 226, max: 296},
