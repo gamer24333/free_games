@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tower Stack - Tank Royale Portal</title>
+    <style>
+        html, body {
+            margin: 0; padding: 0; height: 100%;
+            background-color: #222; font-family: Arial, sans-serif;
+            color: white; display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        .header-bar { background-color: #161616; padding: 10px; text-align: center; border-bottom: 2px solid #2d2d2d; z-index: 10; }
+        .main-content { flex: 1; display: flex; justify-content: center; align-items: flex-start; gap: 30px; padding: 20px; flex-wrap: wrap; overflow-y: auto; }
+        
+        h1 { margin: 0; font-size: 22px; color: #ffd700; display: inline-block; vertical-align: middle; }
+        .btn { display: inline-block; padding: 8px 16px; background: #555; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; border: none; }
+        .btn:hover { background: #444; }
+        .btn-back { float: left; }
+
+        .game-container { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .game-controls-info {
+            display: flex; flex-direction: column; width: 400px; font-size: 14px; color: #ccc;
+            padding: 10px; background: #1a1a1a; border-radius: 8px; border: 1px solid #333; gap: 8px; box-sizing: border-box;
+        }
+        .info-row { display: flex; justify-content: space-between; width: 100%; }
+        .fullscreen-link { color: #ff9f43; text-decoration: underline; cursor: pointer; font-weight: bold; }
+        .fullscreen-link:hover { color: #e08b35; }
+
+        #gameCanvas {
+            border: 4px solid #ffd700; border-radius: 12px; background: #111;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.6); display: block;
+        }
+
+        .game-container:fullscreen { background-color: #111; width: 100vw; height: 100vh; justify-content: center; }
+        .game-container:-webkit-full-screen { background-color: #111; width: 100vw; height: 100vh; justify-content: center; }
+        .game-container:fullscreen #gameCanvas { height: 90vh !important; width: auto !important; max-width: 90vw !important; aspect-ratio: 4/6; }
+        .game-container:-webkit-full-screen #gameCanvas { height: 90vh !important; width: auto !important; max-width: 90vw !important; aspect-ratio: 4/6; }
+        .game-container:fullscreen .game-controls-info { width: auto !important; max-width: 90vw !important; font-size: 16px; min-width: 400px; }
+        .game-container:-webkit-full-screen .game-controls-info { width: auto !important; max-width: 90vw !important; font-size: 16px; min-width: 400px; }
+
+        .leaderboard-box { background: #333; border: 2px solid #444; border-radius: 12px; width: 280px; padding: 20px; box-sizing: border-box; text-align: left; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .leaderboard-table th, .leaderboard-table td { padding: 6px 8px; border-bottom: 1px solid #444; text-align: left; font-size: 14px; }
+        .leaderboard-table th { color: #ffd700; }
+        .leaderboard-table tr:nth-child(1) td { color: #ffd700; font-weight: bold; }
+
+        .rainbow-text {
+            background: linear-gradient(90deg, #ff2e63, #f1c40f, #2ecc71, #00adb5, #9b59b6, #ff2e63);
+            background-size: 200% auto;
+            color: transparent;
+            -webkit-background-clip: text;
+            animation: rainbowAnim 3s linear infinite;
+        }
+        @keyframes rainbowAnim { 
+            0% { background-position: 0% 50%; } 
+            100% { background-position: 200% 50%; } 
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-bar">
+        <a href="/games" class="btn btn-back">⬅️ Zurück</a>
+        <h1>🗼 Tower Stack</h1>
+    </div>
+
+    <div class="main-content">
+        <div class="game-container">
+            <canvas id="gameCanvas" width="400" height="600"></canvas>
+            
+            <div class="game-controls-info">
+                <div class="info-row">
+                    <span>🎮 <b>Leertaste</b> oder <b>Klick</b></span>
+                    <span id="fullscreenLink" class="fullscreen-link" onclick="toggleFullscreen()">📺 [F] Vollbild</span>
+                    <span>Plattform fallen lassen</span>
+                </div>
+                <div class="info-row">
+                    <span style="color: #ffd700;">Staple die Blöcke perfekt aufeinander!</span>
+                    <span>Punkte: <b id="scoreText" style="color: #39ff14; font-size:16px;">0</b></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="leaderboard-box">
+            <h3 style="margin-top: 0; color: #ffd700; text-align: center; margin-bottom: 5px;">🏆 Rangliste</h3>
+            <table class="leaderboard-table">
+                <thead><tr><th>Platz</th><th>Name</th><th>Punkte</th></tr></thead>
+                <tbody>
+                    {% for player, score in leaderboard %}
+                    {% set p_meta = meta.get(player, {'color': 'white', 'title': '', 'display_name': player}) %}
+                    <tr>
+                        <td>{{ loop.index }}.</td>
+                        <td>
+                            <span class="{% if p_meta.color == 'rainbow' %}rainbow-text{% endif %}" 
+                                  style="{% if p_meta.color != 'rainbow' %}color: {{ p_meta.color }};{% endif %} font-weight: bold;">
+                                {{ p_meta.display_name if p_meta.display_name else player }}
+                            </span>
+                            {% if p_meta.title %}
+                                <span style="font-size: 11px; color: #aaa; margin-left: 5px;">{{ p_meta.title }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ score }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        window.focus();
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('scoreText');
+        const gameContainer = document.querySelector('.game-container');
+        const fullscreenLink = document.getElementById('fullscreenLink');
+
+        let score = 0;
+        let isGameOver = false;
+        let gameStarted = false;
+
+        let stack = [];
+        let currentBlock = null;
+        let blockWidth = 150;
+        let blockHeight = 30;
+        let moveSpeed = 3;
+        let cameraY = 0;
+        let targetCameraY = 0;
+
+        function resetGame() {
+            score = 0;
+            scoreEl.textContent = 0;
+            isGameOver = false;
+            gameStarted = false;
+            stack = [];
+            cameraY = 0;
+            targetCameraY = 0;
+            blockWidth = 150;
+            moveSpeed = 3;
+
+            // Basis-Plattform unten
+            stack.push({
+                x: canvas.width / 2 - blockWidth / 2,
+                y: canvas.height - 70,
+                w: blockWidth,
+                h: blockHeight,
+                color: '#ffd700'
+            });
+
+            spawnNewBlock();
+        }
+
+        function spawnNewBlock() {
+            let lastBlock = stack[stack.length - 1];
+            let nextY = lastBlock.y - blockHeight;
+            let startX = Math.random() > 0.5 ? -blockWidth : canvas.width;
+            
+            // Richtungswechsel je nach Startposition
+            currentBlock = {
+                x: startX,
+                y: nextY,
+                w: blockWidth,
+                h: blockHeight,
+                dx: startX < 0 ? moveSpeed : -moveSpeed,
+                color: `hsl(${score * 25 % 360}, 90%, 60%)`
+            };
+        }
+
+        function dropBlock() {
+            if (isGameOver) {
+                resetGame();
+                gameStarted = true;
+                return;
+            }
+
+            if (!gameStarted) {
+                gameStarted = true;
+            }
+
+            let lastBlock = stack[stack.length - 1];
+            
+            // Berechne Überlappung
+            let left = Math.max(currentBlock.x, lastBlock.x);
+            let right = Math.min(currentBlock.x + currentBlock.w, lastBlock.x + lastBlock.w);
+            let overlap = right - left;
+
+            if (overlap <= 0) {
+                // Komplett verfehlt -> Game Over
+                isGameOver = true;
+                currentBlock.dx = 0;
+                triggerGameOver();
+                return;
+            }
+
+            // Erfolgreicher Treffer: Breite anpassen
+            currentBlock.x = left;
+            currentBlock.w = overlap;
+            blockWidth = overlap; // Nächster Block wird auch schmaler (macht es schwerer!)
+
+            stack.push(currentBlock);
+            score++;
+            scoreEl.textContent = score;
+
+            // Schwierigkeit leicht erhöhen
+            moveSpeed = Math.min(7, 3 + score * 0.15);
+
+            // Kamera-Ziel nach oben verschieben, wenn der Turm wächst
+            if (stack.length > 5) {
+                targetCameraY += blockHeight;
+            }
+
+            spawnNewBlock();
+        }
+
+        // Steuerung
+        window.addEventListener('keydown', e => {
+            if (e.key === ' ' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                dropBlock();
+            }
+            if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); }
+        });
+
+        canvas.addEventListener('click', () => {
+            dropBlock();
+        });
+
+        function update() {
+            if (!gameStarted || isGameOver) return;
+
+            // Block hin- und herbewegen
+            currentBlock.x += currentBlock.dx;
+            if (currentBlock.x <= 0 || currentBlock.x + currentBlock.w >= canvas.width) {
+                currentBlock.dx *= -1;
+            }
+
+            // Sanftes Kamera-Gleiten nach oben
+            if (cameraY < targetCameraY) {
+                cameraY += (targetCameraY - cameraY) * 0.1;
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Neon Grid Background
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 1;
+            for(let i = 0; i < canvas.width; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke(); }
+            for(let i = 0; i < canvas.height; i += 40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke(); }
+
+            ctx.save();
+            ctx.translate(0, cameraY);
+
+            // Alle gestapelten Blöcke zeichnen
+            stack.forEach((b, index) => {
+                ctx.fillStyle = b.color;
+                ctx.shadowBlur = index === stack.length - 1 ? 15 : 5;
+                ctx.shadowColor = b.color;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(b.x, b.y, b.w, b.h, 6);
+                else ctx.fillRect(b.x, b.y, b.w, b.h);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            });
+
+            // Aktuellen bewegten Block zeichnen
+            if (currentBlock && !isGameOver) {
+                ctx.fillStyle = currentBlock.color;
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = currentBlock.color;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(currentBlock.x, currentBlock.y, currentBlock.w, currentBlock.h, 6);
+                else ctx.fillRect(currentBlock.x, currentBlock.y, currentBlock.w, currentBlock.h);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            ctx.restore();
+
+            // Start-Overlay
+            if (!gameStarted && !isGameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ffd700'; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'center';
+                ctx.fillText('Leertaste oder Klick', canvas.width / 2, canvas.height / 2 - 10);
+                ctx.fillStyle = '#fff'; ctx.font = '15px Arial';
+                ctx.fillText('zum Platzieren!', canvas.width / 2, canvas.height / 2 + 20);
+                ctx.textAlign = 'left';
+            }
+
+            // Game-Over-Overlay
+            if (isGameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ff5252'; ctx.font = 'bold 32px Arial'; ctx.textAlign = 'center';
+                ctx.fillText('TURM EINGESTÜRZT!', canvas.width / 2, canvas.height / 2 - 15);
+                ctx.fillStyle = '#fff'; ctx.font = '16px Arial';
+                ctx.fillText('Klicke für Neustart', canvas.width / 2, canvas.height / 2 + 25);
+                ctx.textAlign = 'left';
+            }
+        }
+
+        async function triggerGameOver() {
+            try {
+                await fetch('/api/submit-tower', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ score: score })
+                });
+            } catch(e) { console.error("Score Error:", e); }
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                if (gameContainer.requestFullscreen) { gameContainer.requestFullscreen(); }
+                else if (gameContainer.webkitRequestFullscreen) { gameContainer.webkitRequestFullscreen(); }
+                fullscreenLink.textContent = "📺 [F] Vollbild beenden";
+            } else {
+                if (document.exitFullscreen) { document.exitFullscreen(); }
+                fullscreenLink.textContent = "📺 [F] Vollbild";
+            }
+        }
+        
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) fullscreenLink.textContent = "📺 [F] Vollbild";
+        });
+
+        resetGame();
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+
+        window.onload = function() { window.focus(); };
+        document.addEventListener('click', function() { window.focus(); });
+
+        // --- AFK Detection & Ping System ---
+        let isAFK = false;
+        let afkTimer;
+        
+        function resetAFK() {
+            isAFK = false;
+            clearTimeout(afkTimer);
+            afkTimer = setTimeout(() => {
+                isAFK = true;
+            }, 120000); 
+        }
+
+        window.addEventListener('mousemove', resetAFK);
+        window.addEventListener('keydown', resetAFK);
+        window.addEventListener('mousedown', resetAFK);
+        window.addEventListener('touchstart', resetAFK);
+        resetAFK();
+
+        setInterval(() => {
+            let currentActivity = "Spielt Tower Stack"; 
+            fetch('/api/ping', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ activity: currentActivity, is_afk: isAFK }) 
+            }).catch(e => console.log(e));
+        }, 5000);
+    </script>
+</body>
+</html>
