@@ -20,6 +20,20 @@
         .gold-card th { background: #f1c40f; color: #222; }
         tr:hover { background: #444; }
         .highlight { font-weight: bold; color: #2ecc71; }
+
+        /* Rainbow-Animation für Shop-Farben */
+        .rainbow-text {
+            background: linear-gradient(90deg, #ff2e63, #f1c40f, #2ecc71, #00adb5, #9b59b6, #ff2e63);
+            background-size: 200% auto;
+            color: transparent;
+            -webkit-background-clip: text;
+            animation: rainbowAnim 3s linear infinite;
+        }
+        @keyframes rainbowAnim { 
+            0% { background-position: 0% 50%; } 
+            100% { background-position: 200% 50%; } 
+        }
+        
     </style>
 </head>
 <body>
