@@ -50,9 +50,18 @@
             <table>
                 <tr><th>Rang</th><th>Spieler</th><th>Score-Punkte</th><th>Gesamt-Spielzeit</th><th>Effizienz-Wert</th></tr>
                 {% for p in efficiency[:10] %}
+                {% set p_meta = meta.get(p.name, {'color': '', 'title': ''}) %}
                 <tr>
                     <td>#{{ loop.index }}</td>
-                    <td>{{ p.name }}</td>
+                    <td>
+                        <span class="{% if p_meta.color == 'rainbow' %}rainbow-text{% endif %}" 
+                              style="{% if p_meta.color and p_meta.color != 'rainbow' %}color: {{ p_meta.color }};{% endif %} font-weight: bold;">
+                            {{ p.name }}
+                        </span>
+                        {% if p_meta.title %}
+                            <span style="font-size: 11px; color: #aaa; margin-left: 5px;">{{ p_meta.title }}</span>
+                        {% endif %}
+                    </td>
                     <td>{{ p.points }}</td>
                     <td>{{ p.playtime_min }} Min.</td>
                     <td class="highlight">{{ p.efficiency }} ⚡</td>
@@ -60,7 +69,6 @@
                 {% endfor %}
             </table>
         </div>
-
         <!-- Spielzeit pro Spiel -->
         <div class="card">
             <h2 style="margin-top:0;">⏱️ Eure Spielzeiten (in Minuten)</h2>
@@ -78,8 +86,17 @@
                     <th>Neon Jump</th>
                 </tr>
                 {% for name, s in scores.items() %}
+                {% set p_meta = meta.get(name, {'color': '', 'title': ''}) %}
                 <tr>
-                    <td><b>{{ name }}</b></td>
+                    <td>
+                        <span class="{% if p_meta.color == 'rainbow' %}rainbow-text{% endif %}" 
+                              style="{% if p_meta.color and p_meta.color != 'rainbow' %}color: {{ p_meta.color }};{% endif %} font-weight: bold;">
+                            {{ name }}
+                        </span>
+                        {% if p_meta.title %}
+                            <span style="font-size: 11px; color: #aaa; margin-left: 5px;">{{ p_meta.title }}</span>
+                        {% endif %}
+                    </td>
                     <td>{{ ((s.playtime_speedtyping or 0) / 60) | round | int }}m</td>
                     <td>{{ ((s.playtime_clicker or 0) / 60) | round | int }}m</td>
                     <td>{{ ((s.playtime_flappy or 0) / 60) | round | int }}m</td>
