@@ -99,7 +99,6 @@ for i in range(3):
 # --- GEHEIMCODES ---
 GEHEIME_CODES = {
     "TILLISTDERBESTEADMIN": "double_score",
-    "HACKER": "admin",
     "REICHTUM": "1000_coins",
     "ESREGNETMÜNZEN": "100_coins", # NEUER CODE
     "WHEELXP": "100_xp"
