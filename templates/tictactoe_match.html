@@ -34,6 +34,12 @@
         const me = "{{ me }}";
         let myTurn = false;
 
+        const playerMeta = {{ meta | tojson if meta is defined else '{}' }};
+        function getDisplayName(username) {
+            if (!username) return "";
+            return (playerMeta[username] && playerMeta[username].display_name) ? playerMeta[username].display_name : username;
+        }
+
         async function updateBoard() {
             try {
                 const response = await fetch(`/api/tictactoe/status/${gameId}`);
@@ -57,12 +63,12 @@
                             document.getElementById('statusLabel').textContent = "DU bist dran! 🟢";
                             myTurn = true;
                         } else {
-                            document.getElementById('statusLabel').textContent = `Warte auf ${game.turn}... ⏳`;
+                            document.getElementById('statusLabel').textContent = `Warte auf ${getDisplayName(game.turn)}... ⏳`;
                             myTurn = false;
                         }
                     } else if (game.status.startsWith("gewonnen")) {
                         const winner = game.status.split("_")[1];
-                        document.getElementById('statusLabel').textContent = winner === me ? "🎉 DU HAST GEWONNEN! 🎉" : `❌ ${winner} hat gewonnen!`;
+                        document.getElementById('statusLabel').textContent = winner === me ? "🎉 DU HAST GEWONNEN! 🎉" : `❌ ${getDisplayName(winner)} hat gewonnen!`;
                         myTurn = false;
                     } else if (game.status === "unentschieden") {
                         document.getElementById('statusLabel').textContent = "🤝 Unentschieden!";
