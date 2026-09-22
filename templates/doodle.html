@@ -93,7 +93,7 @@
                 <tbody>
     {% for player, score in leaderboard %}
     <!-- Lade die Daten für diesen spezifischen Spieler (Standard: Weiß und kein Titel) -->
-    {% set p_meta = meta.get(player, {'color': 'white', 'title': ''}) %}
+    {% set p_meta = meta.get(player, {'color': 'white', 'title': '', 'display_name': player}) %}
     
     <tr>
         <td>{{ loop.index }}.</td>
@@ -101,7 +101,7 @@
             <!-- Wenn die Farbe "rainbow" ist, nutzen wir CSS, ansonsten die normale Hex-Farbe -->
             <span class="{% if p_meta.color == 'rainbow' %}rainbow-text{% endif %}" 
                   style="{% if p_meta.color != 'rainbow' %}color: {{ p_meta.color }};{% endif %} font-weight: bold;">
-                {{ player }}
+                {{ p_meta.display_name if p_meta.display_name else player }}
             </span>
             <!-- Zeige den Titel kleiner und in Grau daneben an, falls einer existiert -->
             {% if p_meta.title %}
