@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Dino - Tank Royale Portal</title>
+    <style>
+        html, body {
+            margin: 0; padding: 0; height: 100%;
+            background-color: #222; font-family: Arial, sans-serif;
+            color: white; display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        .header-bar { background-color: #161616; padding: 10px; text-align: center; border-bottom: 2px solid #2d2d2d; z-index: 10; }
+        .main-content { flex: 1; display: flex; justify-content: center; align-items: flex-start; gap: 30px; padding: 20px; flex-wrap: wrap; overflow-y: auto; }
+        .footer-bar { background-color: #161616; padding: 12px 10px; text-align: center; border-top: 2px solid #2d2d2d; font-size: 14px; color: #ccc; z-index: 10; }
+
+        h1 { margin: 0; font-size: 22px; color: #39ff14; display: inline-block; vertical-align: middle; }
+        .btn { display: inline-block; padding: 8px 16px; background: #555; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; border: none; }
+        .btn:hover { background: #444; }
+        .btn-back { float: left; }
+
+        .game-container { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .game-controls-info {
+            display: flex; flex-direction: column; width: 400px; font-size: 14px; color: #ccc;
+            padding: 10px; background: #1a1a1a; border-radius: 8px; border: 1px solid #333; gap: 8px; box-sizing: border-box;
+        }
+        .info-row { display: flex; justify-content: space-between; width: 100%; }
+        .fullscreen-link { color: #ff9f43; text-decoration: underline; cursor: pointer; font-weight: bold; }
+        .fullscreen-link:hover { color: #e08b35; }
+
+        #gameCanvas {
+            border: 4px solid #39ff14; border-radius: 12px; background: #111;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.6); display: block; outline: none;
+        }
+
+        .game-container:fullscreen { background-color: #111; width: 100vw; height: 100vh; justify-content: center; }
+        .game-container:-webkit-full-screen { background-color: #111; width: 100vw; height: 100vh; justify-content: center; }
+        .game-container:fullscreen #gameCanvas { height: 80vh !important; width: auto !important; max-width: 90vw !important; aspect-ratio: 4/3; }
+        .game-container:-webkit-full-screen #gameCanvas { height: 80vh !important; width: auto !important; max-width: 90vw !important; aspect-ratio: 4/3; }
+        .game-container:fullscreen .game-controls-info { width: auto !important; max-width: 90vw !important; font-size: 16px; min-width: 400px; }
+        .game-container:-webkit-full-screen .game-controls-info { width: auto !important; max-width: 90vw !important; font-size: 16px; min-width: 400px; }
+
+        .leaderboard-box { background: #333; border: 2px solid #444; border-radius: 12px; width: 280px; padding: 20px; box-sizing: border-box; text-align: left; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .leaderboard-table th, .leaderboard-table td { padding: 6px 8px; border-bottom: 1px solid #444; text-align: left; font-size: 14px; }
+        .leaderboard-table th { color: #39ff14; }
+        .leaderboard-table tr:nth-child(1) td { color: #ffd700; font-weight: bold; }
+
+        .rainbow-text {
+            background: linear-gradient(90deg, #ff2e63, #f1c40f, #2ecc71, #00adb5, #9b59b6, #ff2e63);
+            background-size: 200% auto;
+            color: transparent;
+            -webkit-background-clip: text;
+            animation: rainbowAnim 3s linear infinite;
+        }
+        @keyframes rainbowAnim { 
+            0% { background-position: 0% 50%; } 
+            100% { background-position: 200% 50%; } 
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-bar">
+        <a href="/games" class="btn btn-back" onclick="stopMusic()">⬅️ Zurück</a>
+        <h1>🦖 Neon Dino</h1>
+    </div>
+
+    <div class="main-content">
+        <div class="game-container" style="position: relative;">
+            <canvas id="gameCanvas" width="600" height="300" tabindex="0"></canvas>
+            
+            <div class="game-controls-info">
+                <div class="info-row">
+                    <span>🎮 <b>Leertaste / Pfeil hoch</b> zum Springen</span>
+                    <span id="fullscreenLink" class="fullscreen-link" onclick="toggleFullscreen()">📺 [F] Vollbild</span>
+                </div>
+                <div class="info-row">
+                    <span>⏸️ <b>ESC</b> / <b>P</b> Pause</span>
+                    <span>Punkte: <b id="scoreText" style="color: #39ff14; font-size:16px;">0</b></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="leaderboard-box">
+            <h3 style="margin-top: 0; color: #39ff14; text-align: center; margin-bottom: 5px;">🏆 Rangliste</h3>
+            <table class="leaderboard-table">
+                <thead><tr><th>Platz</th><th>Name</th><th>Score</th></tr></thead>
+                <tbody>
+                    {% for player, score in leaderboard %}
+                    {% set p_meta = meta.get(player, {'color': 'white', 'title': '', 'display_name': player}) %}
+                    <tr>
+                        <td>{{ loop.index }}.</td>
+                        <td>
+                            <span class="{% if p_meta.color == 'rainbow' %}rainbow-text{% endif %}" 
+                                  style="{% if p_meta.color != 'rainbow' %}color: {{ p_meta.color }};{% endif %} font-weight: bold;">
+                                {{ p_meta.display_name if p_meta.display_name else player }}
+                            </span>
+                            {% if p_meta.title %}
+                                <span style="font-size: 11px; color: #aaa; margin-left: 5px;">{{ p_meta.title }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ score }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="footer-bar">Springe über die Cyber-Hindernisse und stelle den Highscore auf! ⚡</div>
+
+    <script>
+        window.focus();
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('scoreText');
+        const gameContainer = document.querySelector('.game-container');
+        const fullscreenLink = document.getElementById('fullscreenLink');
+
+        let lastTime = performance.now();
+
+        // --- WEB AUDIO API MUSIK ---
+        let audioCtx = null;
+        let audioBuffer = null;
+        let audioSource = null;
+
+        async function playMusic() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+            if (!audioBuffer) {
+                try {
+                    let response = await fetch('/static/dino.mp3');
+                    let arrayBuffer = await response.arrayBuffer();
+                    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                } catch (e) { console.error("Audio Fehler:", e); return; }
+            }
+
+            if (!audioSource && gameStarted && !isPaused && !isGameOver) {
+                audioSource = audioCtx.createBufferSource();
+                audioSource.buffer = audioBuffer;
+                audioSource.loop = true;
+                let gainNode = audioCtx.createGain();
+                gainNode.gain.value = 0.4;
+                audioSource.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                audioSource.start();
+            }
+        }
+
+        function stopMusic() {
+            if (audioSource) {
+                try { audioSource.stop(); } catch(e){}
+                audioSource.disconnect();
+                audioSource = null;
+            }
+        }
+
+        // --- SPIELVARIABLEN ---
+        let dino, obstacles, score, gameStarted, isGameOver, isPaused, gameSpeed;
+        const GRAVITY = 0.6;
+        const JUMP_FORCE = -11;
+
+        function resetGame() {
+            stopMusic();
+            dino = { x: 50, y: 210, w: 30, h: 40, dy: 0, grounded: true };
+            obstacles = [];
+            score = 0;
+            scoreEl.textContent = 0;
+            gameSpeed = 6;
+            isGameOver = false;
+            gameStarted = false;
+            isPaused = false;
+        }
+
+        function spawnObstacle() {
+            let h = Math.floor(Math.random() * 25) + 25;
+            let w = Math.floor(Math.random() * 20) + 20;
+            obstacles.push({
+                x: canvas.width,
+                y: 250 - h,
+                w: w,
+                h: h,
+                color: Math.random() > 0.5 ? '#ff2e63' : '#00adb5'
+            });
+        }
+
+        let obstacleTimer = 0;
+
+        // --- STEUERUNG & BOT-ERKENNUNG ---
+        window.addEventListener('keydown', e => {
+            const k = e.key.toLowerCase();
+            
+            if ([' ', 'arrowup', 'w'].includes(k)) {
+                e.preventDefault();
+                detectBot(e);
+                
+                if (!gameStarted) {
+                    gameStarted = true;
+                    playMusic();
+                } else if (isGameOver) {
+                    resetGame();
+                    gameStarted = true;
+                    playMusic();
+                    return;
+                } else if (dino.grounded && !isPaused) {
+                    dino.dy = JUMP_FORCE;
+                    dino.grounded = false;
+                }
+            }
+
+            if (k === 'f') { toggleFullscreen(); return; }
+            if (k === 'p' || k === 'escape') {
+                if (gameStarted && !isGameOver) isPaused = !isPaused;
+                if (isPaused) stopMusic();
+                else if (gameStarted && !isGameOver) playMusic();
+            }
+        });
+
+        canvas.addEventListener('click', (e) => {
+            canvas.focus();
+            detectBot(e);
+            if (!gameStarted) {
+                gameStarted = true;
+                playMusic();
+            } else if (isGameOver) {
+                resetGame();
+                gameStarted = true;
+                playMusic();
+            } else if (dino.grounded && !isPaused) {
+                dino.dy = JUMP_FORCE;
+                dino.grounded = false;
+            }
+        });
+
+        function update(deltaTime) {
+            if (!gameStarted || isGameOver || isPaused) return;
+
+            score += deltaTime * 10;
+            scoreEl.textContent = Math.floor(score);
+
+            // Dynamische Beschleunigung
+            gameSpeed = 6 + Math.floor(score / 100) * 0.5;
+
+            // Dino Physik
+            dino.dy += GRAVITY;
+            dino.y += dino.dy;
+
+            if (dino.y > 210) {
+                dino.y = 210;
+                dino.dy = 0;
+                dino.grounded = true;
+            }
+
+            // Hindernisse bewegen
+            obstacleTimer += deltaTime;
+            if (obstacleTimer > (1.2 - Math.min(gameSpeed * 0.03, 0.6))) {
+                spawnObstacle();
+                obstacleTimer = 0;
+            }
+
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let obs = obstacles[i];
+                obs.x -= gameSpeed;
+
+                // Kollisionsabfrage (AABB)
+                if (
+                    dino.x < obs.x + obs.w &&
+                    dino.x + dino.w > obs.x &&
+                    dino.y < obs.y + obs.h &&
+                    dino.y + dino.h > obs.y
+                ) {
+                    triggerGameOver();
+                }
+
+                // Entfernen, wenn aus dem Bild
+                if (obs.x + obs.w < 0) {
+                    obstacles.splice(i, 1);
+                }
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Neon Grid Bodenlinie
+            ctx.strokeStyle = '#39ff14';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, 250);
+            ctx.lineTo(canvas.width, 250);
+            ctx.stroke();
+
+            // Hindernisse zeichnen
+            obstacles.forEach(obs => {
+                ctx.fillStyle = obs.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = obs.color;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(obs.x, obs.y, obs.w, obs.h, 4);
+                else ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            });
+
+            // Dino zeichnen
+            ctx.fillStyle = '#39ff14';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#39ff14';
+            ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(dino.x, dino.y, dino.w, dino.h, 6);
+            else ctx.fillRect(dino.x, dino.y, dino.w, dino.h);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Dino Auge
+            ctx.fillStyle = '#111';
+            ctx.fillRect(dino.x + 18, dino.y + 8, 4, 4);
+
+            // Overlays
+            if (!gameStarted && !isGameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#39ff14'; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'center';
+                ctx.fillText('Leertaste oder Klick zum Starten', canvas.width / 2, canvas.height / 2);
+                ctx.textAlign = 'left';
+            }
+
+            if (isPaused) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ffeb3b'; ctx.font = 'bold 32px Arial'; ctx.textAlign = 'center';
+                ctx.fillText('PAUSIERT', canvas.width / 2, canvas.height / 2);
+                ctx.textAlign = 'left';
+            }
+
+            if (isGameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ff5252'; ctx.font = 'bold 32px Arial'; ctx.textAlign = 'center';
+                ctx.fillText(isAutoclicker ? 'BOT / MAKRO ERKANNT! 🤖' : 'GAME OVER!', canvas.width / 2, canvas.height / 2 - 10);
+                ctx.fillStyle = '#fff'; ctx.font = '16px Arial';
+                ctx.fillText('Klicke oder drücke Leertaste für Neustart', canvas.width / 2, canvas.height / 2 + 30);
+                ctx.textAlign = 'left';
+            }
+        }
+
+        async function triggerGameOver() {
+            stopMusic();
+            isGameOver = true;
+            try {
+                await fetch('/api/submit-dino', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ score: Math.floor(score) })
+                });
+            } catch(e) { console.error("Score Error:", e); }
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                if (gameContainer.requestFullscreen) { gameContainer.requestFullscreen(); }
+                else if (gameContainer.webkitRequestFullscreen) { gameContainer.webkitRequestFullscreen(); }
+                fullscreenLink.textContent = "📺 [F] Vollbild beenden";
+            } else {
+                if (document.exitFullscreen) { document.exitFullscreen(); }
+                fullscreenLink.textContent = "📺 [F] Vollbild";
+            }
+        }
+        
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) fullscreenLink.textContent = "📺 [F] Vollbild";
+        });
+
+        resetGame();
+
+        function loop(timestamp) {
+            if (!timestamp) timestamp = performance.now();
+            let deltaTime = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+            if (deltaTime > 0.1) deltaTime = 0.016;
+
+            update(deltaTime);
+            draw();
+            requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+
+        window.onload = function() { window.focus(); };
+        document.addEventListener('click', function() { window.focus(); });
+
+        // --- AFK & BOT DETECTION SYSTEM ---
+        let isAFK = false;
+        let afkTimer;
+        let isAutoclicker = false;
+        let actionTimes = [];
+
+        function resetAFK() {
+            isAFK = false;
+            clearTimeout(afkTimer);
+            afkTimer = setTimeout(() => {
+                isAFK = true;
+            }, 120000); 
+        }
+
+        function detectBot(e) {
+            resetAFK();
+            
+            if (e && !e.isTrusted) {
+                isAutoclicker = true;
+                return;
+            }
+
+            let now = performance.now();
+            actionTimes.push(now);
+            if (actionTimes.length > 8) actionTimes.shift();
+
+            if (actionTimes.length === 8) {
+                let timeDiff = actionTimes[7] - actionTimes[0];
+                if (timeDiff < 150) {
+                    isAutoclicker = true;
+                }
+
+                let intervals = [];
+                for(let i = 1; i < actionTimes.length; i++) {
+                    intervals.push(actionTimes[i] - actionTimes[i-1]);
+                }
+                let avg = intervals.reduce((a,b) => a+b, 0) / intervals.length;
+                let variance = intervals.reduce((a,b) => a + Math.abs(b - avg), 0) / intervals.length;
+                
+                if (variance < 2 && avg > 10) {
+                    isAutoclicker = true;
+                }
+            }
+
+            if (isAutoclicker && !isGameOver) {
+                triggerGameOver();
+            }
+        }
+
+        window.addEventListener('mousemove', resetAFK);
+        window.addEventListener('mousedown', detectBot);
+        window.addEventListener('touchstart', resetAFK);
+        resetAFK();
+
+        setInterval(() => {
+            let currentActivity = "Spielt Neon Dino"; 
+            fetch('/api/ping', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    activity: currentActivity, 
+                    is_afk: isAFK,
+                    is_bot: isAutoclicker
+                }) 
+            }).catch(e => console.log(e));
+        }, 5000);
+    </script>
+</body>
+</html>
