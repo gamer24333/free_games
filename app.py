@@ -902,7 +902,7 @@ def admin_panel():
             if u.banned_until.year > 2090: banned_users[u.username] = "Permanent (Für immer)"
             else: banned_users[u.username] = u.banned_until.strftime("%d.%m.%Y - %H:%M Uhr")
     
-    return render_template('admin.html', pins=pins_dict, admins=admins_list, klassen_liste=KLASSEN_LISTE, banned_users=banned_users)
+    return render_template('admin.html', pins=pins_dict, admins=admins_list, klassen_liste=KLASSEN_LISTE, banned_users=banned_users, meta=get_user_metadata())
 
 @app.route('/admin/make-admin', methods=['POST'])
 def make_admin():
