@@ -113,7 +113,8 @@
                     <option value="" disabled selected>Wähle einen Gegner...</option>
                     {% for g in gegner_liste %}
                         {% if g != "Computer-Bot 🤖" %}
-                            <option value="{{ g }}">{{ g }}</option>
+                            {% set g_meta = meta.get(g, {'display_name': g}) %}
+                            <option value="{{ g }}">{{ g_meta.display_name if g_meta.display_name else g }}</option>
                         {% endif %}
                     {% endfor %}
                 </select>
