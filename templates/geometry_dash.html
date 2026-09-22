@@ -112,13 +112,13 @@
                 </thead>
                 <tbody>
                     {% for player, score in leaderboard %}
-                    {% set p_meta = meta.get(player, {'color': 'white', 'title': ''}) %}
+                    {% set p_meta = meta.get(player, {'color': 'white', 'title': '', 'display_name': player}) %}
                     <tr>
                         <td>{{ loop.index }}.</td>
                         <td>
                             <span class="{% if p_meta.color == 'rainbow' %}rainbow-text{% endif %}" 
                                   style="{% if p_meta.color != 'rainbow' %}color: {{ p_meta.color }};{% endif %} font-weight: bold;">
-                                {{ player }}
+                                {{ p_meta.display_name if p_meta.display_name else player }}
                             </span>
                             {% if p_meta.title %}
                                 <span style="font-size: 11px; color: #aaa; margin-left: 5px;">{{ p_meta.title }}</span>
