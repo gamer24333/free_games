@@ -116,6 +116,7 @@ class AdminMessage(db.Model):
 class UserSetting(db.Model):
     __tablename__ = 'user_settings'
     username = db.Column(db.String(50), primary_key=True)
+    display_name = db.Column(db.String(50), nullable=True)
     pin = db.Column(db.String(20), nullable=True)
     is_admin = db.Column(db.Boolean, default=False)
     last_seen = db.Column(db.DateTime, nullable=True)
@@ -769,6 +770,8 @@ def dashboard():
         return redirect(url_for('login'))
     
     me = session['username']
+    user = UserSetting.query.filter_by(username=me).first()
+    display_name = user.display_name if (user and user.display_name) else me
     
     admin_msg = AdminMessage.query.filter((AdminMessage.target == 'alle') | (AdminMessage.target == me)).order_by(AdminMessage.id.desc()).first()
     
@@ -793,14 +796,13 @@ def dashboard():
     for g in tank_games:
         aktive_matches.append({"id": g.game_id, "von": f"Tank Royale vs. {g.gegner if g.ersteller == me else g.ersteller}", "is_active": True, "typ": "tankroyale"})
 
-    user = UserSetting.query.filter_by(username=me).first()
     is_admin = True if (me == "Till" or (user and user.is_admin)) else False
     
     lvl, rank = get_level_info(user.xp if user else 0)
     chpartner = sorted([s for s in KLASSEN_LISTE if s != me])
     
     return render_template('dashboard.html', 
-                           name=me, 
+                           name=display_name, 
                            einladungen=aktive_matches, 
                            is_admin=is_admin,
                            user_level=lvl, 
@@ -812,7 +814,7 @@ def dashboard():
                            spezial_nachricht_id=spezial_nachricht_id,
                            spezial_titel=spezial_titel,
                            spezial_text=spezial_text)
-
+    
 @app.route('/api/change-pin', methods=['POST'])
 def change_pin():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
