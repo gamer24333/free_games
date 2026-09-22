@@ -111,6 +111,20 @@
         .leaderboard-table th, .leaderboard-table td { padding: 8px; border-bottom: 1px solid #444; text-align: left; }
         .leaderboard-table th { color: #00adb5; }
         .leaderboard-table tr:nth-child(1) td { color: #ffd700; font-weight: bold; }
+
+        /* Rainbow-Animation für Shop-Farben */
+        .rainbow-text {
+            background: linear-gradient(90deg, #ff2e63, #f1c40f, #2ecc71, #00adb5, #9b59b6, #ff2e63);
+            background-size: 200% auto;
+            color: transparent;
+            -webkit-background-clip: text;
+            animation: rainbowAnim 3s linear infinite;
+        }
+        @keyframes rainbowAnim { 
+            0% { background-position: 0% 50%; } 
+            100% { background-position: 200% 50%; } 
+        }
+        
     </style>
 </head>
 <body>
@@ -145,9 +159,18 @@
                     </thead>
                     <tbody>
                         {% for player, score in leaderboard %}
+                        {% set p_meta = meta.get(player, {'color': 'white', 'title': ''}) %}
                         <tr>
                             <td>{{ loop.index }}.</td>
-                            <td>{{ player }}</td>
+                            <td>
+                                <span class="{% if p_meta.color == 'rainbow' %}rainbow-text{% endif %}" 
+                                      style="{% if p_meta.color != 'rainbow' %}color: {{ p_meta.color }};{% endif %} font-weight: bold;">
+                                    {{ player }}
+                                </span>
+                                {% if p_meta.title %}
+                                    <span style="font-size: 11px; color: #aaa; margin-left: 5px;">{{ p_meta.title }}</span>
+                                {% endif %}
+                            </td>
                             <td>{{ score }}</td>
                         </tr>
                         {% endfor %}
