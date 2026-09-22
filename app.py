@@ -19,7 +19,7 @@ if db_url and db_url.startswith("postgres://"):
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///local_portal.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# ---  Verhindert Verbindungsabbrüche (SSL closed unexpectedly) ---
+# --- Verhindert Verbindungsabbrüche (SSL closed unexpectedly) ---
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True,
     "pool_recycle": 300,
@@ -243,8 +243,9 @@ def get_user_metadata():
         
         titel_text = f"[{titles[0]}]" if len(titles) > 0 and titles[0] else ""
         farbe = u.active_color if u.active_color else "white"
+        display_n = u.display_name if u.display_name else u.username
         
-        meta[u.username] = {"color": farbe, "title": titel_text}
+        meta[u.username] = {"color": farbe, "title": titel_text, "display_name": display_n}
     return meta
 
 
@@ -468,7 +469,6 @@ def shop_return():
     u.inventory = json.dumps(inv)
     u.coins = (u.coins or 0) + price
     
-    # Unequip if currently active
     item = SHOP_ITEMS[item_id]
     if item["type"] == "title":
         try:
@@ -550,8 +550,10 @@ def global_stats():
         eff = round(pts / (total_min / 10), 2) 
         lvl, rank = get_level_info(u.xp)
         
+        display_n = u.display_name if u.display_name else u.username
+        
         efficiency_list.append({
-            'name': u.username,
+            'name': display_n,
             'points': pts,
             'playtime_min': round((u.playtime_total or 0) / 60),
             'efficiency': eff,
@@ -561,8 +563,6 @@ def global_stats():
         
     efficiency_list.sort(key=lambda x: x['points'], reverse=True)
     scores_dict = {s.username: s for s in all_scores}
-    
-    # NEU: Lade alle Farben und Titel für die globale Rangliste
     meta = get_user_metadata()
     
     return render_template('stats.html', efficiency=efficiency_list, scores=scores_dict, meta=meta)
@@ -572,7 +572,8 @@ def shop_page():
     if 'username' not in session: return redirect(url_for('login'))
     me = session['username']
     user = UserSetting.query.filter_by(username=me).first()
-    return render_template('shop.html', name=me, user_coins=(user.coins if user else 0))
+    display_name = user.display_name if (user and user.display_name) else me
+    return render_template('shop.html', name=display_name, user_coins=(user.coins if user else 0))
 
 @app.route('/api/redeem-code', methods=['POST'])
 def redeem_code():
@@ -674,7 +675,7 @@ def trade_coins():
     
     empfaenger_u = UserSetting.query.filter_by(username=empfaenger).first()
     if not empfaenger_u:
-        empfaenger_u = UserSetting(username=empfaenger)
+        empfaenger_u = UserSetting(username=empfaenger, display_name=empfaenger)
         db.session.add(empfaenger_u)
         
     sender_u.coins -= betrag
@@ -695,7 +696,8 @@ def wheel_page():
     if 'username' not in session: return redirect(url_for('login'))
     me = session['username']
     user = UserSetting.query.filter_by(username=me).first()
-    return render_template('gluecksrad.html', name=me, coins=(user.coins if user else 0))
+    display_name = user.display_name if (user and user.display_name) else me
+    return render_template('gluecksrad.html', name=display_name, coins=(user.coins if user else 0))
 
 @app.route('/api/spin-wheel', methods=['POST'])
 def spin_wheel():
@@ -752,10 +754,12 @@ def login():
             
             if not user:
                 is_till = (eingabe_name == "Till")
-                user = UserSetting(username=eingabe_name, pin=eingabe_pin, is_admin=is_till)
+                user = UserSetting(username=eingabe_name, display_name=eingabe_name, pin=eingabe_pin, is_admin=is_till)
                 db.session.add(user)
             else:
                 user.pin = eingabe_pin
+                if not user.display_name:
+                    user.display_name = eingabe_name
             db.session.commit()
             
             session['username'] = eingabe_name
@@ -790,11 +794,17 @@ def dashboard():
     
     ttt_games = TicTacToeGame.query.filter(((TicTacToeGame.ersteller == me) | (TicTacToeGame.gegner == me)) & (TicTacToeGame.status == "aktiv")).all()
     for g in ttt_games:
-        aktive_matches.append({"id": g.game_id, "von": f"Tic-Tac-Toe vs. {g.gegner if g.ersteller == me else g.ersteller}", "is_active": True, "typ": "tictactoe"})
+        gegner_name = g.gegner if g.ersteller == me else g.ersteller
+        gegner_u = UserSetting.query.filter_by(username=gegner_name).first()
+        gegner_display = gegner_u.display_name if (gegner_u and gegner_u.display_name) else gegner_name
+        aktive_matches.append({"id": g.game_id, "von": f"Tic-Tac-Toe vs. {gegner_display}", "is_active": True, "typ": "tictactoe"})
 
     tank_games = TankGame.query.filter(((TankGame.ersteller == me) | (TankGame.gegner == me)) & (TankGame.status == "aktiv")).all()
     for g in tank_games:
-        aktive_matches.append({"id": g.game_id, "von": f"Tank Royale vs. {g.gegner if g.ersteller == me else g.ersteller}", "is_active": True, "typ": "tankroyale"})
+        gegner_name = g.gegner if g.ersteller == me else g.ersteller
+        gegner_u = UserSetting.query.filter_by(username=gegner_name).first()
+        gegner_display = gegner_u.display_name if (gegner_u and gegner_u.display_name) else gegner_name
+        aktive_matches.append({"id": g.game_id, "von": f"Tank Royale vs. {gegner_display}", "is_active": True, "typ": "tankroyale"})
 
     is_admin = True if (me == "Till" or (user and user.is_admin)) else False
     
@@ -814,7 +824,7 @@ def dashboard():
                            spezial_nachricht_id=spezial_nachricht_id,
                            spezial_titel=spezial_titel,
                            spezial_text=spezial_text)
-    
+
 @app.route('/api/change-pin', methods=['POST'])
 def change_pin():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
@@ -833,6 +843,39 @@ def change_pin():
         user.pin = new_pin
         db.session.commit()
         return {"status": "success"}
+    return {"error": "Nutzer nicht gefunden"}, 404
+
+@app.route('/api/change-name', methods=['POST'])
+def change_name():
+    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
+    data = request.get_json(silent=True) or {}
+    new_name = str(data.get('new_name', '')).strip()
+    
+    if not new_name or len(new_name) < 2:
+        return {"error": "Der Name muss mindestens 2 Zeichen lang sein!"}, 400
+    if len(new_name) > 30:
+        return {"error": "Der Name ist zu lang (max. 30 Zeichen)."}, 400
+        
+    current_user = session['username']
+    
+    # Schutz vor Identitätsfälschung (Impersonation)
+    if new_name in KLASSEN_LISTE and new_name != current_user:
+        user = UserSetting.query.filter_by(username=current_user).first()
+        if user:
+            user.banned_until = datetime.utcnow() + timedelta(days=1)
+            db.session.commit()
+        session.pop('username', None)
+        return {"error": "Identitätsfälschung erkannt! Du hast versucht, dich als eine andere Person auszugeben und wurdest für 24 Stunden gebannt!"}, 403
+
+    existing_display = UserSetting.query.filter(UserSetting.display_name == new_name, UserSetting.username != current_user).first()
+    if existing_display:
+        return {"error": "Dieser Name wird bereits von jemand anderem verwendet!"}, 400
+
+    user = UserSetting.query.filter_by(username=current_user).first()
+    if user:
+        user.display_name = new_name
+        db.session.commit()
+        return {"status": "success", "new_name": new_name}
     return {"error": "Nutzer nicht gefunden"}, 404
 
 # --- ADMIN PANEL ---
@@ -865,7 +908,7 @@ def make_admin():
     if neuer_admin in KLASSEN_LISTE:
         target_user = UserSetting.query.filter_by(username=neuer_admin).first()
         if not target_user:
-            target_user = UserSetting(username=neuer_admin, is_admin=True)
+            target_user = UserSetting(username=neuer_admin, display_name=neuer_admin, is_admin=True)
             db.session.add(target_user)
         else: target_user.is_admin = True
         db.session.commit()
@@ -919,7 +962,7 @@ def admin_ban():
     if schueler and schueler != "Till":
         target_user = UserSetting.query.filter_by(username=schueler).first()
         if not target_user:
-            target_user = UserSetting(username=schueler)
+            target_user = UserSetting(username=schueler, display_name=schueler)
             db.session.add(target_user)
         now = datetime.utcnow()
         if dauer == "1h": target_user.banned_until = now + timedelta(hours=1)
@@ -992,7 +1035,7 @@ def chat(room="global"):
     if 'username' not in session: return redirect(url_for('login'))
     zwei_minuten_ago = datetime.utcnow() - timedelta(minutes=2)
     online_users = UserSetting.query.filter(UserSetting.last_seen >= zwei_minuten_ago).all()
-    online_names = [u.username for u in online_users]
+    online_names = [u.display_name if u.display_name else u.username for u in online_users]
 
     current_user = session['username']
     chpartner = sorted([schueler for schueler in KLASSEN_LISTE if schueler != current_user])
@@ -1029,7 +1072,8 @@ def api_chat_messages(room):
     meta = {}
     for u in all_users:
         lvl, _ = get_level_info(u.xp)
-        meta[u.username] = {'lvl': lvl, 'title': u.active_title, 'color': u.active_color}
+        display_n = u.display_name if u.display_name else u.username
+        meta[u.username] = {'lvl': lvl, 'title': u.active_title, 'color': u.active_color, 'display_name': display_n}
 
     partner_seen_count = 9999
     if room != "global":
@@ -1047,9 +1091,9 @@ def api_chat_messages(room):
         
     nachrichten = []
     for index, m in enumerate(db_messages):
-        u_meta = meta.get(m.sender, {'lvl': 1, 'title': None, 'color': None})
+        u_meta = meta.get(m.sender, {'lvl': 1, 'title': None, 'color': None, 'display_name': m.sender})
         nachrichten.append({
-            "name": m.sender, 
+            "name": u_meta['display_name'], 
             "text": m.text, 
             "gelesen": (index < partner_seen_count) if room != "global" else True,
             "level": u_meta['lvl'], 
@@ -1092,7 +1136,9 @@ def slither_menu():
 @app.route('/slither/play')
 def slither_play():
     if 'username' not in session: return redirect(url_for('login'))
-    return render_template('slither_game.html', me=session['username'])
+    user = UserSetting.query.filter_by(username=session['username']).first()
+    display_name = user.display_name if (user and user.display_name) else session['username']
+    return render_template('slither_game.html', me=display_name)
 
 @app.route('/api/slither/sync', methods=['POST'])
 def slither_sync():
@@ -1596,7 +1642,9 @@ def tankroyale_match(game_id):
     gegner_name = "Computer-Bot 🤖"
     if game:
         me = session['username']
-        gegner_name = game.gegner if game.ersteller == me else game.ersteller
+        raw_gegner = game.gegner if game.ersteller == me else game.ersteller
+        gegner_u = UserSetting.query.filter_by(username=raw_gegner).first()
+        gegner_name = gegner_u.display_name if (gegner_u and gegner_u.display_name) else raw_gegner
     return render_template('tank_royale_match.html', gameId=game_id, me=session['username'], gegner=gegner_name, bot_difficulty=diff)
 
 @app.route('/api/tankroyale/status/<game_id>')
@@ -1668,7 +1716,7 @@ def tank_shoot(game_id):
                 st[5] = 100  
                 st[8] += 1
                 st[9] += 1
-            st[12] = 0       
+            st[12] = 0        
         else:
             if me == g.ersteller:
                 if waffentyp == "berta": st[6] = max(0, st[6] - 1)
