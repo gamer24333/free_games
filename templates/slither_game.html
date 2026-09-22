@@ -121,7 +121,10 @@
         let newlyEatenFood = [];
         let boostCostTracker = 0;
 
-        function getRadius(score) { return 10 + (score / 20); }
+        function getRadius(score) { 
+            // Wächst langsamer (durch Math.sqrt) und stoppt bei maximal 35!
+            return Math.min(35, 10 + Math.sqrt(score) * 1.5); 
+        }
 
         function updateLocal() {
             if (isDead) return;
@@ -160,7 +163,7 @@
 
             myBody.unshift([newX, newY]); 
 
-            const targetLength = Math.floor(myScore / 5) + 5;
+            const targetLength = Math.floor(myScore / 4) + 10; // (Teilt durch 4 statt 5, macht die Schlange etwas länger)
             while (myBody.length > targetLength) myBody.pop();
 
             const myRadius = getRadius(myScore);
@@ -191,9 +194,13 @@
 
             if (killedBy) {
                 isDead = true;
-                syncServer(true); 
+                syncServer(true); // Erstes Mal senden
+                
+                // NEU: Zur Sicherheit nach 500ms nochmal senden, falls das erste im Lag verloren ging!
+                setTimeout(() => syncServer(true), 500); 
+                
                 document.getElementById('death-screen').style.display = "flex";
-                document.getElementById('final-score').innerText = myScore;
+                document.getElementById('final-score').innerText = Math.floor(myScore);
             }
         }
 
@@ -220,9 +227,16 @@
                 ctx.arc(f.x, f.y, f.v === 5 ? 10 : 5, 0, Math.PI * 2);
                 ctx.fillStyle = f.c;
                 ctx.fill();
-                ctx.shadowBlur = 10; ctx.shadowColor = f.c;
+                
+                // Schatten NUR bei großen Futterstücken! Das rettet die Performance auf Handys.
+                if (f.v === 5) {
+                    ctx.shadowBlur = 10; 
+                    ctx.shadowColor = f.c;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
             }
-            ctx.shadowBlur = 0;
+           
 
             const drawSnake = (body, color, name, score) => {
                 if(!body || body.length === 0) return;
@@ -324,7 +338,7 @@
             }
         }
 
-        setInterval(() => { if(!isDead) syncServer(false); }, 100);
+        setInterval(() => { if(!isDead) syncServer(false); }, 150);
         window.addEventListener('resize', () => { 
             canvas.width = window.innerWidth; 
             canvas.height = window.innerHeight; 
