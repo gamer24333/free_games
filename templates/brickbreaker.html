@@ -57,6 +57,19 @@
         .game-wrapper:fullscreen .fullscreen-toggle-btn { position: absolute; top: 20px; right: 20px; z-index: 99999; }
         .game-wrapper:-webkit-full-screen { width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; background: #000; border: none; flex-direction: column; }
         .game-wrapper:-webkit-full-screen canvas { width: 95vw; height: auto; max-height: 85vh; border: 4px solid #e94560; aspect-ratio: 4/3; }
+
+        /* Rainbow-Animation für Shop-Farben */
+        .rainbow-text {
+            background: linear-gradient(90deg, #ff2e63, #f1c40f, #2ecc71, #00adb5, #9b59b6, #ff2e63);
+            background-size: 200% auto;
+            color: transparent;
+            -webkit-background-clip: text;
+            animation: rainbowAnim 3s linear infinite;
+        }
+        @keyframes rainbowAnim { 
+            0% { background-position: 0% 50%; } 
+            100% { background-position: 200% 50%; } 
+        }
     </style>
 </head>
 <body>
@@ -83,7 +96,20 @@
                 <thead><tr><th>Platz</th><th>Name</th><th>Score</th></tr></thead>
                 <tbody>
                     {% for player, score in leaderboard %}
-                    <tr><td>{{ loop.index }}.</td><td>{{ player }}</td><td>{{ score }}</td></tr>
+                    {% set p_meta = meta.get(player, {'color': 'white', 'title': ''}) %}
+                    <tr>
+                        <td>{{ loop.index }}.</td>
+                        <td>
+                            <span class="{% if p_meta.color == 'rainbow' %}rainbow-text{% endif %}" 
+                                  style="{% if p_meta.color != 'rainbow' %}color: {{ p_meta.color }};{% endif %} font-weight: bold;">
+                                {{ player }}
+                            </span>
+                            {% if p_meta.title %}
+                                <span style="font-size: 11px; color: #aaa; margin-left: 5px;">{{ p_meta.title }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ score }}</td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
