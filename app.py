@@ -20,7 +20,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///local_portal.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # ---  Verhindert Verbindungsabbrüche (SSL closed unexpectedly) ---
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {fgluecksr
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True,
     "pool_recycle": 300,
 }
