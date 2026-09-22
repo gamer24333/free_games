@@ -146,7 +146,7 @@
         </div>
     </div>
 
-    <!-- SETTINGS / MENÜ MODAL (ERWEITERT MIT UNTERMENÜS) -->
+    <!-- SETTINGS / MENÜ MODAL -->
     <div id="settingsModal" class="modal-overlay">
         <div class="modal-box" style="width: 420px;">
             
@@ -522,6 +522,77 @@
 
     setInterval(checkNewMessages, 5000);
     checkNewMessages();
+
+    // --- NEU: AFK & BOT DETECTION FÜR DASHBOARD ---
+    let isAFK = false;
+    let afkTimer;
+    let isAutoclicker = false;
+    let actionTimes = [];
+
+    function resetAFK() {
+        isAFK = false;
+        clearTimeout(afkTimer);
+        afkTimer = setTimeout(() => {
+            isAFK = true;
+        }, 120000); // 2 Minuten AFK Zeit
+    }
+
+    function detectBot(e) {
+        resetAFK();
+        
+        // 1. Ist das Event vertrauenswürdig (von der echten Maus/Tastatur)?
+        if (!e.isTrusted) {
+            isAutoclicker = true;
+            return;
+        }
+
+        // 2. Rhythmus und Speed Check
+        let now = performance.now();
+        actionTimes.push(now);
+        if (actionTimes.length > 8) actionTimes.shift();
+
+        if (actionTimes.length === 8) {
+            let timeDiff = actionTimes[7] - actionTimes[0];
+            
+            // Speed Check: 8 Klicks/Tasten in unter 200ms -> Bot
+            if (timeDiff < 200) {
+                isAutoclicker = true;
+            }
+
+            // Rhythm Check: Varianz zwischen den Klicks berechnen
+            let intervals = [];
+            for(let i = 1; i < actionTimes.length; i++) {
+                intervals.push(actionTimes[i] - actionTimes[i-1]);
+            }
+            let avg = intervals.reduce((a,b) => a+b, 0) / intervals.length;
+            let variance = intervals.reduce((a,b) => a + Math.abs(b - avg), 0) / intervals.length;
+            
+            // Wenn der Rhythmus exakt gleich bleibt (Varianz extrem gering), ist es ein Macro/Bot
+            if (variance < 2 && avg > 10) {
+                isAutoclicker = true;
+            }
+        }
+    }
+
+    window.addEventListener('mousemove', resetAFK);
+    window.addEventListener('click', detectBot);
+    window.addEventListener('keydown', detectBot);
+    window.addEventListener('touchstart', resetAFK);
+    resetAFK();
+
+    // Ping-Schleife für das Dashboard
+    setInterval(() => {
+        fetch('/api/ping', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                activity: "Im Dashboard", 
+                is_afk: isAFK, 
+                is_bot: isAutoclicker 
+            }) 
+        }).catch(e => console.log(e));
+    }, 5000);
+
     </script>
 </body>
 </html>
