@@ -19,7 +19,7 @@
         <h2 style="margin-top: 0;">Wer ist gerade online?</h2>
         {% if active_players %}
             {% for p in active_players %}
-                <span class="player-tag">{{ p }}</span>
+                <span class="player-tag">{{ meta.get(p, {}).get('display_name', p) }}</span>
             {% endfor %}
         {% else %}
             <p style="color: #aaa;">Die Arena ist leer. Sei der Erste!</p>
