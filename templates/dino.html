@@ -22,8 +22,8 @@
 
         .game-container { display: flex; flex-direction: column; align-items: center; gap: 10px; }
         .game-controls-info {
-            display: flex; flex-direction: column; width: 400px; font-size: 14px; color: #ccc;
-            padding: 10px; background: #1a1a1a; border-radius: 8px; border: 1px solid #333; gap: 8px; box-sizing: border-box;
+            display: flex; flex-direction: column; width: 800px; font-size: 15px; color: #ccc;
+            padding: 12px; background: #1a1a1a; border-radius: 8px; border: 1px solid #333; gap: 8px; box-sizing: border-box;
         }
         .info-row { display: flex; justify-content: space-between; width: 100%; }
         .fullscreen-link { color: #ff9f43; text-decoration: underline; cursor: pointer; font-weight: bold; }
@@ -36,8 +36,8 @@
 
         .game-container:fullscreen { background-color: #111; width: 100vw; height: 100vh; justify-content: center; }
         .game-container:-webkit-full-screen { background-color: #111; width: 100vw; height: 100vh; justify-content: center; }
-        .game-container:fullscreen #gameCanvas { height: 80vh !important; width: auto !important; max-width: 90vw !important; aspect-ratio: 4/3; }
-        .game-container:-webkit-full-screen #gameCanvas { height: 80vh !important; width: auto !important; max-width: 90vw !important; aspect-ratio: 4/3; }
+        .game-container:fullscreen #gameCanvas { height: 80vh !important; width: auto !important; max-width: 90vw !important; aspect-ratio: 2/1; }
+        .game-container:-webkit-full-screen #gameCanvas { height: 80vh !important; width: auto !important; max-width: 90vw !important; aspect-ratio: 2/1; }
         .game-container:fullscreen .game-controls-info { width: auto !important; max-width: 90vw !important; font-size: 16px; min-width: 400px; }
         .game-container:-webkit-full-screen .game-controls-info { width: auto !important; max-width: 90vw !important; font-size: 16px; min-width: 400px; }
 
@@ -69,11 +69,11 @@
 
     <div class="main-content">
         <div class="game-container" style="position: relative;">
-            <canvas id="gameCanvas" width="600" height="300" tabindex="0"></canvas>
+            <canvas id="gameCanvas" width="800" height="400" tabindex="0"></canvas>
             
             <div class="game-controls-info">
                 <div class="info-row">
-                    <span>🎮 <b>Leertaste / Pfeil hoch</b> zum Springen</span>
+                    <span>🎮 <b>Leertaste / Pfeil hoch</b> zum Springen | 🦅 <b>Vögel: NICHT springen!</b></span>
                     <span id="fullscreenLink" class="fullscreen-link" onclick="toggleFullscreen()">📺 [F] Vollbild</span>
                 </div>
                 <div class="info-row">
@@ -109,7 +109,7 @@
         </div>
     </div>
 
-    <div class="footer-bar">Springe über die Cyber-Hindernisse und stelle den Highscore auf! ⚡</div>
+    <div class="footer-bar">Springe über Cacti, lass Vögel oben durchfliegen und stelle den Highscore auf! ⚡</div>
 
     <script>
         window.focus();
@@ -159,13 +159,15 @@
         }
 
         // --- SPIELVARIABLEN ---
+        const GROUND_Y = 330;
+        const GRAVITY = 0.65;
+        const JUMP_FORCE = -13.5;
+
         let dino, obstacles, score, gameStarted, isGameOver, isPaused, gameSpeed;
-        const GRAVITY = 0.6;
-        const JUMP_FORCE = -11;
 
         function resetGame() {
             stopMusic();
-            dino = { x: 50, y: 210, w: 30, h: 40, dy: 0, grounded: true };
+            dino = { x: 80, y: GROUND_Y - 55, w: 40, h: 55, dy: 0, grounded: true };
             obstacles = [];
             score = 0;
             scoreEl.textContent = 0;
@@ -176,15 +178,31 @@
         }
 
         function spawnObstacle() {
-            let h = Math.floor(Math.random() * 25) + 25;
-            let w = Math.floor(Math.random() * 20) + 20;
-            obstacles.push({
-                x: canvas.width,
-                y: 250 - h,
-                w: w,
-                h: h,
-                color: Math.random() > 0.5 ? '#ff2e63' : '#00adb5'
-            });
+            // Ab 100 Punkten kommen auch fliegende Vögel hinzu
+            let isBird = score > 100 && Math.random() < 0.35;
+            
+            if (isBird) {
+                // Vogel fliegt in mittlerer Höhe -> NICHT springen!
+                obstacles.push({
+                    x: canvas.width,
+                    y: GROUND_Y - 125,
+                    w: 45,
+                    h: 25,
+                    isBird: true,
+                    color: '#ff9f43'
+                });
+            } else {
+                let h = Math.floor(Math.random() * 30) + 35;
+                let w = Math.floor(Math.random() * 25) + 25;
+                obstacles.push({
+                    x: canvas.width,
+                    y: GROUND_Y - h,
+                    w: w,
+                    h: h,
+                    isBird: false,
+                    color: Math.random() > 0.5 ? '#ff2e63' : '#00adb5'
+                });
+            }
         }
 
         let obstacleTimer = 0;
@@ -248,8 +266,8 @@
             dino.dy += GRAVITY;
             dino.y += dino.dy;
 
-            if (dino.y > 210) {
-                dino.y = 210;
+            if (dino.y > GROUND_Y - 55) {
+                dino.y = GROUND_Y - 55;
                 dino.dy = 0;
                 dino.grounded = true;
             }
@@ -288,20 +306,29 @@
 
             // Neon Grid Bodenlinie
             ctx.strokeStyle = '#39ff14';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.moveTo(0, 250);
-            ctx.lineTo(canvas.width, 250);
+            ctx.moveTo(0, GROUND_Y);
+            ctx.lineTo(canvas.width, GROUND_Y);
             ctx.stroke();
 
             // Hindernisse zeichnen
             obstacles.forEach(obs => {
                 ctx.fillStyle = obs.color;
-                ctx.shadowBlur = 10;
+                ctx.shadowBlur = 12;
                 ctx.shadowColor = obs.color;
                 ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(obs.x, obs.y, obs.w, obs.h, 4);
-                else ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                if (obs.isBird) {
+                    // Vogel Form
+                    if (ctx.roundRect) ctx.roundRect(obs.x, obs.y, obs.w, obs.h, 8);
+                    else ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                    // Schnabel/Details
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(obs.x + 32, obs.y + 10, 8, 4);
+                } else {
+                    if (ctx.roundRect) ctx.roundRect(obs.x, obs.y, obs.w, obs.h, 6);
+                    else ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                }
                 ctx.fill();
                 ctx.shadowBlur = 0;
             });
@@ -311,36 +338,36 @@
             ctx.shadowBlur = 15;
             ctx.shadowColor = '#39ff14';
             ctx.beginPath();
-            if (ctx.roundRect) ctx.roundRect(dino.x, dino.y, dino.w, dino.h, 6);
+            if (ctx.roundRect) ctx.roundRect(dino.x, dino.y, dino.w, dino.h, 8);
             else ctx.fillRect(dino.x, dino.y, dino.w, dino.h);
             ctx.fill();
             ctx.shadowBlur = 0;
 
             // Dino Auge
             ctx.fillStyle = '#111';
-            ctx.fillRect(dino.x + 18, dino.y + 8, 4, 4);
+            ctx.fillRect(dino.x + 24, dino.y + 10, 5, 5);
 
             // Overlays
             if (!gameStarted && !isGameOver) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#39ff14'; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'center';
+                ctx.fillStyle = '#39ff14'; ctx.font = 'bold 24px Arial'; ctx.textAlign = 'center';
                 ctx.fillText('Leertaste oder Klick zum Starten', canvas.width / 2, canvas.height / 2);
                 ctx.textAlign = 'left';
             }
 
             if (isPaused) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#ffeb3b'; ctx.font = 'bold 32px Arial'; ctx.textAlign = 'center';
+                ctx.fillStyle = '#ffeb3b'; ctx.font = 'bold 36px Arial'; ctx.textAlign = 'center';
                 ctx.fillText('PAUSIERT', canvas.width / 2, canvas.height / 2);
                 ctx.textAlign = 'left';
             }
 
             if (isGameOver) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#ff5252'; ctx.font = 'bold 32px Arial'; ctx.textAlign = 'center';
-                ctx.fillText(isAutoclicker ? 'BOT / MAKRO ERKANNT! 🤖' : 'GAME OVER!', canvas.width / 2, canvas.height / 2 - 10);
-                ctx.fillStyle = '#fff'; ctx.font = '16px Arial';
-                ctx.fillText('Klicke oder drücke Leertaste für Neustart', canvas.width / 2, canvas.height / 2 + 30);
+                ctx.fillStyle = '#ff5252'; ctx.font = 'bold 36px Arial'; ctx.textAlign = 'center';
+                ctx.fillText(isAutoclicker ? 'BOT / MAKRO ERKANNT! 🤖' : 'GAME OVER!', canvas.width / 2, canvas.height / 2 - 15);
+                ctx.fillStyle = '#fff'; ctx.font = '18px Arial';
+                ctx.fillText('Klicke oder drücke Leertaste für Neustart', canvas.width / 2, canvas.height / 2 + 35);
                 ctx.textAlign = 'left';
             }
         }
