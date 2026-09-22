@@ -50,8 +50,9 @@
             <div class="chat-box" id="chatBox">
                 {% for msg in nachrichten %}
                 <div class="message" style="position: relative; padding-right: 40px;">
-                    <b style="color: {% if msg.name in admins %}#9b59b6{% else %}#00adb5{% endif %};">
-                        {% if msg.name in admins %}👑 {% endif %}{{ msg.name }}
+                    <b style="color: #00adb5;">
+                        {{ msg.name }}
+                    </b>
                     </b>
                     <span>
                         {% if msg.text.startswith('[IMAGE]') %}
@@ -133,9 +134,8 @@
     function appendTemporaryMessage(contentHtml) {
         const tempIndex = chatBox.children.length;
         const isMeAdmin = adminList.includes(currentUsername);
-        const nameColor = isMeAdmin ? "#9b59b6" : "#00adb5";
-        const crown = isMeAdmin ? "👑 " : "";
-
+        const nameColor = "#00adb5"; // Jeder kriegt kurz die Standard-Farbe
+        const crown = ""; // Keine erzwungene Krone mehr!
         chatBox.innerHTML += `
         <div class="message" style="position: relative; padding-right: 40px; opacity: 0.6;" id="msg-temp-${tempIndex}">
             <b style="color: ${nameColor};">${crown}${currentUsername}</b>
@@ -209,7 +209,7 @@
 
                     const isSenderAdmin = adminList.includes(msg.name);
                     const isMeAdmin = adminList.includes(currentUsername);
-                    const crown = isSenderAdmin ? "👑 " : "";
+                    const crown = ""; // Krone wird jetzt wie ein normaler Shop-Titel behandelt
                     
                     // --- FARBEN & TITEL KORREKT PARSEN ---
                     let nameStyle = '';
@@ -220,7 +220,7 @@
                             nameStyle = `color: ${msg.color}; font-weight: bold;`;
                         }
                     } else {
-                        nameStyle = isSenderAdmin ? 'color: #9b59b6; font-weight: bold;' : 'color: #00adb5; font-weight: bold;';
+                        nameStyle = 'color: #00adb5; font-weight: bold;'; // Standard-Farbe für ALLE, auch für Undercover-Admins
                     }
 
                     let titleBadges = '';
