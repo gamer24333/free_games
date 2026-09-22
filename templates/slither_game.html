@@ -52,7 +52,8 @@
         const isMobile = window.innerWidth < 900;
         const zoom = isMobile ? Math.max(0.55, window.innerWidth / 1100) : 1.0;
 
-        const myName = "{{ me }}";
+        const myName = "{{ meta.get(me, {}).get('display_name', me) if meta is defined else me }}";
+        const playerMeta = {{ meta | tojson if meta is defined else '{}' }};
         const mapSize = 3000;
         
         // --- SHOP UPGRADES LADEN ---
@@ -293,8 +294,12 @@
             
             let lbHtml = "";
             leaderboard.forEach((item, index) => {
-                const isMe = item[0] === myName ? 'style="color:#00adb5; font-weight:bold;"' : '';
-                lbHtml += `<div ${isMe}>${index+1}. ${item[0]} ${index===0 ? '👑' : ''} - ${item[1]}</div>`;
+                const username = item[0];
+                const score = item[1];
+                // Holt den schönen Anzeigenamen aus den Meta-Daten (fallback auf den Login, falls nicht gefunden)
+                const displayName = (playerMeta[username] && playerMeta[username].display_name) ? playerMeta[username].display_name : username;
+                const isMe = username === "{{ me }}" ? 'style="color:#00adb5; font-weight:bold;"' : '';
+                lbHtml += `<div ${isMe}>${index+1}. ${displayName} ${index===0 ? '👑' : ''} - ${score}</div>`;
             });
             document.getElementById('lb-list').innerHTML = lbHtml;
         }
