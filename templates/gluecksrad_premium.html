@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Glücksrad</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1015; color: white; margin-top: 30px; user-select: none; }
+        .btn { display: inline-block; padding: 12px 25px; background: #f1c40f; color: #222; text-decoration: none; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; font-size: 18px; margin-top: 15px;}
+        .btn:hover { background: #d4ac0d; }
+        
+        .wheel-area { position: relative; width: 320px; height: 320px; margin: 30px auto; }
+
+        .hidden-code-box {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: #2a1a1a; border: 2px dashed #f1c40f; padding: 20px;
+            border-radius: 12px; width: 200px; text-align: center;
+            box-shadow: 0 0 15px rgba(241, 196, 15, 0.3); z-index: 1;
+        }
+
+        .wheel-wrapper {
+            position: absolute; top: 0; left: 20px; width: 280px; height: 280px;
+            z-index: 5; cursor: grab; touch-action: none; transition: transform 0.2s ease-out;
+        }
+        .wheel-wrapper:active { cursor: grabbing; }
+
+        .wheel-container {
+            width: 280px; height: 280px; border-radius: 50%;
+            border: 8px solid #f1c40f;
+            background: conic-gradient(
+                #c0392b 0deg 234deg,      /* Niete: 65% */
+                #2980b9 234deg 306deg,    /* 40 Münzen: 20% */
+                #27ae60 306deg 342deg,    /* 100 Münzen: 10% */
+                #f39c12 342deg 356.4deg,  /* Jackpot: 4% */
+                #8e44ad 356.4deg 360deg   /* XP-Boost: 1% */
+            );
+            position: relative;
+            transition: transform 3s cubic-bezier(0.25, 0.1, 0.25, 1);
+            box-shadow: 0 0 40px rgba(241, 196, 15, 0.6);
+        }
+
+        .pointer {
+            position: absolute; top: -24px; left: 50%; transform: translateX(-50%);
+            width: 0; height: 0; border-left: 15px solid transparent;
+            border-right: 15px solid transparent; border-top: 30px solid #f1c40f;
+            z-index: 10; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
+        }
+
+        .odds-box {
+            background: #221515; border: 1px solid #f1c40f; border-radius: 10px;
+            max-width: 340px; margin: 20px auto; padding: 15px; text-align: left;
+            box-shadow: 0 4px 15px rgba(241, 196, 15, 0.2);
+        }
+        .odds-box h3 { margin-top: 0; font-size: 15px; color: #f1c40f; text-align: center; border-bottom: 1px solid #444; padding-bottom: 8px; }
+        .odd-item { display: flex; align-items: center; justify-content: space-between; font-size: 13px; margin: 8px 0; color: #ccc; }
+        .color-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; margin-right: 8px; flex-shrink: 0; }
+
+        #result { margin-top: 20px; font-size: 24px; font-weight: bold; color: #f1c40f; height: 30px; text-shadow: 0 0 10px rgba(241,196,15,0.5); }
+    </style>
+</head>
+<body>
+
+    <a href="/gluecksrad" class="btn" style="position: absolute; top: 20px; left: 20px; font-size: 14px; background: #555; color: white;">⬅ Normales Rad</a>
+
+    <h1 style="color: #f1c40f; margin-top: 40px; text-shadow: 0 0 15px rgba(241,196,15,0.4);">💎 Premium Glücksrad</h1>
+    <p>Einsatz: <b style="color:#ff5252;">30 Münzen</b> pro Drehung. Deine Münzen: <span id="coinBalance" style="color: #f1c40f;">{{ coins }} 🪙</span></p>
+
+    <div class="wheel-area">
+        <div class="hidden-code-box">
+            <span style="font-size: 12px; color: #aaa;">✨ Gefunden! ✨</span>
+            <p style="margin: 5px 0 2px 0; font-size: 13px; color: #ccc;">Geheimer XP-Code:</p>
+            <b style="color: #f1c40f; font-size: 16px; letter-spacing: 1px; user-select: all;">WHEELXP</b>
+        </div>
+
+        <div class="wheel-wrapper" id="wheelWrapper">
+            <div class="pointer"></div>
+            <div class="wheel-container" id="wheel"></div>
+        </div>
+    </div>
+
+    <button class="btn" id="spinBtn" onclick="spinWheel()">Premium Drehung (30 🪙)</button>
+    <div id="result"></div>
+
+    <div class="odds-box">
+        <h3>📊 Segmente & Gewinnchancen</h3>
+        <div class="odd-item"><span style="display: flex; align-items: center;"><span class="color-dot" style="background: #c0392b;"></span>😭 Niete (0 🪙)</span> <strong style="color:#ff5252;">65%</strong></div>
+        <div class="odd-item"><span style="display: flex; align-items: center;"><span class="color-dot" style="background: #2980b9;"></span>🪙 40 Münzen</span> <strong>20%</strong></div>
+        <div class="odd-item"><span style="display: flex; align-items: center;"><span class="color-dot" style="background: #27ae60;"></span>💰 100 Münzen</span> <strong>10%</strong></div>
+        <div class="odd-item"><span style="display: flex; align-items: center;"><span class="color-dot" style="background: #f39c12;"></span>💎 MEGA Jackpot (250 🪙)</span> <strong>4%</strong></div>
+        <div class="odd-item"><span style="display: flex; align-items: center;"><span class="color-dot" style="background: #8e44ad;"></span>🔥 XP-Boost (+2500 XP)</span> <strong>1%</strong></div>
+    </div>
+
+    <script>
+        let currentRotation = 0;
+        let isSpinning = false;
+
+        const wheelWrapper = document.getElementById('wheelWrapper');
+        let isDragging = false;
+        let startX = 0;
+        let currentX = 0;
+
+        wheelWrapper.addEventListener('pointerdown', (e) => {
+            isDragging = true;
+            startX = e.clientX - currentX;
+            wheelWrapper.setPointerCapture(e.pointerId);
+        });
+
+        wheelWrapper.addEventListener('pointermove', (e) => {
+            if (!isDragging) return;
+            currentX = e.clientX - startX;
+            if (currentX < -230) currentX = -230;
+            if (currentX > 230) currentX = 230;
+            wheelWrapper.style.transform = `translateX(${currentX}px)`;
+        });
+
+        wheelWrapper.addEventListener('pointerup', (e) => {
+            isDragging = false;
+            wheelWrapper.releasePointerCapture(e.pointerId);
+        });
+
+        // Neue Winkel für das Premium Rad
+        const segmentAngles = {
+            'niete': {min: 10, max: 220},
+            '40coins': {min: 240, max: 295},
+            '100coins': {min: 312, max: 338},
+            'jackpot': {min: 345, max: 353},
+            'xp': {min: 357, max: 359}
+        };
+
+        async function spinWheel() {
+            if (isSpinning) return;
+            
+            const resultDiv = document.getElementById('result');
+            const wheel = document.getElementById('wheel');
+            const coinSpan = document.getElementById('coinBalance');
+            
+            resultDiv.textContent = "";
+
+            try {
+                // Aufruf der neuen Premium Route
+                const res = await fetch('/api/spin-wheel-premium', { method: 'POST' });
+                const data = await res.json();
+                
+                if (!res.ok) {
+                    alert("❌ " + data.error);
+                    return;
+                }
+
+                isSpinning = true;
+                document.getElementById('spinBtn').style.opacity = '0.5';
+
+                const range = segmentAngles[data.segment] || {min: 10, max: 220};
+                const targetAngle = Math.floor(Math.random() * (range.max - range.min + 1)) + range.min;
+
+                const targetMod = (360 - targetAngle) % 360;
+                const currentMod = currentRotation % 360;
+                let diff = targetMod - currentMod;
+                if (diff <= 0) diff += 360;
+
+                const extraSpins = 360 * 6; // Dreht sich etwas länger für mehr Spannung
+                currentRotation += extraSpins + diff;
+                
+                wheel.style.transform = `rotate(${currentRotation}deg)`;
+
+                setTimeout(() => {
+                    resultDiv.textContent = data.text;
+                    coinSpan.textContent = data.new_balance + " 🪙";
+                    isSpinning = false;
+                    document.getElementById('spinBtn').style.opacity = '1';
+                }, 3000);
+
+            } catch (e) {
+                alert("Verbindungsfehler.");
+            }
+        }
+    </script>
+</body>
+</html>
