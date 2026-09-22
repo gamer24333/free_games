@@ -48,6 +48,27 @@
         }
         .settings-gear:hover { color: #00adb5; transform: rotate(45deg); }
 
+        /* Spenden-Button unten rechts (dezent) */
+        .donate-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #0070ba;
+            color: white;
+            padding: 8px 14px;
+            font-size: 13px;
+            border-radius: 20px;
+            z-index: 1000;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.2s, transform 0.2s;
+        }
+        .donate-btn:hover { background: #003087; transform: scale(1.05); }
+        
         /* Modals (Pop-ups) */
         .modal-overlay {
             display: none;
@@ -90,6 +111,30 @@
     <!-- Buttons in den Ecken -->
     <button class="btn code-btn" onclick="openCodeModal()">🎁 Code eingeben</button>
     <button class="settings-gear" onclick="openSettingsModal()" title="Einstellungen">⚙️</button>
+    <button class="donate-btn" onclick="openDonateModal()" title="Projekt unterstützen">☕ Spenden</button>
+
+    <!-- SPENDEN MODAL -->
+    <div id="donateModal" class="modal-overlay">
+        <div class="modal-box" style="border-color: #0070ba; box-shadow: 0 0 20px rgba(0, 112, 186, 0.3);">
+            <h3 style="color: #0070ba; margin-top: 0;">☕ Projekt unterstützen</h3>
+            <p style="font-size: 13px; color: #ccc; line-height: 1.5; text-align: left;">
+                Hey! Schön, dass dir die Plattform und die Spiele so viel Spaß machen. 🚀<br><br>
+                <b>Wofür wird das Geld genutzt?</b><br>
+                100% der Spenden fließen direkt in Server-Kosten, neue Updates, coole Features und die Weiterentwicklung der Minigames!<br><br>
+                <b>Warum solltest du spenden?</b><br>
+                Es ist absolut freiwillig! Wenn du das Projekt unterstützen möchtest und dir noch mehr Updates wünschst, hilfst du mir damit riesig.<br><br>
+                <b>Wie funktioniert das?</b><br>
+                Klicke auf den Button unten. Du wirst sicher zu meinem <b>PayPal</b>-Konto weitergeleitet, wo du freiwillig einen Betrag senden kannst. Vielen Dank! ❤️
+            </p>
+            
+            <!-- ERSETZE HIER "DEIN_PAYPAL_NAME" MIT DEINEM ECHTEN PAYPAL.ME LINK -->
+            <a href="https://paypal.me/DEIN_PAYPAL_NAME" target="_blank" class="btn" style="background: #0070ba; width: 100%; margin-top: 15px; box-sizing: border-box; text-decoration: none; font-size: 16px;">
+                💳 Über PayPal Spenden
+            </a>
+            
+            <button onclick="closeDonateModal()" class="btn" style="background: #555; width: 100%; margin-top: 10px; box-sizing: border-box;">Schließen</button>
+        </div>
+    </div>
 
     <!-- CODE MODAL -->
     <div id="codeModal" class="modal-overlay">
@@ -272,6 +317,9 @@
     <a href="/logout" style="color: #ff2e63; text-decoration: none; font-weight: bold;">Abmelden</a>
 
     <script>
+    // --- SPENDEN MODAL STEUERUNG ---
+    function openDonateModal() { document.getElementById('donateModal').style.display = 'flex'; }
+    function closeDonateModal() { document.getElementById('donateModal').style.display = 'none'; }
     // --- RANG MODAL STEUERUNG ---
     function openRankModal() { document.getElementById('rankModal').style.display = 'flex'; }
     function closeRankModal() { document.getElementById('rankModal').style.display = 'none'; }
