@@ -736,6 +736,44 @@ def spin_wheel():
     
     return {"status": "success", "text": text, "new_balance": u.coins, "segment": segment}
 
+@app.route('/gluecksrad/premium')
+def premium_wheel_page():
+    if 'username' not in session: return redirect(url_for('login'))
+    me = session['username']
+    user = UserSetting.query.filter_by(username=me).first()
+    display_name = user.display_name if (user and user.display_name) else me
+    return render_template('gluecksrad_premium.html', name=display_name, coins=(user.coins if user else 0))
+
+@app.route('/api/spin-wheel-premium', methods=['POST'])
+def spin_wheel_premium():
+    if 'username' not in session: return {"error": "401"}, 401
+    u = UserSetting.query.filter_by(username=session['username']).first()
+    
+    einsatz = 30
+    if (u.coins or 0) < einsatz: return {"error": f"Du brauchst {einsatz} Münzen zum Drehen!"}, 400
+    
+    u.coins -= einsatz
+    
+    rand = random.random()
+    if rand < 0.65: # 65% Niete (höheres Risiko)
+        gewinn, text, segment = 0, "Niete! 💸", "niete"
+    elif rand < 0.85: # 20% 40 Münzen
+        gewinn, text, segment = 40, "40 Münzen! 🪙", "40coins"
+    elif rand < 0.95: # 10% 100 Münzen
+        gewinn, text, segment = 100, "100 Münzen! 💰", "100coins"
+    elif rand < 0.99: # 4% 250 Münzen
+        gewinn, text, segment = 250, "MEGA JACKPOT! 250 Münzen! 💎", "jackpot"
+    else: # 1% Mega XP-Boost
+        gewinn, text, segment = 0, "MEGA XP-Boost! +2500 XP 🔥", "xp"
+        u.xp = (u.xp or 0) + 2500
+        
+    u.coins += gewinn
+    db.session.commit()
+    
+    return {"status": "success", "text": text, "new_balance": u.coins, "segment": segment}
+
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if 'username' in session:
