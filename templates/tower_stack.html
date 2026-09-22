@@ -62,7 +62,7 @@
 <body>
 
     <div class="header-bar">
-        <a href="/games" class="btn btn-back">⬅️ Zurück</a>
+        <a href="/games" class="btn btn-back" onclick="stopMusic()">⬅️ Zurück</a>
         <h1>🗼 Tower Stack</h1>
     </div>
 
@@ -117,6 +117,43 @@
         const gameContainer = document.querySelector('.game-container');
         const fullscreenLink = document.getElementById('fullscreenLink');
 
+        // --- MUSIK EINBINDEN (WEB AUDIO API) ---
+        let audioCtx = null;
+        let audioBuffer = null;
+        let audioSource = null;
+
+        async function playMusic() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+            if (!audioBuffer) {
+                try {
+                    let response = await fetch('/static/tower_stack.mp3');
+                    let arrayBuffer = await response.arrayBuffer();
+                    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                } catch (e) { console.error("Audio Fehler:", e); return; }
+            }
+
+            if (!audioSource && gameStarted && !isGameOver) {
+                audioSource = audioCtx.createBufferSource();
+                audioSource.buffer = audioBuffer;
+                audioSource.loop = true;
+                let gainNode = audioCtx.createGain();
+                gainNode.gain.value = 0.4;
+                audioSource.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                audioSource.start();
+            }
+        }
+
+        function stopMusic() {
+            if (audioSource) {
+                try { audioSource.stop(); } catch(e){}
+                audioSource.disconnect();
+                audioSource = null;
+            }
+        }
+
         let score = 0;
         let isGameOver = false;
         let gameStarted = false;
@@ -130,6 +167,7 @@
         let targetCameraY = 0;
 
         function resetGame() {
+            stopMusic();
             score = 0;
             scoreEl.textContent = 0;
             isGameOver = false;
@@ -157,7 +195,6 @@
             let nextY = lastBlock.y - blockHeight;
             let startX = Math.random() > 0.5 ? -blockWidth : canvas.width;
             
-            // Richtungswechsel je nach Startposition
             currentBlock = {
                 x: startX,
                 y: nextY,
@@ -172,41 +209,38 @@
             if (isGameOver) {
                 resetGame();
                 gameStarted = true;
+                playMusic();
                 return;
             }
 
             if (!gameStarted) {
                 gameStarted = true;
+                playMusic();
             }
 
             let lastBlock = stack[stack.length - 1];
             
-            // Berechne Überlappung
             let left = Math.max(currentBlock.x, lastBlock.x);
             let right = Math.min(currentBlock.x + currentBlock.w, lastBlock.x + lastBlock.w);
             let overlap = right - left;
 
             if (overlap <= 0) {
-                // Komplett verfehlt -> Game Over
                 isGameOver = true;
                 currentBlock.dx = 0;
                 triggerGameOver();
                 return;
             }
 
-            // Erfolgreicher Treffer: Breite anpassen
             currentBlock.x = left;
             currentBlock.w = overlap;
-            blockWidth = overlap; // Nächster Block wird auch schmaler (macht es schwerer!)
+            blockWidth = overlap;
 
             stack.push(currentBlock);
             score++;
             scoreEl.textContent = score;
 
-            // Schwierigkeit leicht erhöhen
             moveSpeed = Math.min(7, 3 + score * 0.15);
 
-            // Kamera-Ziel nach oben verschieben, wenn der Turm wächst
             if (stack.length > 5) {
                 targetCameraY += blockHeight;
             }
@@ -230,13 +264,11 @@
         function update() {
             if (!gameStarted || isGameOver) return;
 
-            // Block hin- und herbewegen
             currentBlock.x += currentBlock.dx;
             if (currentBlock.x <= 0 || currentBlock.x + currentBlock.w >= canvas.width) {
                 currentBlock.dx *= -1;
             }
 
-            // Sanftes Kamera-Gleiten nach oben
             if (cameraY < targetCameraY) {
                 cameraY += (targetCameraY - cameraY) * 0.1;
             }
@@ -246,7 +278,6 @@
             ctx.fillStyle = '#111';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Neon Grid Background
             ctx.strokeStyle = '#222';
             ctx.lineWidth = 1;
             for(let i = 0; i < canvas.width; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke(); }
@@ -255,7 +286,6 @@
             ctx.save();
             ctx.translate(0, cameraY);
 
-            // Alle gestapelten Blöcke zeichnen
             stack.forEach((b, index) => {
                 ctx.fillStyle = b.color;
                 ctx.shadowBlur = index === stack.length - 1 ? 15 : 5;
@@ -267,7 +297,6 @@
                 ctx.shadowBlur = 0;
             });
 
-            // Aktuellen bewegten Block zeichnen
             if (currentBlock && !isGameOver) {
                 ctx.fillStyle = currentBlock.color;
                 ctx.shadowBlur = 15;
@@ -281,7 +310,6 @@
 
             ctx.restore();
 
-            // Start-Overlay
             if (!gameStarted && !isGameOver) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#ffd700'; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'center';
@@ -291,7 +319,6 @@
                 ctx.textAlign = 'left';
             }
 
-            // Game-Over-Overlay
             if (isGameOver) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#ff5252'; ctx.font = 'bold 32px Arial'; ctx.textAlign = 'center';
@@ -303,6 +330,8 @@
         }
 
         async function triggerGameOver() {
+            stopMusic();
+            isGameOver = true;
             try {
                 await fetch('/api/submit-tower', {
                     method: 'POST',
