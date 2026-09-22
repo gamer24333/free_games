@@ -50,13 +50,13 @@
             <table>
                 <tr><th>Rang</th><th>Spieler</th><th>Score-Punkte</th><th>Gesamt-Spielzeit</th><th>Effizienz-Wert</th></tr>
                 {% for p in efficiency[:10] %}
-                {% set p_meta = meta.get(p.name, {'color': '', 'title': ''}) %}
+                {% set p_meta = meta.get(p.name, {'color': '', 'title': '', 'display_name': p.name}) %}
                 <tr>
                     <td>#{{ loop.index }}</td>
                     <td>
                         <span class="{% if p_meta.color == 'rainbow' %}rainbow-text{% endif %}" 
                               style="{% if p_meta.color and p_meta.color != 'rainbow' %}color: {{ p_meta.color }};{% endif %} font-weight: bold;">
-                            {{ p.name }}
+                            {{ p_meta.display_name if p_meta.display_name else p.name }}
                         </span>
                         {% if p_meta.title %}
                             <span style="font-size: 11px; color: #aaa; margin-left: 5px;">{{ p_meta.title }}</span>
@@ -86,12 +86,12 @@
                     <th>Neon Jump</th>
                 </tr>
                 {% for name, s in scores.items() %}
-                {% set p_meta = meta.get(name, {'color': '', 'title': ''}) %}
+                {% set p_meta = meta.get(name, {'color': '', 'title': '', 'display_name': name}) %}
                 <tr>
                     <td>
                         <span class="{% if p_meta.color == 'rainbow' %}rainbow-text{% endif %}" 
                               style="{% if p_meta.color and p_meta.color != 'rainbow' %}color: {{ p_meta.color }};{% endif %} font-weight: bold;">
-                            {{ name }}
+                            {{ p_meta.display_name if p_meta.display_name else name }}
                         </span>
                         {% if p_meta.title %}
                             <span style="font-size: 11px; color: #aaa; margin-left: 5px;">{{ p_meta.title }}</span>
