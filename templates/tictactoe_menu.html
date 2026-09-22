@@ -14,7 +14,8 @@
         <form action="/tictactoe/invite" method="POST">
             <select name="gegner" style="width: 100%; padding: 10px; background: #2d2d2d; color: white; border-radius: 6px; margin-bottom: 20px; font-size: 16px;">
                 {% for g in gegner_liste %}
-                    <option value="{{ g }}">{{ g }}</option>
+                    {% set g_meta = meta.get(g, {'display_name': g}) %}
+                    <option value="{{ g }}">{{ g_meta.display_name if g_meta.display_name else g }}</option>
                 {% endfor %}
             </select>
             <button type="submit" class="btn" style="width: 100%; background: #ff2e63;">Herausforderung senden! ⚔️</button>
