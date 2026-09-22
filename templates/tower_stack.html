@@ -1,3 +1,8 @@
+Das erklärt, warum das Spiel sofort abgestürzt ist oder eingefroren ist! Der Fehler lag daran, dass die neuen Blöcke ganz am Rand bzw. außerhalb des Bildschirms (-blockWidth) gestartet sind. Dadurch hat die Randkanten-Prüfung sofort gegriffen, der Block hat sich an der Kante unendlich hin- und hergefangen (daher das Einfrieren) oder die Kollision schlug sofort fehl.
+
+Hier ist der korrigierte und vollständige Code für deine tower_stack.html. Die Startposition der Blöcke wurde so angepasst, dass sie direkt im Sichtfeld starten und sauber hin- und hergleiten:
+
+HTML
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -197,14 +202,15 @@
         function spawnNewBlock() {
             let lastBlock = stack[stack.length - 1];
             let nextY = lastBlock.y - blockHeight;
-            let startX = Math.random() > 0.5 ? -blockWidth : canvas.width;
+            let startFromLeft = Math.random() > 0.5;
+            let startX = startFromLeft ? 0 : canvas.width - blockWidth;
             
             currentBlock = {
                 x: startX,
                 y: nextY,
                 w: blockWidth,
                 h: blockHeight,
-                dx: startX < 0 ? moveSpeed : -moveSpeed,
+                dx: startFromLeft ? moveSpeed : -moveSpeed,
                 color: `hsl(${score * 25 % 360}, 90%, 60%)`
             };
         }
@@ -284,7 +290,6 @@
         function update() {
             if (isPaused || isGameOver) return;
 
-            // Block bewegt sich jetzt auch vor dem ersten Klick (damit man sofort Action sieht)
             if (currentBlock) {
                 currentBlock.x += currentBlock.dx;
                 if (currentBlock.x <= 0 || currentBlock.x + currentBlock.w >= canvas.width) {
