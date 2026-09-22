@@ -95,7 +95,7 @@
                 </thead>
                 <tbody>
                     {% for player, score in leaderboard %}
-                    {% set p_meta = meta.get(player, {'color': 'white', 'title': '', 'display_name': player}) %}}
+                    {% set p_meta = meta.get(player, {'color': 'white', 'title': '', 'display_name': player}) %}
                     <tr>
                         <td>{{ loop.index }}.</td>
                         <td>
