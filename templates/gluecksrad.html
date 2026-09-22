@@ -150,8 +150,8 @@
             if (!isDragging) return;
             currentX = e.clientX - startX;
             // Begrenzung, damit man es nicht komplett aus dem Bildschirm zieht
-            if (currentX < -130) currentX = -130;
-            if (currentX > 130) currentX = 130;
+            if (currentX < -230) currentX = -230;
+            if (currentX > 230) currentX = 230;
             wheelWrapper.style.transform = `translateX(${currentX}px)`;
         });
 
