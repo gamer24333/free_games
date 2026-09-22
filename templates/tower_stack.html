@@ -116,20 +116,6 @@
         const gameContainer = document.querySelector('.game-container');
         const fullscreenLink = document.getElementById('fullscreenLink');
 
-        // --- HINTERGRUND TÜRME SETUP (Parallax Effekt) ---
-        const bgTowers = [];
-        for(let i = 0; i < 7; i++) {
-            let p = 0.2 + Math.random() * 0.5; // Parallax-Faktor: 0.2 = weit weg, 0.7 = nah
-            bgTowers.push({
-                baseX: Math.random() * canvas.width,
-                parallax: p,
-                scale: p, // Je weiter weg, desto kleiner
-                opacity: 0.03 + Math.random() * 0.05, // Sehr schwach sichtbar (nicht störend)
-                seed: Math.random() * 10000,
-                hue: Math.floor(Math.random() * 360) // Leichte Farbvariationen
-            });
-        }
-
         // --- WEB AUDIO API MUSIK ---
         let audioCtx = null;
         let audioBuffer = null;
@@ -313,6 +299,37 @@
             }
         }
 
+        // Hilfsfunktion: Zeichnet genau den aktuellen Turm
+        function drawTowerBlocks(isMainLayer) {
+            stack.forEach((b, index) => {
+                ctx.fillStyle = b.color;
+                if (isMainLayer) {
+                    ctx.shadowBlur = index === stack.length - 1 ? 15 : 5;
+                    ctx.shadowColor = b.color;
+                } else {
+                    ctx.shadowBlur = 0; // Performance: Keine Schatten in den Hintergrund-Schichten
+                }
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(b.x, b.y, b.w, b.h, 6);
+                else ctx.fillRect(b.x, b.y, b.w, b.h);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            });
+
+            if (currentBlock && !isGameOver) {
+                ctx.fillStyle = currentBlock.color;
+                if (isMainLayer) {
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = currentBlock.color;
+                }
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(currentBlock.x, currentBlock.y, currentBlock.w, currentBlock.h, 6);
+                else ctx.fillRect(currentBlock.x, currentBlock.y, currentBlock.w, currentBlock.h);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+
         function draw() {
             ctx.fillStyle = '#111';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -323,62 +340,38 @@
             for(let i = 0; i < canvas.width; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke(); }
             for(let i = 0; i < canvas.height; i += 40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke(); }
 
-            // === NEU: HINTERGRUND-TÜRME (Parallax) ===
-            bgTowers.forEach(t => {
-                let yOffset = cameraY * t.parallax;
-                ctx.fillStyle = `hsla(${t.hue}, 50%, 60%, ${t.opacity})`;
-                
-                let blockHeightScaled = 30 * t.scale;
-                let startY = canvas.height - 70;
-                
-                // Berechne nur die Blöcke, die gerade im Sichtfeld sind (spart extrem viel Leistung!)
-                let maxI = Math.floor((startY + yOffset + 50) / blockHeightScaled);
-                let minI = Math.floor((startY + yOffset - canvas.height - 50) / blockHeightScaled);
-                if (minI < 0) minI = 0;
-                
-                for(let i = minI; i <= maxI; i++) {
-                    let y = startY - i * blockHeightScaled;
-                    
-                    // Ein bisschen Mathe-Magie, damit die Türme "unordentlich" gestapelt aussehen
-                    let xPos = t.baseX + Math.sin(i * 0.3 + t.seed) * 20 * t.scale;
-                    let w = (80 + Math.cos(i * 0.5 + t.seed) * 40) * t.scale;
-                    
-                    ctx.beginPath();
-                    if (ctx.roundRect) {
-                        ctx.roundRect(xPos - w/2, y + yOffset, w, blockHeightScaled + 0.5, 4 * t.scale);
-                    } else {
-                        ctx.fillRect(xPos - w/2, y + yOffset, w, blockHeightScaled + 0.5);
-                    }
-                    ctx.fill();
-                }
-            });
-            // =========================================
+            // === NEU: INFINITE MIRROR / KAMERA-IN-KAMERA EFFEKT ===
+            const totalLayers = 8; // Wie oft sich der Turm in die Tiefe spiegelt
+            const scaleStep = 0.65; // Wie viel kleiner jede Ebene wird (0.65 = 65% der Größe)
 
-            ctx.save();
-            ctx.translate(0, cameraY);
-
-            stack.forEach((b, index) => {
-                ctx.fillStyle = b.color;
-                ctx.shadowBlur = index === stack.length - 1 ? 15 : 5;
-                ctx.shadowColor = b.color;
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(b.x, b.y, b.w, b.h, 6);
-                else ctx.fillRect(b.x, b.y, b.w, b.h);
-                ctx.fill();
-                ctx.shadowBlur = 0;
-            });
-
-            if (currentBlock && !isGameOver) {
-                ctx.fillStyle = currentBlock.color;
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = currentBlock.color;
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(currentBlock.x, currentBlock.y, currentBlock.w, currentBlock.h, 6);
-                else ctx.fillRect(currentBlock.x, currentBlock.y, currentBlock.w, currentBlock.h);
-                ctx.fill();
-                ctx.shadowBlur = 0;
+            // Wir zeichnen von hinten nach vorne
+            for (let i = totalLayers; i >= 1; i--) {
+                ctx.save();
+                
+                let scale = Math.pow(scaleStep, i);
+                let alpha = Math.pow(0.55, i); // Je weiter weg, desto transparenter (verschwindet in der Dunkelheit)
+                
+                // Setze den Fokuspunkt (Fluchtpunkt) genau in die Mitte des Bildschirms
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.scale(scale, scale);
+                ctx.translate(-canvas.width / 2, -canvas.height / 2);
+                
+                ctx.globalAlpha = alpha;
+                
+                // Kamera-Bewegung mitnehmen
+                ctx.translate(0, cameraY);
+                
+                drawTowerBlocks(false);
+                
+                ctx.restore();
             }
+            // ========================================================
 
+            // Zeichne den echten, spielbaren Turm ganz vorne (Ebene 0)
+            ctx.save();
+            ctx.globalAlpha = 1.0;
+            ctx.translate(0, cameraY);
+            drawTowerBlocks(true);
             ctx.restore();
 
             // Start-Overlay
