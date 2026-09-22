@@ -212,7 +212,7 @@
             <select id="tradeTarget">
                 <option value="">-- Empfänger wählen --</option>
                 {% for schueler in partner %}
-                    <option value="{{ schueler }}">{{ schueler }}</option>
+                    <option value="{{ schueler.username }}">{{ schueler.display_name }}</option>
                 {% endfor %}
             </select>
             <input type="number" id="tradeAmount" placeholder="Anzahl Coins" min="1" style="margin-top: 10px;">
