@@ -144,7 +144,7 @@
                     audioSource.start();
                 }
             } catch (e) {
-                // Musik optional (falls Datei fehlt, läuft das Spiel normal weiter)
+                // Musik optional
             }
         }
 
@@ -223,20 +223,20 @@
         function dropBlock() {
             if (isGameOver) {
                 resetGame();
-                gameStarted = true;
-                playMusic();
                 return;
             }
 
             if (!gameStarted) {
                 gameStarted = true;
                 playMusic();
+                return; // Verhindert, dass der erste Klick direkt den ersten Block droppt
             }
 
             if (isPaused) return;
 
             let lastBlock = stack[stack.length - 1];
             
+            // Exakte Position fixieren
             let left = Math.max(currentBlock.x, lastBlock.x);
             let right = Math.min(currentBlock.x + currentBlock.w, lastBlock.x + lastBlock.w);
             let overlap = right - left;
@@ -283,11 +283,15 @@
         });
 
         function update() {
-            if (isPaused || isGameOver) return;
+            if (isPaused || isGameOver || !gameStarted) return; // Block bewegt sich erst nach Start
 
             if (currentBlock) {
                 currentBlock.x += currentBlock.dx;
-                if (currentBlock.x <= 0 || currentBlock.x + currentBlock.w >= canvas.width) {
+                if (currentBlock.x <= 0) {
+                    currentBlock.x = 0; // Ungenauigkeit an der linken Kante fixen
+                    currentBlock.dx *= -1;
+                } else if (currentBlock.x + currentBlock.w >= canvas.width) {
+                    currentBlock.x = canvas.width - currentBlock.w; // Ungenauigkeit an der rechten Kante fixen
                     currentBlock.dx *= -1;
                 }
             }
@@ -340,7 +344,7 @@
                 ctx.fillStyle = '#ffd700'; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'center';
                 ctx.fillText('Leertaste oder Klick', canvas.width / 2, canvas.height / 2 - 10);
                 ctx.fillStyle = '#fff'; ctx.font = '15px Arial';
-                ctx.fillText('zum Starten & Stapeln!', canvas.width / 2, canvas.height / 2 + 20);
+                ctx.fillText('zum Starten & Bewegen!', canvas.width / 2, canvas.height / 2 + 20);
                 ctx.textAlign = 'left';
             }
 
