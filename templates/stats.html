@@ -84,7 +84,8 @@
                     <th>Snake</th>
                     <th>Crossy Huhn</th>
                     <th>Neon Jump</th>
-                    <th>Tower Stack</th> <!-- NEU -->
+                    <th>Tower Stack</th>
+                    <th>Neon Dino</th>
                 </tr>
                 {% for name, s in scores.items() %}
                 {% set p_meta = meta.get(name, {'color': '', 'title': '', 'display_name': name}) %}
@@ -107,7 +108,8 @@
                     <td>{{ ((s.playtime_snake or 0) / 60) | round | int }}m</td>
                     <td>{{ ((s.playtime_crossy or 0) / 60) | round | int }}m</td>
                     <td>{{ ((s.playtime_doodle or 0) / 60) | round | int }}m</td>
-                    <td>{{ ((s.playtime_tower or 0) / 60) | round | int }}m</td> <!-- NEU -->
+                    <td>{{ ((s.playtime_tower or 0) / 60) | round | int }}m</td> 
+                    <td>{{ ((s.playtime_dino or 0) / 60) | round | int }}m</td>
                 </tr>
                 {% endfor %}
             </table>
