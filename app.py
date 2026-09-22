@@ -617,8 +617,19 @@ def trade_coins():
         empfaenger_u = UserSetting(username=empfaenger)
         db.session.add(empfaenger_u)
         
+    # Coins übertragen
     sender_u.coins -= betrag
     empfaenger_u.coins = (empfaenger_u.coins or 0) + betrag
+    
+    # --- NEU: Automatische Chat-Benachrichtigung generieren ---
+    # Wir erstellen automatisch eine private Nachricht an den Empfänger
+    room_id = get_private_room_name(sender, empfaenger)
+    benachrichtigungs_text = f"💸 Ich habe dir gerade {betrag} Coins gesendet!"
+    
+    new_msg = ChatMessage(room=room_id, sender=sender, text=benachrichtigungs_text)
+    db.session.add(new_msg)
+    # --------------------------------------------------------
+    
     db.session.commit()
     return {"status": "success", "new_balance": sender_u.coins}
 
