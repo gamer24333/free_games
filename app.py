@@ -159,6 +159,7 @@ class GameScore(db.Model):
     brickbreaker = db.Column(db.Integer, default=0)
     speedtyping = db.Column(db.Integer, default=0)
     slither = db.Column(db.Integer, default=0)
+    tower = db.Column(db.Integer, default=0)
     
     playtime_gd = db.Column(db.Integer, default=0)
     playtime_clicker = db.Column(db.Integer, default=0)
@@ -170,6 +171,7 @@ class GameScore(db.Model):
     playtime_brickbreaker = db.Column(db.Integer, default=0)
     playtime_speedtyping = db.Column(db.Integer, default=0)
     playtime_slither = db.Column(db.Integer, default=0)
+    playtime_tower = db.Column(db.Integer, default=0)
 
 class TicTacToeGame(db.Model):
     __tablename__ = 'tictactoe_games'
@@ -327,6 +329,7 @@ def ping_user():
                     elif game_name == "brickbreaker": score_entry.playtime_brickbreaker = (score_entry.playtime_brickbreaker or 0) + 5
                     elif game_name == "speedtyping": score_entry.playtime_speedtyping = (score_entry.playtime_speedtyping or 0) + 5
                     elif game_name == "slither": score_entry.playtime_slither = (score_entry.playtime_slither or 0) + 5
+                    elif game_name == "tower stack": score_entry.playtime_tower = (score_entry.playtime_tower or 0) + 5  # <--- NEU
                 
                 db.session.commit()
             
@@ -542,6 +545,7 @@ def global_stats():
     assign_points('brickbreaker', ignore_val=0)
     assign_points('speedtyping', ignore_val=0)
     assign_points('slither', ignore_val=0)
+    assign_points('tower', ignore_val=0)
     
     efficiency_list = []
     for u in all_users:
@@ -1766,6 +1770,35 @@ def tankroyale_delete_match(game_id):
         db.session.delete(match)
         db.session.commit()
     return redirect(url_for('dashboard'))
+
+@app.route('/tower-stack')
+def tower_stack_game():
+    if 'username' not in session: return redirect(url_for('login'))
+    all_scores = GameScore.query.all()
+    scores_dict = {s.username: (getattr(s, 'tower', 0) or 0) for s in all_scores}
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
+    meta = get_user_metadata()
+    return render_template('tower_stack.html', leaderboard=leaderboard, meta=meta)
+
+@app.route('/api/submit-tower', methods=['POST'])
+def submit_tower():
+    if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
+    current_user = session['username']
+    multiplier = get_user_multiplier(current_user)
+    score = int(request.json.get('score', 0)) * multiplier
+    
+    user_score = GameScore.query.filter_by(username=current_user).first()
+    if not user_score: 
+        db.session.add(GameScore(username=current_user, tower=score))
+    else:
+        current_best = getattr(user_score, 'tower', 0)
+        if current_best is None: current_best = 0
+        if score > current_best: 
+            user_score.tower = score
+    db.session.commit()
+    return {"status": "success"}
+
+
 
 if __name__ == '__main__':
     with app.app_context():
