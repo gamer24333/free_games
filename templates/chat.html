@@ -37,7 +37,7 @@
                 
                 <h3>Direktnachrichten</h3>
                 {% for p in partner %}
-                <a href="/chat/{{ p }}" class="partner-btn" data-partner="{{ p.username }}" style="position: relative;">
+                <a href="/chat/{{ p.username }}" class="partner-btn" data-partner="{{ p.username }}" style="position: relative;">
                     <span>👤 {{ p.display_name }} <span id="status-{{ p.username }}" class="status-dot"></span></span>
                     <span id="badge-{{ p.username }}" class="badge" style="background: #ff2e63; color: white; border-radius: 50%; padding: 2px 6px; font-size: 11px; display: none;">0</span>
                 </a>
