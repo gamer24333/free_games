@@ -31,7 +31,7 @@
                 <option value="" disabled selected>Mitschüler auswählen...</option>
                 {% for s in klassen_liste %}
                     {% if s not in admins %}
-                        <option value="{{ s }}">{{ s }}</option>
+                        <option value="{{ s }}">{{ meta.get(s, {}).get('display_name', s) }}</option>
                     {% endif %}
                 {% endfor %}
             </select>
@@ -46,8 +46,10 @@
             <tbody>
                 {% for admin in admins %}
                 <tr>
-                    {% set m = meta.get(admin, {}) %}
-                    <b>{{ m.display_name if m.display_name else admin }}</b>
+                    <td>
+                        {% set m = meta.get(admin, {}) %}
+                        👑 <b>{{ m.display_name if m.display_name else admin }}</b>
+                    </td>
                     <td>
                         {% if admin != "Till" %}
                             <form action="/admin/remove-admin/{{ admin }}" method="POST" style="margin: 0;">
@@ -123,8 +125,10 @@
                 <option value="alle">🌍 AN ALLE SCHÜLER SENDEN</option>
                 <optgroup label="Bestimmter Schüler">
                     {% for s in klassen_liste %}
-                        <option value="{{ s }}">{{ s }}</option>
+                        <option value="{{ s }}">{{ meta.get(s, {}).get('display_name', s) }}</option>
                     {% endfor %}
+                </optgroup>
+                </optgroup>
                 </optgroup>
             </select>
             
