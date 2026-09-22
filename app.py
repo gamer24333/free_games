@@ -801,7 +801,7 @@ def dashboard():
 
     tank_games = TankGame.query.filter(((TankGame.ersteller == me) | (TankGame.gegner == me)) & (TankGame.status == "aktiv")).all()
     for g in tank_games:
-        gegner_name = g.gegner if g.ersteller == me else g.ersteller
+        gegner_name = g.gegner if g.ersteller == me else g.gegner
         gegner_u = UserSetting.query.filter_by(username=gegner_name).first()
         gegner_display = gegner_u.display_name if (gegner_u and gegner_u.display_name) else gegner_name
         aktive_matches.append({"id": g.game_id, "von": f"Tank Royale vs. {gegner_display}", "is_active": True, "typ": "tankroyale"})
@@ -809,7 +809,13 @@ def dashboard():
     is_admin = True if (me == "Till" or (user and user.is_admin)) else False
     
     lvl, rank = get_level_info(user.xp if user else 0)
-    chpartner = sorted([s for s in KLASSEN_LISTE if s != me])
+    
+    # Partner-Liste mit echtem Namen und Display-Name vorbereiten
+    meta = get_user_metadata()
+    chpartner = []
+    for s in sorted([s for s in KLASSEN_LISTE if s != me]):
+        d_name = meta.get(s, {}).get('display_name', s)
+        chpartner.append({'username': s, 'display_name': d_name})
     
     return render_template('dashboard.html', 
                            name=display_name, 
@@ -1038,7 +1044,11 @@ def chat(room="global"):
     online_names = [u.display_name if u.display_name else u.username for u in online_users]
 
     current_user = session['username']
-    chpartner = sorted([schueler for schueler in KLASSEN_LISTE if schueler != current_user])
+    meta = get_user_metadata()
+    chpartner = []
+    for schueler in sorted([s for s in KLASSEN_LISTE if s != current_user]):
+        d_name = meta.get(schueler, {}).get('display_name', schueler)
+        chpartner.append({'username': schueler, 'display_name': d_name})
     
     admins = get_admins_list()
     return render_template('chat.html', room=room, partner=chpartner, admins=admins, online_liste=online_names)
