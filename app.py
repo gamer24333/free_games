@@ -21,8 +21,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # ---  Verhindert Verbindungsabbrüche (SSL closed unexpectedly) ---
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "pool_pre_ping": True,  # Prüft, ob die Verbindung noch lebt, bevor sie genutzt wird
-    "pool_recycle": 300,    # Erneuert die Verbindung alle 5 Minuten präventiv
+    "pool_pre_ping": True,
+    "pool_recycle": 300,
 }
 
 db = SQLAlchemy(app)
@@ -41,23 +41,18 @@ last_active = {}
 user_activities = {}
 
 # --- SHOP ITEMS ---
-
 SHOP_ITEMS = {
-    # Titel
     "title_destroyer": {"id": "title_destroyer", "type": "title", "name": "Titel: Der Zerstörer", "desc": "Ein bedrohlicher Titel im Chat.", "price": 250, "value": "Der Zerstörer"},
     "title_king": {"id": "title_king", "type": "title", "name": "Titel: King", "desc": "Zeig allen, wer der Boss ist.", "price": 500, "value": "King"},
     
-    # Farben (Skins)
     "color_gold": {"id": "color_gold", "type": "color", "name": "Name: Gold", "desc": "Dein Name leuchtet Gold.", "price": 300, "value": "#f1c40f"},
     "color_rainbow": {"id": "color_rainbow", "type": "color", "name": "Name: Regenbogen", "desc": "Bunter Chat-Name!", "price": 800, "value": "rainbow"},
     "color_neon": {"id": "color_neon", "type": "color", "name": "Name: Neon Cyan", "desc": "Helles Hacker-Blau.", "price": 300, "value": "#00adb5"},
     
-    # Admin Exklusiv
     "title_admin": {"id": "title_admin", "type": "title", "name": "Titel: Admin", "desc": "Offizieller Admin-Titel.", "price": 0, "value": "Admin", "admin_only": True},
     "title_crown": {"id": "title_crown", "type": "title", "name": "Titel: Krone", "desc": "Das Zeichen des Bosses.", "price": 0, "value": "👑", "admin_only": True},
     "color_purple": {"id": "color_purple", "type": "color", "name": "Name: Admin Lila", "desc": "Die Admin-Farbe.", "price": 0, "value": "#9b59b6", "admin_only": True},
     
-    # NEU: Spiel-Upgrades (Die werden nur gekauft und können passiv im Spiel geprüft werden)
     "upg_snake_life": {"id": "upg_snake_life", "type": "upgrade", "name": "Snake: Extra Leben", "desc": "Du kannst 1x pro Runde eine Wand berühren, ohne zu sterben.", "price": 1000, "value": "snake_life"},
     "upg_brick_fire": {"id": "upg_brick_fire", "type": "upgrade", "name": "BrickBreaker: Feuerball", "desc": "Dein Ball zerstört beim Start Blöcke sofort ohne abzuprallen.", "price": 1200, "value": "brick_fire"},
     "upg_slither_boost": {"id": "upg_slither_boost", "type": "upgrade", "name": "Slither: Sprint-Boost", "desc": "Verliere weniger Punkte, wenn du boostest.", "price": 1500, "value": "slither_boost"}
@@ -65,10 +60,10 @@ SHOP_ITEMS = {
 
 # --- SLITHER.IO RAM-SPEICHER ---
 SLITHER_STATE = {
-    "players": {},       # username -> {body: [[x,y], ...], color, score, last_seen}
-    "bots": {},          # bot_id -> {body: [[x,y], ...], color, score, angle, x, y}
-    "food": {},          # food_id -> {'x': int, 'y': int, 'c': color, 'v': value}
-    "map_size": 3000     # Größe der Arena
+    "players": {},
+    "bots": {},
+    "food": {},
+    "map_size": 3000
 }
 
 COLORS = ["#ff2e63", "#00adb5", "#2ecc71", "#f1c40f", "#9b59b6", "#e67e22", "#ffffff", "#e74c3c"]
@@ -80,13 +75,11 @@ def spawn_food(amount=10):
             'x': random.randint(100, SLITHER_STATE["map_size"] - 100),
             'y': random.randint(100, SLITHER_STATE["map_size"] - 100),
             'c': random.choice(COLORS),
-            'v': 1 # Futter-Wert
+            'v': 1
         }
 
-# Initiales Futter spawnen
 spawn_food(150)
 
-# 3 Bots hinzufügen
 for i in range(3):
     SLITHER_STATE["bots"][f"Bot {i+1}"] = {
         "body": [[random.randint(500, 2500), random.randint(500, 2500)]],
@@ -100,11 +93,11 @@ for i in range(3):
 GEHEIME_CODES = {
     "TILLISTDERBESTEADMIN": "double_score",
     "REICHTUM": "1000_coins",
-    "ESREGNETMÜNZEN": "100_coins", # NEUER CODE
+    "ESREGNETMÜNZEN": "100_coins",
     "WHEELXP": "100_xp"
 }
 
-# --- DATENBANK MODELLE (TABELLEN) ---
+# --- DATENBANK MODELLE ---
 class Feedback(db.Model):
     __tablename__ = 'feedback'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -241,14 +234,12 @@ def get_user_metadata():
     meta = {}
     for u in all_users:
         titles = []
-        # JSON parsen, da Titel als String-Liste in der Datenbank liegen
         if u.active_title:
             try:
                 titles = json.loads(u.active_title) if u.active_title.startswith('[') else [u.active_title]
             except:
                 titles = [u.active_title]
         
-        # Wenn ein Titel existiert, eckige Klammern drum machen
         titel_text = f"[{titles[0]}]" if len(titles) > 0 and titles[0] else ""
         farbe = u.active_color if u.active_color else "white"
         
@@ -302,23 +293,18 @@ def ping_user():
         
         data = request.get_json(silent=True) or {}
         activity = data.get('activity', 'Im Portal')
-        is_afk = data.get('is_afk', False) # <--- NEU: Überprüft auf AFK Status
+        is_afk = data.get('is_afk', False)
         
-        # Activity Label updaten (zeigt z.B. "Im Portal (AFK)")
         if is_afk:
              user_activities[current_user] = f"{activity} (AFK)"
         else:
              user_activities[current_user] = activity
         
-        # --- Spielzeit & XP/Coins tracken (NUR WENN NICHT AFK) ---
         if not is_afk:
             user = UserSetting.query.filter_by(username=current_user).first()
             if user:
                 user.playtime_total = (user.playtime_total or 0) + 5
-                
-                # XP und Coins generieren
-                user.xp = (user.xp or 0) + 2  # 2 XP pro Ping
-                # Alle 25 Pings gibt es 1 Coin
+                user.xp = (user.xp or 0) + 2 
                 if (user.playtime_total % 25) == 0: 
                     user.coins = (user.coins or 0) + 1
 
@@ -369,6 +355,7 @@ def dashboard_stats():
         }
     return {"error": "Nicht autorisiert"}, 401
 
+
 # --- SHOP & INVENTAR ROUTEN ---
 @app.route('/api/shop/data')
 def shop_data():
@@ -378,8 +365,6 @@ def shop_data():
     if not u: return {}, 404
     
     inv = json.loads(u.inventory) if u.inventory else []
-    
-    # Admins automatisch Admin-Items ins Inventar geben
     admins_list = get_admins_list()
     is_admin_user = (username == "Till" or u.is_admin or username in admins_list)
     
@@ -391,7 +376,6 @@ def shop_data():
         u.inventory = json.dumps(inv)
         db.session.commit()
 
-    # Nur Admins sehen die Admin-Items im Shop/Inventar-Bereich
     filtered_shop_items = {}
     for item_id, item_data in SHOP_ITEMS.items():
         if item_data.get("admin_only"):
@@ -405,7 +389,6 @@ def shop_data():
     except:
         active_titles = [u.active_title] if u.active_title else []
 
-    
     return jsonify({
         "coins": u.coins or 0,
         "inventory": inv,
@@ -425,7 +408,6 @@ def shop_buy():
     admins_list = get_admins_list()
     is_admin_user = (session['username'] == "Till" or u.is_admin or session['username'] in admins_list)
 
-    # Verhindern, dass normale User Admin-Items kaufen
     if SHOP_ITEMS[item_id].get("admin_only") and not is_admin_user:
         return {"error": "Dieses Item ist exklusiv für Admins!"}, 403
     
@@ -457,13 +439,12 @@ def shop_equip():
             active_titles = [u.active_title] if u.active_title else []
             
         if item["value"] in active_titles:
-            active_titles.remove(item["value"]) # Unequip
+            active_titles.remove(item["value"])
         else:
-            active_titles.append(item["value"]) # Equip
+            active_titles.append(item["value"])
         u.active_title = json.dumps(active_titles)
         
     elif item["type"] == "color":
-        
         if u.active_color == item["value"]:
             u.active_color = None
         else:
@@ -517,7 +498,10 @@ def global_stats():
     efficiency_list.sort(key=lambda x: x['points'], reverse=True)
     scores_dict = {s.username: s for s in all_scores}
     
-    return render_template('stats.html', efficiency=efficiency_list, scores=scores_dict)
+    # NEU: Lade alle Farben und Titel für die globale Rangliste
+    meta = get_user_metadata()
+    
+    return render_template('stats.html', efficiency=efficiency_list, scores=scores_dict, meta=meta)
 
 @app.route('/shop')
 def shop_page():
@@ -525,7 +509,6 @@ def shop_page():
     me = session['username']
     user = UserSetting.query.filter_by(username=me).first()
     return render_template('shop.html', name=me, user_coins=(user.coins if user else 0))
-
 
 @app.route('/api/redeem-code', methods=['POST'])
 def redeem_code():
@@ -547,7 +530,6 @@ def redeem_code():
     belohnung = GEHEIME_CODES[code]
     msg = "Code akzeptiert!"
 
-    # Fester Admin/Score-Bonus
     if belohnung == "double_score":
         user.score_multiplier = 2  
         msg = "Code akzeptiert! Du hast ab sofort DOPPELTEN SCORE in den Spielen!"
@@ -555,11 +537,10 @@ def redeem_code():
         user.is_admin = True
         msg = "Code akzeptiert! Du bist jetzt Admin!"
     else:
-        # Dynamisches Parsen für alles mit "_" (z.B. "1000_coins" oder "100_xp")
         try:
             teile = belohnung.split("_", 1)
-            menge = int(teile[0])  # Die Zahl (z.B. 1000 oder 100)
-            typ = teile[1]         # Die Art (z.B. "coins" oder "xp")
+            menge = int(teile[0])
+            typ = teile[1]
             
             if typ == "coins":
                 user.coins = (user.coins or 0) + menge
@@ -575,23 +556,20 @@ def redeem_code():
     
     return {"status": "success", "message": msg}
 
-# --- DAILY LOGIN BONUS ---
 @app.route('/api/daily-bonus', methods=['POST'])
 def daily_bonus():
     if 'username' not in session: return {"error": "Nicht eingeloggt"}, 401
     u = UserSetting.query.filter_by(username=session['username']).first()
     
     now = datetime.utcnow()
-    # Wenn noch nie abgeholt oder letzter Abruf vor einem Tag war
     if not u.last_daily_claim or (now - u.last_daily_claim).days >= 1:
-        # Check ob Streak gerissen ist (mehr als 2 Tage her)
         if u.last_daily_claim and (now - u.last_daily_claim).days > 2:
             u.login_streak = 1
         else:
             u.login_streak = (u.login_streak or 0) + 1
             
-        belohnung = 10 + (u.login_streak * 5) # Jeder Tag in Folge gibt 5 Coins mehr
-        if belohnung > 100: belohnung = 100 # Maximal 100 Coins pro Tag
+        belohnung = 10 + (u.login_streak * 5)
+        if belohnung > 100: belohnung = 100 
         
         u.coins = (u.coins or 0) + belohnung
         u.last_daily_claim = now
@@ -608,7 +586,6 @@ def daily_page():
     now = datetime.utcnow()
     can_claim = True
     
-    # Prüfen, ob der Bonus in den letzten 24h schon abgeholt wurde
     if user.last_daily_claim and (now - user.last_daily_claim).days < 1:
         can_claim = False
         
@@ -616,7 +593,6 @@ def daily_page():
     return render_template('daily_bonus.html', streak=streak, can_claim=can_claim, coins=(user.coins or 0))
 
 
-# --- TRADING SYSTEM (COINS SENDEN) ---
 @app.route('/api/trade/coins', methods=['POST'])
 def trade_coins():
     if 'username' not in session: return {"error": "401"}, 401
@@ -637,24 +613,19 @@ def trade_coins():
         empfaenger_u = UserSetting(username=empfaenger)
         db.session.add(empfaenger_u)
         
-    # Coins übertragen
     sender_u.coins -= betrag
     empfaenger_u.coins = (empfaenger_u.coins or 0) + betrag
     
-    # --- NEU: Automatische Chat-Benachrichtigung generieren ---
-    # Wir erstellen automatisch eine private Nachricht an den Empfänger
     room_id = get_private_room_name(sender, empfaenger)
     benachrichtigungs_text = f"💸 Ich habe dir gerade {betrag} Coins gesendet!"
     
     new_msg = ChatMessage(room=room_id, sender=sender, text=benachrichtigungs_text)
     db.session.add(new_msg)
-    # --------------------------------------------------------
     
     db.session.commit()
     return {"status": "success", "new_balance": sender_u.coins}
 
 
-# --- GLÜCKSRAD ---
 @app.route('/gluecksrad')
 def wheel_page():
     if 'username' not in session: return redirect(url_for('login'))
@@ -672,7 +643,6 @@ def spin_wheel():
     
     u.coins -= einsatz
     
-    # Neue, ausbalancierte Chancen-Verteilung
     rand = random.random()
     if rand < 0.60: 
         gewinn, text, segment = 0, "Niete! 😭", "niete"
@@ -690,7 +660,6 @@ def spin_wheel():
     db.session.commit()
     
     return {"status": "success", "text": text, "new_balance": u.coins, "segment": segment}
-    
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -731,7 +700,6 @@ def login():
             
     return render_template('login.html')
 
-
 @app.route('/welcome')
 def dashboard():
     if 'username' not in session: 
@@ -766,8 +734,6 @@ def dashboard():
     is_admin = True if (me == "Till" or (user and user.is_admin)) else False
     
     lvl, rank = get_level_info(user.xp if user else 0)
-
-    # NEU: Partner-Liste für das Trading-Dropdown übergeben
     chpartner = sorted([s for s in KLASSEN_LISTE if s != me])
     
     return render_template('dashboard.html', 
@@ -926,7 +892,6 @@ def send_admin_message():
         db.session.commit()
     return redirect(url_for('admin_panel'))
 
-# --- FEEDBACK SYSTEM ---
 @app.route('/api/submit-feedback', methods=['POST'])
 def submit_feedback():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
@@ -956,7 +921,6 @@ def mark_feedback_read(fb_id):
         db.session.commit()
     return {"status": "success"}
 
-# --- CHAT ROUTEN (MIT LEVELS & TITELN) ---
 @app.route('/chat')
 @app.route('/chat/<room>')
 def chat(room="global"):
@@ -996,7 +960,6 @@ def api_chat_messages(room):
         
     db_messages = ChatMessage.query.filter_by(room=actual_room).order_by(ChatMessage.id.asc()).all()[-150:]
     
-    # Nutzer-Metadaten laden (Level, Titel, Farbe)
     all_users = UserSetting.query.all()
     meta = {}
     for u in all_users:
@@ -1047,13 +1010,10 @@ def delete_message(room, msg_index):
             db.session.commit()
     return redirect(url_for('chat', room=room))
 
-
-# --- SLITHER.IO MULTIPLAYER ROUTEN ---
 @app.route('/slither')
 def slither_menu():
     if 'username' not in session: return redirect(url_for('login'))
     
-    # Aufräumen: Inaktive Spieler entfernen (nach 5 Sekunden ohne Ping)
     now = time.time()
     active_players = []
     for p, data in list(SLITHER_STATE["players"].items()):
@@ -1125,11 +1085,9 @@ def slither_sync():
         new_x = bot["x"] + math.cos(bot["angle"]) * speed
         new_y = bot["y"] + math.sin(bot["angle"]) * speed
         
-        # --- AB HIER NEU: BOTS STERBEN AN DER WAND ODER AN SPIELERN ---
         bot_radius = 10 + (bot["score"] / 20)
         bot_died = False
         
-        # 1. Kollision mit echten Spielern prüfen
         for p_name, p_data in SLITHER_STATE["players"].items():
             if not p_data.get("body"): continue
             enemy_radius = 10 + (p_data.get("score", 0) / 20)
@@ -1140,7 +1098,6 @@ def slither_sync():
                     break
             if bot_died: break
             
-        # 2. Kollision mit anderen Bots prüfen
         if not bot_died:
             for other_bot_id, other_bot in SLITHER_STATE["bots"].items():
                 if other_bot_id == bot_id or not other_bot.get("body"): continue
@@ -1152,14 +1109,11 @@ def slither_sync():
                         break
                 if bot_died: break
 
-        # Wenn der Bot die Wand berührt ODER in einen Spieler/anderen Bot gecrasht ist
         if bot_died or new_x < 0 or new_x > SLITHER_STATE["map_size"] or new_y < 0 or new_y > SLITHER_STATE["map_size"]:
-            # Bot platzt in Futter!
             for segment in bot["body"][::2]:
                 fid = str(uuid.uuid4())[:8]
                 SLITHER_STATE["food"][fid] = {'x': segment[0], 'y': segment[1], 'c': bot["color"], 'v': 3}
             
-            # Bot an zufälliger Position neu spawnen
             SLITHER_STATE["bots"][bot_id] = {
                 "body": [[random.randint(1000, 2000), random.randint(1000, 2000)]],
                 "color": random.choice(COLORS),
@@ -1167,13 +1121,12 @@ def slither_sync():
                 "angle": random.uniform(0, math.pi * 2),
                 "x": 0, "y": 0
             }
-            continue # Diesen Bot für diesen Durchlauf überspringen
+            continue
         
         bot["body"].insert(0, [new_x, new_y])
         if len(bot["body"]) > (bot["score"] // 10) + 5:
             bot["body"].pop()
             
-        # Bot isst Futter (simuliert)
         if random.random() < 0.02: bot["score"] += 1
 
     all_entities = []
@@ -1199,14 +1152,14 @@ def games_menu():
     for i in tank_invites: aktive_einladungen.append({"id": i.game_id, "von": i.ersteller, "typ": "tankroyale"})
     return render_template('games.html', einladungen=aktive_einladungen)
 
-# --- GEOMETRY DASH ---
 @app.route('/geometry-dash')
 def game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: s.geometry_dash for s in all_scores}
     leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
-    return render_template('geometry_dash.html', leaderboard=leaderboard)
+    meta = get_user_metadata()
+    return render_template('geometry_dash.html', leaderboard=leaderboard, meta=meta)
     
 @app.route('/api/submit-score', methods=['POST'])
 def submit_score():
@@ -1223,14 +1176,14 @@ def submit_score():
     db.session.commit()
     return {"status": "success"}
 
-# --- CLICKER ---
 @app.route('/clicker')
 def clicker_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: s.clicker for s in all_scores}
     leaderboard = sorted([(s, scores_dict.get(s, 0) if scores_dict.get(s) is not None else 0) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
-    return render_template('clicker.html', leaderboard=leaderboard)
+    meta = get_user_metadata()
+    return render_template('clicker.html', leaderboard=leaderboard, meta=meta)
     
 @app.route('/api/submit-clicker', methods=['POST'])
 def submit_clicker():
@@ -1247,14 +1200,14 @@ def submit_clicker():
     db.session.commit()
     return {"status": "success"}
 
-# --- FLAPPY BIRD ---
 @app.route('/flappy')
 def flappy_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: s.flappy for s in all_scores}
     leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
-    return render_template('flappy.html', leaderboard=leaderboard)
+    meta = get_user_metadata()
+    return render_template('flappy.html', leaderboard=leaderboard, meta=meta)
 
 @app.route('/api/submit-flappy', methods=['POST'])
 def submit_flappy():
@@ -1271,14 +1224,14 @@ def submit_flappy():
     db.session.commit()
     return {"status": "ok"}
 
-# --- REACTION TIME ---
 @app.route('/reaction')
 def reaction_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: s.reaction for s in all_scores}
     leaderboard = sorted([(s, scores_dict.get(s, 9999)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=False)
-    return render_template('reaction.html', leaderboard=leaderboard)
+    meta = get_user_metadata()
+    return render_template('reaction.html', leaderboard=leaderboard, meta=meta)
 
 @app.route('/api/submit-reaction', methods=['POST'])
 def submit_reaction():
@@ -1295,14 +1248,14 @@ def submit_reaction():
     db.session.commit()
     return {"status": "ok"}
 
-# --- SNAKE ---
 @app.route('/snake')
 def snake_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: (s.snake if s.snake is not None else 0) for s in all_scores}
     leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
-    return render_template('snake.html', leaderboard=leaderboard)
+    meta = get_user_metadata()
+    return render_template('snake.html', leaderboard=leaderboard, meta=meta)
 
 @app.route('/api/submit-snake', methods=['POST'])
 def submit_snake():
@@ -1319,14 +1272,14 @@ def submit_snake():
     db.session.commit()
     return {"status": "success"}
 
-# --- CROSSY HUHN ---
 @app.route('/crossy')
 def crossy_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: (s.crossy if s.crossy is not None else 0) for s in all_scores}
     leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
-    return render_template('crossy.html', leaderboard=leaderboard)
+    meta = get_user_metadata()
+    return render_template('crossy.html', leaderboard=leaderboard, meta=meta)
 
 @app.route('/api/submit-crossy', methods=['POST'])
 def submit_crossy():
@@ -1343,18 +1296,15 @@ def submit_crossy():
     db.session.commit()
     return {"status": "success"}
 
-# --- NEON JUMP (Doodle) ---
 @app.route('/doodle')
 def doodle_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: (s.doodle if s.doodle is not None else 0) for s in all_scores}
     leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
-    # NEU: Lade alle Farben und Titel
     meta = get_user_metadata()
-    
-    # NEU: Gib "meta=meta" an das HTML-Template weiter
     return render_template('doodle.html', leaderboard=leaderboard, meta=meta)
+
 @app.route('/api/submit-doodle', methods=['POST'])
 def submit_doodle():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
@@ -1370,14 +1320,14 @@ def submit_doodle():
     db.session.commit()
     return {"status": "success"}
 
-# --- BRICK BREAKER ---
 @app.route('/brickbreaker')
 def brickbreaker_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: (s.brickbreaker if hasattr(s, 'brickbreaker') and s.brickbreaker is not None else 0) for s in all_scores}
     leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
-    return render_template('brickbreaker.html', leaderboard=leaderboard)
+    meta = get_user_metadata()
+    return render_template('brickbreaker.html', leaderboard=leaderboard, meta=meta)
 
 @app.route('/api/submit-brickbreaker', methods=['POST'])
 def submit_brickbreaker():
@@ -1395,14 +1345,14 @@ def submit_brickbreaker():
     db.session.commit()
     return {"status": "success"}
 
-# --- SPEED TYPING ---
 @app.route('/speedtyping')
 def speedtyping_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: (getattr(s, 'speedtyping', 0) or 0) for s in all_scores}
     leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
-    return render_template('speedtyping.html', leaderboard=leaderboard)
+    meta = get_user_metadata()
+    return render_template('speedtyping.html', leaderboard=leaderboard, meta=meta)
 
 @app.route('/api/submit-speedtyping', methods=['POST'])
 def submit_speedtyping():
@@ -1425,7 +1375,6 @@ def logout():
     session.pop('username', None)
     return redirect(url_for('login'))
 
-# --- TIC-TAC-TOE Multiplayer ---
 @app.route('/tictactoe')
 def tictactoe_menu():
     if 'username' not in session: return redirect(url_for('login'))
@@ -1529,7 +1478,6 @@ def ttt_move(game_id):
             return {"status": "success"}
     return {"status": "invalid_move"}, 400
 
-# --- TANK ROYALE MULTIPLAYER ---
 @app.route('/tankroyale')
 def tankroyale_menu():
     if 'username' not in session: return redirect(url_for('login'))
