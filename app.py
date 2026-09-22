@@ -20,7 +20,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///local_portal.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # ---  Verhindert Verbindungsabbrüche (SSL closed unexpectedly) ---
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {fgluecksr
     "pool_pre_ping": True,
     "pool_recycle": 300,
 }
@@ -653,8 +653,8 @@ def spin_wheel():
     elif rand < 0.99: 
         gewinn, text, segment = 100, "JACKPOT! 100 Münzen! 💎", "jackpot"
     else: 
-        gewinn, text, segment = 0, "XP-Boost! +50 XP 🌟", "xp"
-        u.xp = (u.xp or 0) + 50
+        gewinn, text, segment = 0, "XP-Boost! +1000 XP 🌟", "xp"
+        u.xp = (u.xp or 0) + 1000
         
     u.coins += gewinn
     db.session.commit()
