@@ -46,7 +46,8 @@
             <tbody>
                 {% for admin in admins %}
                 <tr>
-                    <td>👑 <b>{{ admin }}</b></td>
+                    {% set m = meta.get(admin, {}) %}
+                    <b>{{ m.display_name if m.display_name else admin }}</b>
                     <td>
                         {% if admin != "Till" %}
                             <form action="/admin/remove-admin/{{ admin }}" method="POST" style="margin: 0;">
@@ -72,7 +73,7 @@
                 <option value="" disabled selected>Wen möchtest du bannen?</option>
                 {% for s in klassen_liste %}
                     {% if s != "Till" and s not in banned_users %}
-                        <option value="{{ s }}">{{ s }}</option>
+                        <option value="{{ s }}">{{ meta.get(s, {}).get('display_name', s) }}</option>
                     {% endif %}
                 {% endfor %}
             </select>
@@ -96,7 +97,8 @@
             <tbody>
                 {% for schueler, bis_wann in banned_users.items() %}
                 <tr>
-                    <td><b>{{ schueler }}</b></td>
+                    {% set m = meta.get(schueler, {}) %}
+                    <td><b>{{ m.display_name if m.display_name else schueler }}</b></td>
                     <td style="color: #ff2e63; font-size: 14px;">{{ bis_wann }}</td>
                     <td>
                         <form action="/admin/unban/{{ schueler }}" method="POST" style="margin: 0;">
@@ -153,7 +155,8 @@
             <tbody>
                 {% for schueler, pin in pins.items() %}
                 <tr>
-                    <td><b>{{ schueler }}</b></td>
+                    {% set m = meta.get(schueler, {}) %}
+                    <td><b>{{ m.display_name if m.display_name else schueler }}</b></td>
                     <td>
                         <form action="/admin/reset-pin/{{ schueler }}" method="POST" style="display:inline;">
                             <button type="submit" class="btn danger-btn" style="padding: 5px 10px; font-size: 12px;">PIN löschen</button>
