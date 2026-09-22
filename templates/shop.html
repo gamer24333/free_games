@@ -86,9 +86,14 @@
 
             for (const [id, item] of Object.entries(data.shop_items)) {
                 const isOwned = data.inventory.includes(id);
-                const isEquipped = Array.isArray(data.active_title) ? data.active_title.includes(item.value) : (data.active_title === item.value || data.active_color === item.value);
                 const type = item.type; // title, color, upgrade
-
+                
+                let isEquipped = false;
+                if (type === 'title') {
+                    isEquipped = Array.isArray(data.active_title) ? data.active_title.includes(item.value) : (data.active_title === item.value);
+                } else if (type === 'color') {
+                    isEquipped = (data.active_color === item.value);
+                }
                 if (!isOwned) {
                     hasShopItems = true;
                     shopItemsHTML[type] += `
