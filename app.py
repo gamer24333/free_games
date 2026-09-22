@@ -298,13 +298,18 @@ def ping_user():
         data = request.get_json(silent=True) or {}
         activity = data.get('activity', 'Im Portal')
         is_afk = data.get('is_afk', False)
+        is_bot = data.get('is_bot', False)  # <-- NEU: Bot-Flag auslesen
         
-        if is_afk:
-             user_activities[current_user] = f"{activity} (AFK)"
+        # Aktivitäten-Status updaten (sichtbar im Dashboard/Admin-Panel)
+        if is_bot:
+            user_activities[current_user] = f"{activity} (BOT VERDACHT)"
+        elif is_afk:
+            user_activities[current_user] = f"{activity} (AFK)"
         else:
-             user_activities[current_user] = activity
+            user_activities[current_user] = activity
         
-        if not is_afk:
+        # <-- NEU: XP und Coins werden abgebrochen, wenn der User AFK ist ODER ein Bot erkannt wurde!
+        if not is_afk and not is_bot:
             user = UserSetting.query.filter_by(username=current_user).first()
             if user:
                 user.playtime_total = (user.playtime_total or 0) + 5
@@ -329,10 +334,10 @@ def ping_user():
                     elif game_name == "brickbreaker": score_entry.playtime_brickbreaker = (score_entry.playtime_brickbreaker or 0) + 5
                     elif game_name == "speedtyping": score_entry.playtime_speedtyping = (score_entry.playtime_speedtyping or 0) + 5
                     elif game_name == "slither": score_entry.playtime_slither = (score_entry.playtime_slither or 0) + 5
-                    elif game_name == "tower stack": score_entry.playtime_tower = (score_entry.playtime_tower or 0) + 5  # <--- NEU
-                
-                db.session.commit()
+                    elif game_name == "tower stack": score_entry.playtime_tower = (score_entry.playtime_tower or 0) + 5 
             
+                db.session.commit()
+        
         return {"status": "success"}
     return {"error": "Unauthorized"}, 401
 
