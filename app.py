@@ -29,7 +29,7 @@ db = SQLAlchemy(app)
 
 # Feste Klassenliste
 KLASSEN_LISTE = [
-    "Till", "Bredi11", "Matteo", "Louis", "Maxim", "Jonah P", "Jonah S", 
+    "Till", "Ben", "Matteo", "Louis", "Maxim", "Jonah P", "Jonah S", 
     "Mateo", "Hanna", "Emma", "Lia", "Mia", "Lena S", "Lena G", "Johann", 
     "Lena D", "Dasha", "Daniel", "Bennet", "Erik", "Roman", "Meike",
     "Janne", "Tom", "Levin", "Liam", "Tim", "Nathalie", "Richard", "Julius",
