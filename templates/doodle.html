@@ -29,7 +29,6 @@
         .fullscreen-link { color: #ff9f43; text-decoration: underline; cursor: pointer; font-weight: bold; }
         .fullscreen-link:hover { color: #e08b35; }
 
-        /* Das Canvas ist hier etwas höher, passend für ein Spring-Spiel */
         #gameCanvas {
             border: 4px solid #b142ff; border-radius: 12px; background: #111;
             box-shadow: 0 8px 25px rgba(0,0,0,0.6); display: block;
@@ -48,7 +47,6 @@
         .leaderboard-table th { color: #b142ff; }
         .leaderboard-table tr:nth-child(1) td { color: #ffd700; font-weight: bold; }
 
-        /* NEU: Rainbow-Animation für den Regenbogen-Namen */
         .rainbow-text {
             background: linear-gradient(90deg, #ff2e63, #f1c40f, #2ecc71, #00adb5, #9b59b6, #ff2e63);
             background-size: 200% auto;
@@ -92,18 +90,15 @@
                 <thead><tr><th>Platz</th><th>Name</th><th>Höhe</th></tr></thead>
                 <tbody>
     {% for player, score in leaderboard %}
-    <!-- Lade die Daten für diesen spezifischen Spieler (Standard: Weiß und kein Titel) -->
     {% set p_meta = meta.get(player, {'color': 'white', 'title': '', 'display_name': player}) %}
     
     <tr>
         <td>{{ loop.index }}.</td>
         <td>
-            <!-- Wenn die Farbe "rainbow" ist, nutzen wir CSS, ansonsten die normale Hex-Farbe -->
             <span class="{% if p_meta.color == 'rainbow' %}rainbow-text{% endif %}" 
                   style="{% if p_meta.color != 'rainbow' %}color: {{ p_meta.color }};{% endif %} font-weight: bold;">
                 {{ p_meta.display_name if p_meta.display_name else player }}
             </span>
-            <!-- Zeige den Titel kleiner und in Grau daneben an, falls einer existiert -->
             {% if p_meta.title %}
                 <span style="font-size: 11px; color: #aaa; margin-left: 5px;">{{ p_meta.title }}</span>
             {% endif %}
@@ -125,7 +120,6 @@
         const fullscreenLink = document.getElementById('fullscreenLink');
         let lastTime = performance.now();
         
-        // --- MUSIK EINBINDEN ---
         // --- MUSIK EINBINDEN (WEB AUDIO API) ---
         let audioCtx = null;
         let audioBuffer = null;
@@ -202,26 +196,25 @@
             let r = Math.random();
             let type = 'normal'; // Grün
             
-            // Spezial-Plattformen erst ab höherem Score und viel seltener, damit es fair bleibt
             if (score > 1500 && r < 0.12) type = 'moving'; 
             else if (score > 2500 && r < 0.20) type = 'breakable'; 
         
             let p = { 
                 x: Math.random() * (canvas.width - 70), 
                 y: y, 
-                w: 70, // Etwas breiter gemacht (vorher 60), damit man sie besser trifft!
+                w: 70, 
                 h: 12, 
                 type: type, 
                 dx: (Math.random() > 0.5 ? 1.2 : -1.2) 
             };
             platforms.push(p);
         
-            // Feder (hilft beim Hochkommen)
+            // Feder
             if (type === 'normal' && Math.random() < 0.18) {
                 springs.push({ x: p.x + 25, y: p.y - 12, w: 20, h: 12, platform: p });
             }
             
-            // Monster sehr selten und nur auf sicheren Plattformen
+            // Monster
             if (type === 'normal' && score > 2500 && Math.random() < 0.05 && !springs.find(s => s.platform === p)) {
                 monsters.push({ x: p.x + 15, y: p.y - 30, w: 35, h: 25, platform: p, dx: 1 });
             }
@@ -265,27 +258,22 @@
             
             if (!gameStarted || isGameOver || isPaused) return;
 
-            // X-Bewegung
             if (leftPressed) player.dx = -5;
             else if (rightPressed) player.dx = 5;
             else player.dx = 0;
 
             player.x += player.dx * timeScale;
 
-            // Portal-Effekt (links raus -> rechts rein)
             if (player.x < -player.w) player.x = canvas.width;
             if (player.x > canvas.width) player.x = -player.w;
 
-            // Y-Bewegung & Schwerkraft
             player.dy += GRAVITY;
             player.y += player.dy * timeScale;
 
-            // Kamera verschieben, wenn Spieler hoch springt
             if (player.y < canvas.height / 2) {
                 let diff = (canvas.height / 2) - player.y;
                 player.y = canvas.height / 2;
                 
-                // Alle Objekte nach unten schieben
                 platforms.forEach(p => p.y += diff);
                 springs.forEach(s => s.y += diff);
                 monsters.forEach(m => m.y += diff);
@@ -297,7 +285,6 @@
                 }
             }
 
-            // Plattformen aufräumen & neu spawnen
             platforms = platforms.filter(p => p.y < canvas.height + 50);
             springs = springs.filter(s => s.y < canvas.height + 50);
             monsters = monsters.filter(m => m.y < canvas.height + 50);
@@ -306,29 +293,25 @@
                 spawnPlatform(platforms[platforms.length - 1].y - (Math.random() * 20 + 50));
             }
 
-            // Kollisionen (Nur beim Fallen!)
             if (player.dy > 0) {
-                // Plattformen
                 platforms.forEach(p => {
                     if (player.x + player.w - 5 > p.x && player.x + 5 < p.x + p.w &&
                         player.y + player.h >= p.y && player.y + player.h <= p.y + p.h + 10) {
                         
-                        player.dy = JUMP_POWER; // Man kann einmal sicher abspringen
+                        player.dy = JUMP_POWER;
                         if (p.type === 'breakable') {
-                            p.broken = true; // Und danach bricht und verschwindet sie!
+                            p.broken = true;
                         }
                     }
                 });
 
-                // Federn
                 springs.forEach(s => {
                     if (player.x + player.w > s.x && player.x < s.x + s.w &&
                         player.y + player.h >= s.y && player.y + player.h <= s.y + s.h + 10) {
-                        player.dy = SPRING_POWER; // Mega-Sprung
+                        player.dy = SPRING_POWER;
                     }
                 });
                 
-                // Monster töten (auf den Kopf springen)
                 monsters.forEach(m => {
                     if (player.x + player.w > m.x && player.x < m.x + m.w &&
                         player.y + player.h >= m.y && player.y + player.h <= m.y + m.h + 10) {
@@ -338,11 +321,9 @@
                 });
             }
 
-            // Kaputte/Tote Objekte entfernen
             platforms = platforms.filter(p => !p.broken);
             monsters = monsters.filter(m => !m.dead);
 
-            // Tödliche Kollision mit Monstern (von unten oder Seite)
             monsters.forEach(m => {
                 if (player.x + player.w - 5 > m.x && player.x + 5 < m.x + m.w &&
                     player.y + player.h - 5 > m.y && player.y + 5 < m.y + m.h) {
@@ -350,7 +331,6 @@
                 }
             });
 
-            // Plattformen und Monster bewegen
             platforms.forEach(p => {
                 if (p.type === 'moving') {
                     p.x += p.dx  * timeScale;
@@ -367,7 +347,6 @@
                 }
             });
 
-            // Tod durch Runterfallen
             if (player.y > canvas.height) {
                 triggerGameOver();
             }
@@ -377,17 +356,15 @@
             ctx.fillStyle = '#111';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Neon Grid Background (leicht sichtbar)
             ctx.strokeStyle = '#222';
             ctx.lineWidth = 1;
             for(let i=0; i<canvas.width; i+=40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
             for(let i=0; i<canvas.height; i+=40) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
 
-            // Plattformen
             platforms.forEach(p => {
-                if (p.type === 'normal') ctx.fillStyle = '#39ff14'; // Grün
-                else if (p.type === 'moving') ctx.fillStyle = '#00adb5'; // Blau
-                else if (p.type === 'breakable') ctx.fillStyle = '#ff9f43'; // Orange
+                if (p.type === 'normal') ctx.fillStyle = '#39ff14';
+                else if (p.type === 'moving') ctx.fillStyle = '#00adb5';
+                else if (p.type === 'breakable') ctx.fillStyle = '#ff9f43';
                 
                 ctx.beginPath();
                 if (ctx.roundRect) ctx.roundRect(p.x, p.y, p.w, p.h, 6);
@@ -395,16 +372,14 @@
                 ctx.fill();
             });
 
-            // Federn (Gelb)
             springs.forEach(s => {
                 ctx.fillStyle = '#ffd700';
                 ctx.fillRect(s.x, s.y, s.w, s.h);
-                ctx.fillStyle = '#111'; // Rillen
+                ctx.fillStyle = '#111';
                 ctx.fillRect(s.x, s.y + 3, s.w, 2);
                 ctx.fillRect(s.x, s.y + 8, s.w, 2);
             });
 
-            // Monster (Rot)
             monsters.forEach(m => {
                 ctx.fillStyle = '#ff2e63';
                 ctx.beginPath();
@@ -412,14 +387,12 @@
                 else ctx.fillRect(m.x, m.y, m.w, m.h);
                 ctx.fill();
                 
-                // Fiese Augen
                 ctx.fillStyle = '#fff';
                 ctx.beginPath(); ctx.arc(m.x + 10, m.y + 10, 4, 0, Math.PI*2); ctx.arc(m.x + 30, m.y + 10, 4, 0, Math.PI*2); ctx.fill();
                 ctx.fillStyle = '#000';
                 ctx.beginPath(); ctx.arc(m.x + 10, m.y + 11, 2, 0, Math.PI*2); ctx.arc(m.x + 30, m.y + 11, 2, 0, Math.PI*2); ctx.fill();
             });
 
-            // Spieler (Alien / Leuchtendes Quadrat)
             ctx.fillStyle = '#b142ff';
             ctx.shadowBlur = 10;
             ctx.shadowColor = '#b142ff';
@@ -427,14 +400,12 @@
             if (ctx.roundRect) ctx.roundRect(player.x, player.y, player.w, player.h, 10);
             else ctx.fillRect(player.x, player.y, player.w, player.h);
             ctx.fill();
-            ctx.shadowBlur = 0; // Reset für andere Objekte
+            ctx.shadowBlur = 0; 
             
-            // Spieler Augen (gucken in Laufrichtung)
             ctx.fillStyle = '#fff';
             let eyeOffsetX = player.dx > 0 ? 5 : (player.dx < 0 ? -5 : 0);
             ctx.beginPath(); ctx.arc(player.x + 10 + eyeOffsetX, player.y + 10, 3, 0, Math.PI*2); ctx.arc(player.x + 20 + eyeOffsetX, player.y + 10, 3, 0, Math.PI*2); ctx.fill();
 
-            // Overlays
             if (isPaused) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.65)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#ffeb3b'; ctx.font = 'bold 36px Arial'; ctx.textAlign = 'center';
@@ -491,7 +462,6 @@
         resetGame();
         
         function loop(timestamp) {
-            // 1. Zeit hier berechnen!
             if (!timestamp) timestamp = performance.now();
             let deltaTime = (timestamp - lastTime) / 1000;
             lastTime = timestamp;
@@ -499,53 +469,78 @@
             
             let timeScale = deltaTime * 60;
 
-            // 2. timeScale an update() übergeben
             update(timeScale);
             draw();
             requestAnimationFrame(loop);
         }
         requestAnimationFrame(loop);
-        // Fokus-Fix: Hört sofort auf die Tastatur
-        window.onload = function() {
-            window.focus();
-        };
-        document.addEventListener('click', function() {
-            window.focus();
-        });
         
-        // --- AFK Detection (Anti-Farm System) ---
+        window.onload = function() { window.focus(); };
+        document.addEventListener('click', function() { window.focus(); });
+        
+        // --- NEU: ERWEITERTE AFK & BOT DETECTION ---
         let isAFK = false;
         let afkTimer;
-        
-        // Reset timer if the user moves the mouse, clicks, or presses a key
+        let isAutoclicker = false;
+        let actionTimes = [];
+
         function resetAFK() {
             isAFK = false;
             clearTimeout(afkTimer);
-            // If the user does nothing for 2 minutes (120,000 ms), they are AFK
             afkTimer = setTimeout(() => {
                 isAFK = true;
-                console.log("User is now AFK");
             }, 120000); 
         }
 
+        function detectBot(e) {
+            resetAFK();
+            
+            if (!e.isTrusted) {
+                isAutoclicker = true;
+                return;
+            }
+
+            let now = performance.now();
+            actionTimes.push(now);
+            if (actionTimes.length > 8) actionTimes.shift();
+
+            if (actionTimes.length === 8) {
+                let timeDiff = actionTimes[7] - actionTimes[0];
+                
+                if (timeDiff < 200) {
+                    isAutoclicker = true;
+                }
+
+                let intervals = [];
+                for(let i = 1; i < actionTimes.length; i++) {
+                    intervals.push(actionTimes[i] - actionTimes[i-1]);
+                }
+                let avg = intervals.reduce((a,b) => a+b, 0) / intervals.length;
+                let variance = intervals.reduce((a,b) => a + Math.abs(b - avg), 0) / intervals.length;
+                
+                if (variance < 2 && avg > 10) {
+                    isAutoclicker = true;
+                }
+            }
+        }
+
         window.addEventListener('mousemove', resetAFK);
-        window.addEventListener('keydown', resetAFK);
-        window.addEventListener('mousedown', resetAFK);
+        window.addEventListener('click', detectBot);
+        window.addEventListener('keydown', detectBot);
         window.addEventListener('touchstart', resetAFK);
-        
-        // Start the timer immediately
         resetAFK();
 
-        // --- Ping Request to the Server ---
         setInterval(() => {
-            // Replace "Spielt BrickBreaker" with the actual activity for each page
-            let currentActivity = "Spielt Doodle Jump"; 
+            let currentActivity = "Spielt Neon Jump"; 
             
             fetch('/api/ping', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // We now send the isAFK flag to the server!
-                body: JSON.stringify({ activity: currentActivity, is_afk: isAFK }) 
+                body: JSON.stringify({ 
+                    activity: currentActivity, 
+                    is_afk: isAFK,
+                    is_bot: isAutoclicker
+                }) 
             }).catch(e => console.log(e));
         }, 5000);
     </script>
