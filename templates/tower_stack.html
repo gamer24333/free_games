@@ -1,8 +1,3 @@
-Das erklärt, warum das Spiel sofort abgestürzt ist oder eingefroren ist! Der Fehler lag daran, dass die neuen Blöcke ganz am Rand bzw. außerhalb des Bildschirms (-blockWidth) gestartet sind. Dadurch hat die Randkanten-Prüfung sofort gegriffen, der Block hat sich an der Kante unendlich hin- und hergefangen (daher das Einfrieren) oder die Kollision schlug sofort fehl.
-
-Hier ist der korrigierte und vollständige Code für deine tower_stack.html. Die Startposition der Blöcke wurde so angepasst, dass sie direkt im Sichtfeld starten und sauber hin- und hergleiten:
-
-HTML
 <!DOCTYPE html>
 <html lang="de">
 <head>
