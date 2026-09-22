@@ -235,6 +235,26 @@ def get_level_info(xp):
     else: rank = "Legende"
     return level, rank
 
+def get_user_metadata():
+    import json
+    all_users = UserSetting.query.all()
+    meta = {}
+    for u in all_users:
+        titles = []
+        # JSON parsen, da Titel als String-Liste in der Datenbank liegen
+        if u.active_title:
+            try:
+                titles = json.loads(u.active_title) if u.active_title.startswith('[') else [u.active_title]
+            except:
+                titles = [u.active_title]
+        
+        # Wenn ein Titel existiert, eckige Klammern drum machen
+        titel_text = f"[{titles[0]}]" if len(titles) > 0 and titles[0] else ""
+        farbe = u.active_color if u.active_color else "white"
+        
+        meta[u.username] = {"color": farbe, "title": titel_text}
+    return meta
+
 
 # --- ROUTEN ---
 @app.before_request
@@ -1330,8 +1350,11 @@ def doodle_game():
     all_scores = GameScore.query.all()
     scores_dict = {s.username: (s.doodle if s.doodle is not None else 0) for s in all_scores}
     leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
-    return render_template('doodle.html', leaderboard=leaderboard)
-
+    # NEU: Lade alle Farben und Titel
+    meta = get_user_metadata()
+    
+    # NEU: Gib "meta=meta" an das HTML-Template weiter
+    return render_template('doodle.html', leaderboard=leaderboard, meta=meta)
 @app.route('/api/submit-doodle', methods=['POST'])
 def submit_doodle():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
