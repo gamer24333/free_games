@@ -370,9 +370,10 @@ def shop_data():
     
     if is_admin_user:
         admin_items = ["title_admin", "title_crown", "color_purple"]
+        owned_ids = [i if isinstance(i, str) else i.get('id') for i in inv]
         for ai in admin_items:
-            if ai not in inv:
-                inv.append(ai)
+            if ai not in owned_ids:
+                inv.append({"id": ai, "bought_at": datetime.utcnow().isoformat()})
         u.inventory = json.dumps(inv)
         db.session.commit()
 
@@ -411,14 +412,75 @@ def shop_buy():
     if SHOP_ITEMS[item_id].get("admin_only") and not is_admin_user:
         return {"error": "Dieses Item ist exklusiv für Admins!"}, 403
     
-    if item_id in inv: return {"error": "Du besitzt dieses Item bereits!"}, 400
+    owned_ids = [i if isinstance(i, str) else i.get('id') for i in inv]
+    if item_id in owned_ids: return {"error": "Du besitzt dieses Item bereits!"}, 400
     
     price = SHOP_ITEMS[item_id]["price"]
     if (u.coins or 0) < price: return {"error": "Nicht genug Münzen!"}, 400
     
     u.coins -= price
-    inv.append(item_id)
+    inv.append({
+        "id": item_id,
+        "bought_at": datetime.utcnow().isoformat()
+    })
     u.inventory = json.dumps(inv)
+    db.session.commit()
+    return {"status": "success", "coins": u.coins}
+
+@app.route('/api/shop/return', methods=['POST'])
+def shop_return():
+    if 'username' not in session: return {"error": "401"}, 401
+    item_id = request.json.get('item_id')
+    if item_id not in SHOP_ITEMS: return {"error": "Item nicht gefunden"}, 400
+    
+    u = UserSetting.query.filter_by(username=session['username']).first()
+    inv = json.loads(u.inventory) if u.inventory else []
+    
+    target_item = None
+    target_index = -1
+    for idx, item in enumerate(inv):
+        iid = item if isinstance(item, str) else item.get('id')
+        if iid == item_id:
+            target_item = item
+            target_index = idx
+            break
+            
+    if target_index == -1:
+        return {"error": "Du besitzt dieses Item nicht!"}, 400
+        
+    if isinstance(target_item, str):
+        return {"error": "Dieses Item kann nicht zurückgegeben werden."}, 400
+        
+    bought_at_str = target_item.get('bought_at')
+    if not bought_at_str:
+        return {"error": "Rückgabezeitraum abgelaufen."}, 400
+        
+    bought_at = datetime.fromisoformat(bought_at_str)
+    if datetime.utcnow() - bought_at > timedelta(hours=24):
+        return {"error": "Der Rückgabezeitraum von 24 Stunden ist abgelaufen!"}, 400
+        
+    price = SHOP_ITEMS[item_id]["price"]
+    if price <= 0:
+        return {"error": "Dieses Item kann nicht zurückgegeben werden."}, 400
+        
+    inv.pop(target_index)
+    u.inventory = json.dumps(inv)
+    u.coins = (u.coins or 0) + price
+    
+    # Unequip if currently active
+    item = SHOP_ITEMS[item_id]
+    if item["type"] == "title":
+        try:
+            active_titles = json.loads(u.active_title) if u.active_title and u.active_title.startswith('[') else ([u.active_title] if u.active_title else [])
+        except:
+            active_titles = [u.active_title] if u.active_title else []
+        if item["value"] in active_titles:
+            active_titles.remove(item["value"])
+            u.active_title = json.dumps(active_titles)
+    elif item["type"] == "color":
+        if u.active_color == item["value"]:
+            u.active_color = None
+            
     db.session.commit()
     return {"status": "success", "coins": u.coins}
 
@@ -429,7 +491,8 @@ def shop_equip():
     u = UserSetting.query.filter_by(username=session['username']).first()
     inv = json.loads(u.inventory) if u.inventory else []
     
-    if item_id not in inv: return {"error": "Item nicht im Inventar!"}, 400
+    owned_ids = [i if isinstance(i, str) else i.get('id') for i in inv]
+    if item_id not in owned_ids: return {"error": "Item nicht im Inventar!"}, 400
     
     item = SHOP_ITEMS[item_id]
     if item["type"] == "title":
