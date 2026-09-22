@@ -49,9 +49,20 @@
         // Zwingt den Browser, sofort auf Tasteneingaben zu hören!
         window.focus();
         const gameId = "{{ gameId or 'offline_bot_game' }}";
-        const me = "{{ me or 'Spieler 1' }}";
-        const gegnerName = "{{ gegner or 'Computer-Bot 🤖' }}";
+        const myUsername = "{{ me or 'Spieler 1' }}";
+        const gegnerLogin = "{{ gegner or 'Computer-Bot 🤖' }}";
         const botDifficulty = "{{ bot_difficulty or 'medium' }}"; 
+        
+        // Meta-Daten für Anzeigenamen laden
+        const playerMeta = {{ meta | tojson if meta is defined else '{}' }};
+        
+        function getDisplayName(username) {
+            if (!username || username.includes('Bot') || username.includes('Computer')) return username;
+            return (playerMeta[username] && playerMeta[username].display_name) ? playerMeta[username].display_name : username;
+        }
+
+        // Interne Logik nutzt Logins, UI nutzt Anzeigenamen
+        const me = myUsername; 
         
         const canvas = document.getElementById('tankCanvas');
         const ctx = canvas.getContext('2d');
@@ -94,7 +105,7 @@
         }
 
         function initMatch() {
-            const gegnerNameClean = gegnerName.toLowerCase();
+            const gegnerNameClean = gegnerLogin.toLowerCase();
             const gameIdClean = gameId.toLowerCase();
             
             if (gameIdClean === "offline_bot_game" || gameIdClean.includes("bot") || gegnerNameClean.includes("bot") || gegnerNameClean.includes("computer")) {
@@ -161,7 +172,7 @@
         window.addEventListener('touchend', () => { isAiming = false; });
 
 
-        // --- DIE NEUE BOT KI ---
+        // --- BOT KI ---
         function triggerBotTurn() {
             if (!isBotMode || botCalculated || gameState.status !== "aktiv" || bullets.length > 0) return;
             botCalculated = true;
@@ -177,21 +188,19 @@
                 let st = gameState.raw_state.split(',').map(Number);
                 let botFuel = st[5];
 
-                // KI überlegt, ob sie fährt (ca. 70% Chance, wenn genug Sprit da ist)
                 if (botFuel > 5 && Math.random() < 0.7) {
                     document.getElementById('matchInfo').innerText = "🤖 Bot fährt...";
-                    let maxPixels = Math.min(botFuel * 3, 120); // 1 Fuel = 3 Pixel. Maximal 120 Pixel am Stück fahren.
-                    let moveAmount = (Math.random() * maxPixels * 0.8) + 15; // Mindestens 15 Pixel
+                    let maxPixels = Math.min(botFuel * 3, 120); 
+                    let moveAmount = (Math.random() * maxPixels * 0.8) + 15; 
                     
-                    if (Math.random() < 0.5) moveAmount = -moveAmount; // Richtung links oder rechts
+                    if (Math.random() < 0.5) moveAmount = -moveAmount; 
                     
                     botTargetX = Math.max(20, Math.min(canvas.width - 20, gameState.p2_x + moveAmount));
                     botIsMoving = true;
                 } else {
-                    // Bleibt stehen, spart Treibstoff und zielt direkt
                     botAimAndShoot();
                 }
-            }, 800); // 0.8 Sekunden "Bedenkzeit"
+            }, 800); 
         }
 
         function botAimAndShoot() {
@@ -204,32 +213,29 @@
                 let p2_x = gameState.p2_x;
                 let startY = terrainPoints[Math.floor(p2_x)] - 17;
 
-                // Dynamische Kraftberechnung (KI wählt die exakte Schusskraft, die sie zum Erreichen braucht)
                 let dx = Math.abs(p1_x - p2_x); 
                 let minPower = Math.sqrt(dx * gravity) / 1.2; 
                 
-                // Kraft leicht zufällig über dem Minimum wählen, max. 16
                 let targetPower = minPower + 1.5 + (Math.random() * 2);
                 if (targetPower > 16) targetPower = 16;
                 if (targetPower < 6) targetPower = 6 + Math.random() * 3;
 
                 let v = targetPower * 1.2;
                 let val = (dx * gravity) / (v * v);
-                let targetAngle = 45; // Standard, falls Berechnung scheitert
+                let targetAngle = 45; 
                 
                 if (val <= 1) {
                     let radApprox = 0.5 * Math.asin(val);
                     targetAngle = radApprox * (180 / Math.PI);
                 }
 
-                // Fehlerquote einberechnen
                 let errorMargin = 0;
                 if (botDifficulty === 'easy') {
-                    errorMargin = (Math.random() * 24) - 12; // Trifft selten
+                    errorMargin = (Math.random() * 24) - 12; 
                 } else if (botDifficulty === 'medium') {
-                    errorMargin = (Math.random() * 6) - 3;  // Ziemlich gut
+                    errorMargin = (Math.random() * 6) - 3;  
                 } else if (botDifficulty === 'hard') {
-                    errorMargin = (Math.random() * 1.5) - 0.75; // Fast perfekte Parabel, tödlich genau!
+                    errorMargin = (Math.random() * 1.5) - 0.75; 
                 }
                 
                 targetAngle += errorMargin;
@@ -238,7 +244,6 @@
                 if (targetAngle > 85) targetAngle = 85;
                 let rad = (targetAngle * Math.PI) / 180;
                 
-                // Waffenwahl der KI
                 let st = gameState.raw_state.split(',').map(Number);
                 let botBerta = st[8];
                 let botTriple = st[9];
@@ -250,9 +255,8 @@
                 } else if (botTriple > 0 && Math.random() < (useSpecialChance + 0.1)) {
                     botWeapon = 'triple'; st[9]--;
                 }
-                gameState.raw_state = st.join(','); // Zustand updaten
+                gameState.raw_state = st.join(','); 
 
-                // Schuss abfeuern
                 bullets = [{
                     x: p2_x - Math.cos(rad) * 22,
                     y: startY - Math.sin(rad) * 22,
@@ -263,9 +267,8 @@
                     active: true
                 }];
 
-            }, 1000); // Eine Sekunde zum realistischen Zielen
+            }, 1000); 
         }
-        // ------------------------
 
         async function updateStatus() {
             if (isBotMode) return;
@@ -305,10 +308,10 @@
                 const isMyTurn = (gameState.turn === me && gameState.status === "aktiv");
                 shootBtn.disabled = !isMyTurn || bullets.length > 0;
                 if (gameState.status === "aktiv") {
-                    document.getElementById('matchInfo').innerText = isMyTurn ? "🔴 DU BIST DRAN!" : `⏳ ${gameState.turn} zielt...`;
+                    document.getElementById('matchInfo').innerText = isMyTurn ? "🔴 DU BIST DRAN!" : `⏳ ${getDisplayName(gameState.turn)} zielt...`;
                 } else if (gameState.status.startsWith("gewonnen")) {
                     let sieger = gameState.status.split('_')[1];
-                    document.getElementById('matchInfo').innerText = `🏆 ${sieger} HAT GEWONNEN!`;
+                    document.getElementById('matchInfo').innerText = `🏆 ${getDisplayName(sieger)} HAT GEWONNEN!`;
                     shootBtn.disabled = true;
                 }
             } catch (e) { console.error(e); }
@@ -361,8 +364,8 @@
             let p1_x = Math.max(20, Math.min(canvas.width - 20, Math.round(gameState.p1_x + (amIErsteller ? myXOffset : 0))));
             let p2_x = Math.max(20, Math.min(canvas.width - 20, Math.round(gameState.p2_x + (!amIErsteller ? myXOffset : 0))));
 
-            let p1 = { x: p1_x, y: terrainPoints[p1_x] - 15, hp: st[0], fuel: p1_f, color: '#00adb5', name: gameState.ersteller, dX: 1 };
-            let p2 = { x: p2_x, y: terrainPoints[p2_x] - 15, hp: st[1], fuel: p2_f, color: '#ff2e63', name: gameState.gegner || "Bot 🤖", dX: -1 };
+            let p1 = { x: p1_x, y: terrainPoints[p1_x] - 15, hp: st[0], fuel: p1_f, color: '#00adb5', name: getDisplayName(gameState.ersteller), dX: 1 };
+            let p2 = { x: p2_x, y: terrainPoints[p2_x] - 15, hp: st[1], fuel: p2_f, color: '#ff2e63', name: getDisplayName(gameState.gegner || "Bot 🤖"), dX: -1 };
 
             if (crate.active) {
                 let groundY = terrainPoints[Math.floor(crate.x)] - 12;
@@ -370,7 +373,6 @@
                 ctx.fillStyle = '#ff9f43'; ctx.fillRect(crate.x - 12, crate.y, 24, 24);
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(crate.x - 12, crate.y, 24, 24);
                 
-                // Neue Prüfung: JEDER Panzer (auch der Bot) kann Kisten während der Fahrt einsammeln
                 let activeTank = null;
                 [p1, p2].forEach(tank => {
                     if (Math.abs(tank.x - crate.x) < 25 && Math.abs(tank.y - crate.y) < 25) {
@@ -381,7 +383,7 @@
                 if (activeTank) {
                     crate.active = false;
                     if (isBotMode) {
-                        if (activeTank.name === me) {
+                        if (activeTank.name === getDisplayName(me)) {
                             st[0] = Math.min(100, st[0] + 25);
                             myFuel = 100; st[4] = 100;
                             st[6]++; st[7]++;
@@ -390,11 +392,10 @@
                             st[5] = 100;
                             st[8]++; st[9]++;
                         }
-                        st[12] = 0; // Kiste vom Feld nehmen
+                        st[12] = 0; 
                         gameState.raw_state = st.join(',');
                     } else {
-                        // Kiste im Multiplayer (nur senden, wenn ICH sie aufhebe)
-                        if (activeTank.name === me) {
+                        if (activeTank.name === getDisplayName(me)) {
                             sendShotResult(myAngle, myPower, "crate_collected", p1.x, p2.x);
                         }
                     }
@@ -407,7 +408,7 @@
                 ctx.fillStyle = p.color; ctx.fillRect(p.x - 18, p.y, 36, 10);
                 ctx.beginPath(); ctx.arc(p.x, p.y, 8, Math.PI, 0); ctx.fill();
 
-                let rad = (p.name === me ? myAngle : 45) * Math.PI / 180;
+                let rad = (p.name === getDisplayName(me) ? myAngle : 45) * Math.PI / 180;
                 let direction = p.dX; 
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(p.x, p.y - 2);
                 ctx.lineTo(p.x + Math.cos(rad) * 18 * direction, p.y - 2 - Math.sin(rad) * 18);
@@ -542,32 +543,29 @@
                 p2_hp = Math.max(0, p2_hp - dmg);
             }
 
-            // Zug-Wechsel und Treibstoff persistieren
             if (!wasBotShot) {
                 gameState.p1_x = Math.max(20, Math.min(canvas.width - 20, gameState.p1_x + myXOffset));
-                st[4] = myFuel; // Speichere den restlichen Treibstoff des Spielers ab
+                st[4] = myFuel; 
                 
                 gameState.turn = "Computer-Bot 🤖";
                 document.getElementById('matchInfo').innerText = "⏳ Bot ist dran...";
             } else {
                 gameState.turn = me;
-                myFuel = st[4]; // Treibstoff des Spielers wieder laden
+                myFuel = st[4]; 
                 document.getElementById('matchInfo').innerText = "🔴 DU BIST DRAN!";
                 shootBtn.disabled = false;
             }
             botCalculated = false;
 
-            // KI Kisten-Spawn nach einem Schuss (35% Chance)
             if (st[12] === 0 && Math.random() < 0.35) {
-                st[10] = 150 + Math.random() * 600; // Random X Position
-                st[11] = 0; // Fällt von oben
+                st[10] = 150 + Math.random() * 600; 
+                st[11] = 0; 
                 st[12] = 1;
                 crate.active = true;
                 crate.x = st[10];
                 crate.y = st[11];
             }
 
-            // Siegbedingung prüfen
             if (p1_hp <= 0) {
                 gameState.status = "gewonnen_Bot";
                 document.getElementById('matchInfo').innerText = "❌ Der Bot hat dich zerstört!";
@@ -579,7 +577,6 @@
             }
 
             st[0] = p1_hp; st[1] = p2_hp;
-            // Treibstoff wird jetzt NICHT MEHR auf 100 gesetzt am Ende jeder Runde, sondern nur bei Kisten
             gameState.raw_state = st.join(',');
             myXOffset = 0;
         }
@@ -610,41 +607,32 @@
         function gameLoop(timestamp) { 
             if (!timestamp) timestamp = performance.now();
             
-            // Vergangene Zeit berechnen (in Sekunden)
             let dt = (timestamp - lastTime) / 1000;
             lastTime = timestamp;
             
-            // Limitieren, falls der Tab verlassen wurde
             if (dt > 0.25) dt = 0.25;
             
             timeAccumulator += dt;
             
-            // Die gesamte Spiel-Logik läuft jetzt in festen 60-FPS-Schritten!
             while (timeAccumulator >= STEP_TIME) {
                 handleInput(); 
 
-                // Simuliere hier das visuelle Fahren des Bots in Echtzeit!
                 if (isBotMode && botIsMoving) {
                     let st = gameState.raw_state.split(',').map(Number);
                     let diff = botTargetX - gameState.p2_x;
                     
-                    // 1.5 Pixel pro Frame bewegen, kostet 0.5 Fuel
                     if (Math.abs(diff) >= 1.5 && st[5] >= 0.5) {
                         gameState.p2_x += (diff > 0 ? 1.5 : -1.5);
-                        st[5] -= 0.5; // Bot-Treibstoff abziehen
+                        st[5] -= 0.5; 
                         gameState.raw_state = st.join(',');
                     } else {
-                        // Bot ist angekommen oder Tank ist leer
                         botIsMoving = false;
                         botAimAndShoot();
                     }
                 }
 
-                // Da in deiner draw() Funktion auch die Physik (Kisten fallen, Kugeln fliegen) 
-                // berechnet wird, rufen wir sie hier exakt 60 mal pro Sekunde auf!
                 draw(); 
                 
-                // Wenn der Bot dran ist, noch nichts berechnet wurde und er nicht gerade fährt, starte seinen Zug
                 if (isBotMode && gameState.turn === "Computer-Bot 🤖" && !botCalculated && bullets.length === 0 && !botIsMoving) {
                     triggerBotTurn();
                 }
@@ -652,14 +640,15 @@
                 timeAccumulator -= STEP_TIME;
             }
 
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Starten
+        initMatch();
         requestAnimationFrame(gameLoop);
-        // Fokus-Fix: Hört sofort auf die Tastatur
-        window.onload = function() {
-            window.focus();
-        };
-        document.addEventListener('click', function() {
-            window.focus();
-        });
+
+        window.onload = function() { window.focus(); };
+        document.addEventListener('click', function() { window.focus(); });
     </script>
 </body>
 </html>
