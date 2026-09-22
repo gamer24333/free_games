@@ -1655,7 +1655,7 @@ def tankroyale_match(game_id):
         raw_gegner = game.gegner if game.ersteller == me else game.ersteller
         gegner_u = UserSetting.query.filter_by(username=raw_gegner).first()
         gegner_name = gegner_u.display_name if (gegner_u and gegner_u.display_name) else raw_gegner
-    return render_template('tank_royale_match.html', gameId=game_id, me=session['username'], gegner=gegner_name, bot_difficulty=diff)
+    return render_template('tank_royale_match.html', gameId=game_id, me=session['username'], gegner=gegner_name, bot_difficulty=diff, meta=get_user_metadata())
 
 @app.route('/api/tankroyale/status/<game_id>')
 def tank_status(game_id):
