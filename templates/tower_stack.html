@@ -21,8 +21,8 @@
 
         .game-container { display: flex; flex-direction: column; align-items: center; gap: 10px; }
         .game-controls-info {
-            display: flex; flex-direction: column; width: 400px; font-size: 14px; color: #ccc;
-            padding: 10px; background: #1a1a1a; border-radius: 8px; border: 1px solid #333; gap: 8px; box-sizing: border-box;
+            display: flex; flex-direction: column; width: 400px; font-size: 13px; color: #ccc;
+            padding: 10px; background: #1a1a1a; border-radius: 8px; border: 1px solid #333; gap: 6px; box-sizing: border-box;
         }
         .info-row { display: flex; justify-content: space-between; width: 100%; }
         .fullscreen-link { color: #ff9f43; text-decoration: underline; cursor: pointer; font-weight: bold; }
@@ -72,12 +72,11 @@
             
             <div class="game-controls-info">
                 <div class="info-row">
-                    <span>🎮 <b>Leertaste</b> oder <b>Klick</b></span>
+                    <span>🎮 <b>Leertaste / Klick</b>: Stapeln</span>
                     <span id="fullscreenLink" class="fullscreen-link" onclick="toggleFullscreen()">📺 [F] Vollbild</span>
-                    <span>Plattform fallen lassen</span>
                 </div>
                 <div class="info-row">
-                    <span style="color: #ffd700;">Staple die Blöcke perfekt aufeinander!</span>
+                    <span>⏸️ <b>[P]</b> Pause</span>
                     <span>Punkte: <b id="scoreText" style="color: #39ff14; font-size:16px;">0</b></span>
                 </div>
             </div>
@@ -117,32 +116,35 @@
         const gameContainer = document.querySelector('.game-container');
         const fullscreenLink = document.getElementById('fullscreenLink');
 
-        // --- MUSIK EINBINDEN (WEB AUDIO API) ---
+        // --- WEB AUDIO API MUSIK ---
         let audioCtx = null;
         let audioBuffer = null;
         let audioSource = null;
 
         async function playMusic() {
-            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioCtx.state === 'suspended') await audioCtx.resume();
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-            if (!audioBuffer) {
-                try {
+                if (!audioBuffer) {
                     let response = await fetch('/static/tower_stack.mp3');
+                    if (!response.ok) return;
                     let arrayBuffer = await response.arrayBuffer();
                     audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-                } catch (e) { console.error("Audio Fehler:", e); return; }
-            }
+                }
 
-            if (!audioSource && gameStarted && !isGameOver) {
-                audioSource = audioCtx.createBufferSource();
-                audioSource.buffer = audioBuffer;
-                audioSource.loop = true;
-                let gainNode = audioCtx.createGain();
-                gainNode.gain.value = 0.4;
-                audioSource.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-                audioSource.start();
+                if (!audioSource && gameStarted && !isGameOver && !isPaused) {
+                    audioSource = audioCtx.createBufferSource();
+                    audioSource.buffer = audioBuffer;
+                    audioSource.loop = true;
+                    let gainNode = audioCtx.createGain();
+                    gainNode.gain.value = 0.4;
+                    audioSource.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    audioSource.start();
+                }
+            } catch (e) {
+                // Musik optional (falls Datei fehlt, läuft das Spiel normal weiter)
             }
         }
 
@@ -157,6 +159,7 @@
         let score = 0;
         let isGameOver = false;
         let gameStarted = false;
+        let isPaused = false;
 
         let stack = [];
         let currentBlock = null;
@@ -172,6 +175,7 @@
             scoreEl.textContent = 0;
             isGameOver = false;
             gameStarted = false;
+            isPaused = false;
             stack = [];
             cameraY = 0;
             targetCameraY = 0;
@@ -205,6 +209,16 @@
             };
         }
 
+        function togglePause() {
+            if (!gameStarted || isGameOver) return;
+            isPaused = !isPaused;
+            if (isPaused) {
+                stopMusic();
+            } else {
+                playMusic();
+            }
+        }
+
         function dropBlock() {
             if (isGameOver) {
                 resetGame();
@@ -217,6 +231,8 @@
                 gameStarted = true;
                 playMusic();
             }
+
+            if (isPaused) return;
 
             let lastBlock = stack[stack.length - 1];
             
@@ -254,6 +270,10 @@
                 e.preventDefault();
                 dropBlock();
             }
+            if (e.key === 'p' || e.key === 'P') {
+                e.preventDefault();
+                togglePause();
+            }
             if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); }
         });
 
@@ -262,11 +282,14 @@
         });
 
         function update() {
-            if (!gameStarted || isGameOver) return;
+            if (isPaused || isGameOver) return;
 
-            currentBlock.x += currentBlock.dx;
-            if (currentBlock.x <= 0 || currentBlock.x + currentBlock.w >= canvas.width) {
-                currentBlock.dx *= -1;
+            // Block bewegt sich jetzt auch vor dem ersten Klick (damit man sofort Action sieht)
+            if (currentBlock) {
+                currentBlock.x += currentBlock.dx;
+                if (currentBlock.x <= 0 || currentBlock.x + currentBlock.w >= canvas.width) {
+                    currentBlock.dx *= -1;
+                }
             }
 
             if (cameraY < targetCameraY) {
@@ -278,6 +301,7 @@
             ctx.fillStyle = '#111';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+            // Neon Grid Background
             ctx.strokeStyle = '#222';
             ctx.lineWidth = 1;
             for(let i = 0; i < canvas.width; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke(); }
@@ -310,15 +334,27 @@
 
             ctx.restore();
 
+            // Start-Overlay
             if (!gameStarted && !isGameOver) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#ffd700'; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'center';
                 ctx.fillText('Leertaste oder Klick', canvas.width / 2, canvas.height / 2 - 10);
                 ctx.fillStyle = '#fff'; ctx.font = '15px Arial';
-                ctx.fillText('zum Platzieren!', canvas.width / 2, canvas.height / 2 + 20);
+                ctx.fillText('zum Starten & Stapeln!', canvas.width / 2, canvas.height / 2 + 20);
                 ctx.textAlign = 'left';
             }
 
+            // Pausen-Overlay
+            if (isPaused) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ff9f43'; ctx.font = 'bold 32px Arial'; ctx.textAlign = 'center';
+                ctx.fillText('PAUSE', canvas.width / 2, canvas.height / 2 - 15);
+                ctx.fillStyle = '#fff'; ctx.font = '16px Arial';
+                ctx.fillText('Drücke [P] zum Fortsetzen', canvas.width / 2, canvas.height / 2 + 25);
+                ctx.textAlign = 'left';
+            }
+
+            // Game-Over-Overlay
             if (isGameOver) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#ff5252'; ctx.font = 'bold 32px Arial'; ctx.textAlign = 'center';
