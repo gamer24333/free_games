@@ -376,7 +376,8 @@ def ping_user():
 def dashboard_stats():
     if 'username' in session: 
         current_user = session['username']
-        global_chat_len = ChatMessage.query.filter_by(room='global').count()
+        user = UserSetting.query.filter_by(username=current_user).first()
+        global_chat_len = ChatMessage.query.filter_by(room=f"Klasse_{user.klasse}").count()
         
         private_chats_stats = {}
         for schueler in get_klassen_liste_fuer_user(current_user):
@@ -559,8 +560,13 @@ def shop_equip():
 def global_stats():
     if 'username' not in session: return redirect(url_for('login'))
     
-    all_users = UserSetting.query.all()
-    all_scores = GameScore.query.all()
+    me = session['username']
+    # Holt nur die Namen der Leute aus der eigenen Klasse
+    meine_klasse = get_klassen_liste_fuer_user(me)
+    
+    # NEU: Zieht nur noch User und Scores, die in 'meine_klasse' sind!
+    all_users = UserSetting.query.filter(UserSetting.username.in_(meine_klasse)).all()
+    all_scores = GameScore.query.filter(GameScore.username.in_(meine_klasse)).all()
     
     points = {u.username: 0 for u in all_users}
     
@@ -582,7 +588,6 @@ def global_stats():
     assign_points('slither', ignore_val=0)
     assign_points('tower', ignore_val=0)
     assign_points('dino', ignore_val=0)
-    
     
     efficiency_list = []
     for u in all_users:
@@ -1219,8 +1224,12 @@ def send_message(room):
     nachricht_text = request.form.get('message', '').strip()
     if not nachricht_text: return {"status": "empty"}, 400
     current_user = session['username']
-    actual_room = room
-    if room != "global": actual_room = get_private_room_name(current_user, room)
+    user = UserSetting.query.filter_by(username=current_user).first()
+    
+    # NEU: Wenn Raum "global" ist, nimm den Klassennamen. Sonst Privatchat.
+    if room == "global": actual_room = f"Klasse_{user.klasse}"
+    else: actual_room = get_private_room_name(current_user, room)
+    
     new_msg = ChatMessage(room=actual_room, sender=current_user, text=nachricht_text)
     db.session.add(new_msg)
     db.session.commit()
@@ -1230,9 +1239,13 @@ def send_message(room):
 def api_chat_messages(room):
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
     current_user = session['username']
-    actual_room = room
+    user = UserSetting.query.filter_by(username=current_user).first()
     
-    if room != "global":
+    # NEU: Automatische Umleitung in den Klassenraum
+    if room == "global": 
+        actual_room = f"Klasse_{user.klasse}"
+        partner = None
+    else:
         partner = room
         actual_room = get_private_room_name(current_user, partner)
         
@@ -1276,9 +1289,13 @@ def api_chat_messages(room):
 def delete_message(room, msg_index):
     if 'username' not in session: return redirect(url_for('login'))
     current_user = session['username']
+    user = UserSetting.query.filter_by(username=current_user).first()
     admins = get_admins_list()
-    actual_room = room
-    if room != "global": actual_room = get_private_room_name(current_user, room)
+    
+    # NEU: Auch beim Löschen den echten Raum ermitteln
+    if room == "global": actual_room = f"Klasse_{user.klasse}"
+    else: actual_room = get_private_room_name(current_user, room)
+    
     db_messages = ChatMessage.query.filter_by(room=actual_room).order_by(ChatMessage.id.asc()).all()
     sliced_messages = db_messages[-150:]
     
