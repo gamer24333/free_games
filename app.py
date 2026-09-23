@@ -293,7 +293,14 @@ def get_klassen_liste_fuer_user(username):
     if not user or not user.klasse:
         return ["Till"]
         
-    students = AllowedStudent.query.filter_by(class_name=user.klasse).all()
+    # --- FIX: Alte Klassennamen automatisch updaten ---
+    such_klasse = user.klasse
+    if such_klasse == "G8c":
+        such_klasse = "Klasse G8c"
+        user.klasse = "Klasse G8c"  # Updatet den alten Eintrag des Schülers
+        db.session.commit()         # Speichert die Korrektur in der Datenbank
+        
+    students = AllowedStudent.query.filter_by(class_name=such_klasse).all()
     liste = [s.name for s in students]
     
     if "Till" not in liste: 
