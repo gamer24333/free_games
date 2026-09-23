@@ -4,173 +4,194 @@
     <meta charset="UTF-8">
     <title>🛠️ Admin-Steuerung</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #222; color: white; padding: 30px; text-align: center; }
-        .btn { display: inline-block; padding: 10px 20px; background: #555; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; }
+        body { font-family: Arial, sans-serif; background-color: #1a1a1a; color: white; padding: 20px; text-align: center; margin: 0; }
+        h1 { margin-top: 0; color: #00adb5; }
+        .btn { display: inline-block; padding: 10px 20px; background: #555; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; transition: 0.2s;}
         .btn:hover { background: #444; }
-        .container { max-width: 600px; margin: 0 auto; background: #333; padding: 20px; border-radius: 12px; text-align: left; }
+        
+        /* Das neue Layout: Breiter und zweispaltig */
+        .container { max-width: 1000px; margin: 0 auto; text-align: left; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        
+        /* Schicke Kacheln für die einzelnen Bereiche */
+        .card { background: #2a2a2a; padding: 20px; border-radius: 12px; border: 1px solid #444; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .card h3 { margin-top: 0; color: #fff; border-bottom: 2px solid #00adb5; padding-bottom: 10px; margin-bottom: 15px;}
+        
         .danger-btn { background: #ff2e63; color: white; }
         .danger-btn:hover { background: #cc244f; }
         .success-btn { background: #2ecc71; color: white; }
         .success-btn:hover { background: #27ae60; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 10px; border-bottom: 1px solid #444; }
-        select, input { padding: 8px; background: #222; color: white; border: 1px solid #555; border-radius: 6px; font-size: 14px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
+        th, td { padding: 10px; border-bottom: 1px solid #444; text-align: left; }
+        select, input, textarea { padding: 10px; background: #1a1a1a; color: white; border: 1px solid #555; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+        
+        /* Responsiv für Handys */
+        @media (max-width: 768px) {
+            .grid-2 { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
 
-    <a href="/welcome" class="btn">⬅️ Zurück zum Dashboard</a>
-    <h1>🛠️ Admin-Steuerung</h1>
-
-    <div class="container">
-        <h3>👑 Admin-Rechte verwalten</h3>
-        <p style="color: #aaa; font-size: 14px;">Hier kannst du Mitschülern Admin-Rechte geben oder sie wieder entziehen.</p>
-        
-        <form action="/admin/make-admin" method="POST" style="margin-bottom: 25px; display: flex; gap: 10px; align-items: center;">
-            <select name="schueler" required>
-                <option value="" disabled selected>Mitschüler auswählen...</option>
-                {% for s in klassen_liste %}
-                    {% if s not in admins %}
-                        <option value="{{ s }}">{{ meta.get(s, {}).get('display_name', s) }}</option>
-                    {% endif %}
-                {% endfor %}
-            </select>
-            <button type="submit" class="btn success-btn">Zum Admin machen ✨</button>
-        </form>
-
-        <h4>Aktuelle Admins:</h4>
-        <table style="margin-bottom: 30px;">
-            <thead>
-                <tr><th>Name</th><th>Status / Aktion</th></tr>
-            </thead>
-            <tbody>
-                {% for admin in admins %}
-                <tr>
-                    <td>
-                        {% set m = meta.get(admin, {}) %}
-                        👑 <b>{{ m.display_name if m.display_name else admin }}</b>
-                    </td>
-                    <td>
-                        {% if admin != "Till" %}
-                            <form action="/admin/remove-admin/{{ admin }}" method="POST" style="margin: 0;">
-                                <button type="submit" class="btn danger-btn" style="padding: 5px 10px; font-size: 12px;">Rechte entziehen ❌</button>
-                            </form>
-                        {% else %}
-                            <span style="color: #00adb5; font-size: 13px; font-style: italic;">Haupt-Admin (Unantastbar)</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-
-        <hr style="border: 0; border-top: 1px solid #444; margin: 25px 0;">
-
-        <!-- NEU: BANN SYSTEM -->
-        <h3>🚫 Bann-Verwaltung (Ban-Hammer)</h3>
-        <p style="color: #aaa; font-size: 14px;">Schließe Störenfriede temporär oder für immer aus dem System aus.</p>
-        
-        <form action="/admin/ban" method="POST" style="margin-bottom: 25px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: #222; padding: 15px; border-radius: 8px; border: 1px solid #555;">
-            <select name="schueler" required style="flex-grow: 1;">
-                <option value="" disabled selected>Wen möchtest du bannen?</option>
-                {% for s in klassen_liste %}
-                    {% if s != "Till" and s not in banned_users %}
-                        <option value="{{ s }}">{{ meta.get(s, {}).get('display_name', s) }}</option>
-                    {% endif %}
-                {% endfor %}
-            </select>
-            
-            <select name="dauer" required>
-                <option value="" disabled selected>Wie lange?</option>
-                <option value="1h">1 Stunde</option>
-                <option value="1d">1 Tag</option>
-                <option value="1w">1 Woche</option>
-                <option value="perm">Permanent (Für immer)</option>
-            </select>
-            
-            <button type="submit" class="btn danger-btn">Bannen 🔨</button>
-        </form>
-
-        <h4>Aktuell gesperrte Spieler:</h4>
-        <table>
-            <thead>
-                <tr><th>Name</th><th>Gebannt bis</th><th>Aktion</th></tr>
-            </thead>
-            <tbody>
-                {% for schueler, bis_wann in banned_users.items() %}
-                <tr>
-                    {% set m = meta.get(schueler, {}) %}
-                    <td><b>{{ m.display_name if m.display_name else schueler }}</b></td>
-                    <td style="color: #ff2e63; font-size: 14px;">{{ bis_wann }}</td>
-                    <td>
-                        <form action="/admin/unban/{{ schueler }}" method="POST" style="margin: 0;">
-                            <button type="submit" class="btn success-btn" style="padding: 5px 10px; font-size: 12px;">Entbannen 🕊️</button>
-                        </form>
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="3" style="color: #aaa; font-size: 14px; text-align: center;">Niemand ist gebannt. Alles friedlich!</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-
-        <hr style="border: 0; border-top: 1px solid #444; margin: 25px 0;">
-
-        <h3>📢 System-Nachricht (Pop-up) senden</h3>
-        <p style="color: #aaa; font-size: 14px;">Diese Nachricht poppt unübersehbar auf dem Dashboard der ausgewählten Person(en) auf.</p>
-        
-        <form action="/admin/send-message" method="POST" style="background: #222; padding: 15px; border-radius: 8px; border: 1px solid #555;">
-            <label style="display: block; font-size: 14px; margin-bottom: 5px; color: #00adb5; font-weight: bold;">An wen?</label>
-            <select name="target" style="width: 100%; margin-bottom: 15px;">
-                <option value="alle">🌍 AN ALLE SCHÜLER SENDEN</option>
-                <optgroup label="Bestimmter Schüler">
-                    {% for s in klassen_liste %}
-                        <option value="{{ s }}">{{ meta.get(s, {}).get('display_name', s) }}</option>
-                    {% endfor %}
-                </optgroup>
-                </optgroup>
-                </optgroup>
-            </select>
-            
-            <label style="display: block; font-size: 14px; margin-bottom: 5px; color: #ff2e63; font-weight: bold;">Titel der Nachricht</label>
-            <input type="text" name="title" placeholder="z.B. Wichtige Ankündigung 📢" required style="width: 100%; padding: 8px; box-sizing: border-box; background: #333; color: white; border: 1px solid #555; border-radius: 6px; margin-bottom: 15px;">
-            
-            <label style="display: block; font-size: 14px; margin-bottom: 5px; font-weight: bold;">Nachricht (Text)</label>
-            <textarea name="message" rows="4" placeholder="Schreibe hier die Nachricht..." required style="width: 100%; padding: 8px; box-sizing: border-box; background: #333; color: white; border: 1px solid #555; border-radius: 6px; margin-bottom: 15px; resize: vertical;"></textarea>
-            
-            <button type="submit" class="btn success-btn" style="width: 100%;">🚀 Nachricht jetzt aussenden</button>
-        </form>
-        
-        <hr style="border: 0; border-top: 1px solid #444; margin: 25px 0;">
-
-        <h3>🧹 Chat-Verwaltung</h3>
-        <form action="/admin/clear-chat" method="POST" onsubmit="return confirm('Wirklich den gesamten globalen Chat löschen?');">
-            <button type="submit" class="btn danger-btn">Globalen Chat komplett leeren</button>
-        </form>
-        
-        <br>
-        <h3>🔒 Registrierte PINs zurücksetzen</h3>
-        <p style="color: #aaa; font-size: 14px;">Falls ein Mitschüler seine PIN vergessen hat, kannst du sie hier löschen.</p>
-        
-        <table>
-            <thead>
-                <tr><th>Name</th><th>Aktion</th></tr>
-            </thead>
-            <tbody>
-                {% for schueler, pin in pins.items() %}
-                <tr>
-                    {% set m = meta.get(schueler, {}) %}
-                    <td><b>{{ m.display_name if m.display_name else schueler }}</b></td>
-                    <td>
-                        <form action="/admin/reset-pin/{{ schueler }}" method="POST" style="display:inline;">
-                            <button type="submit" class="btn danger-btn" style="padding: 5px 10px; font-size: 12px;">PIN löschen</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div style="text-align: left; max-width: 1000px; margin: 0 auto 20px auto;">
+        <a href="/welcome" class="btn">⬅️ Zurück zum Dashboard</a>
     </div>
 
+    <div class="container">
+        <h1 style="text-align: center; margin-bottom: 30px;">🛠️ Admin-Steuerung</h1>
+
+        <!-- OBERSTE REIHE: Klassen & Schüler (Schnell-Eingabe) -->
+        <div class="grid-2">
+            <div class="card">
+                <h3>🏫 1. Neue Klasse anlegen</h3>
+                <p style="color: #aaa; font-size: 13px;">Leg hier zuerst die Klassen an (z.B. "8a" oder "Lehrer").</p>
+                <form action="/admin/add-class" method="POST" style="display: flex; gap: 10px;">
+                    <input type="text" name="class_name" placeholder="Klassenname..." required style="flex-grow: 1;">
+                    <button type="submit" class="btn success-btn">Speichern</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>👨‍🎓 2. Schüler eintragen</h3>
+                <p style="color: #aaa; font-size: 13px;">Weise Vornamen einer existierenden Klasse zu.</p>
+                <form action="/admin/add-student" method="POST" style="display: flex; gap: 10px;">
+                    <input type="text" name="student_name" placeholder="Vorname" required style="flex-grow: 1;">
+                    <select name="class_name" required>
+                        <option value="" disabled selected>Klasse...</option>
+                        {% for k in echte_klassen %}
+                            <option value="{{ k.name }}">{{ k.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn success-btn">Hinzufügen</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ZWEITE REIHE: Nachrichten & Bans -->
+        <div class="grid-2">
+            <div class="card">
+                <h3>📢 System-Nachricht (Pop-up)</h3>
+                <form action="/admin/send-message" method="POST">
+                    <select name="target" style="width: 100%; margin-bottom: 10px;">
+                        <option value="alle">🌍 AN ALLE SCHÜLER SENDEN</option>
+                        <optgroup label="Bestimmter Schüler">
+                            {% for s in klassen_liste %}
+                                <option value="{{ s }}">{{ meta.get(s, {}).get('display_name', s) }}</option>
+                            {% endfor %}
+                        </optgroup>
+                    </select>
+                    <input type="text" name="title" placeholder="Titel (z.B. Wichtig! 📢)" required style="width: 100%; margin-bottom: 10px;">
+                    <textarea name="message" rows="3" placeholder="Nachrichtentext..." required style="width: 100%; margin-bottom: 10px; resize: vertical;"></textarea>
+                    <button type="submit" class="btn success-btn" style="width: 100%;">🚀 Nachricht aussenden</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>🚫 Bann-Verwaltung</h3>
+                <form action="/admin/ban" method="POST" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
+                    <select name="schueler" required style="flex-grow: 1;">
+                        <option value="" disabled selected>Wen bannen?</option>
+                        {% for s in klassen_liste %}
+                            {% if s != "Till" and s not in banned_users %}
+                                <option value="{{ s }}">{{ meta.get(s, {}).get('display_name', s) }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    <select name="dauer" required>
+                        <option value="1h">1 Stunde</option>
+                        <option value="1d">1 Tag</option>
+                        <option value="1w">1 Woche</option>
+                        <option value="perm">Permanent</option>
+                    </select>
+                    <button type="submit" class="btn danger-btn">🔨</button>
+                </form>
+
+                <div style="max-height: 150px; overflow-y: auto;">
+                    <table>
+                        <tbody>
+                            {% for schueler, bis_wann in banned_users.items() %}
+                            <tr>
+                                <td><b>{{ meta.get(schueler, {}).get('display_name', schueler) }}</b><br><span style="color:#ff2e63;font-size:11px;">{{ bis_wann }}</span></td>
+                                <td style="text-align: right;">
+                                    <form action="/admin/unban/{{ schueler }}" method="POST" style="margin: 0;">
+                                        <button type="submit" class="btn success-btn" style="padding: 4px 8px; font-size: 12px;">Entbannen</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td style="color: #aaa; text-align: center;">Niemand ist gebannt.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- DRITTE REIHE: Admins, Chat & PINs -->
+        <div class="grid-2">
+            <div class="card">
+                <h3>👑 Admin-Rechte verwalten</h3>
+                <form action="/admin/make-admin" method="POST" style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <select name="schueler" required style="flex-grow: 1;">
+                        <option value="" disabled selected>Schüler auswählen...</option>
+                        {% for s in klassen_liste %}
+                            {% if s not in admins %}
+                                <option value="{{ s }}">{{ meta.get(s, {}).get('display_name', s) }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn success-btn">Zum Admin machen</button>
+                </form>
+                
+                <div style="max-height: 150px; overflow-y: auto;">
+                    <table>
+                        <tbody>
+                            {% for admin in admins %}
+                            <tr>
+                                <td>👑 <b>{{ meta.get(admin, {}).get('display_name', admin) }}</b></td>
+                                <td style="text-align: right;">
+                                    {% if admin != "Till" %}
+                                        <form action="/admin/remove-admin/{{ admin }}" method="POST" style="margin: 0;">
+                                            <button type="submit" class="btn danger-btn" style="padding: 4px 8px; font-size: 12px;">Entfernen</button>
+                                        </form>
+                                    {% else %}
+                                        <span style="color: #00adb5; font-size: 11px;">Haupt-Admin</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>🧹 Wartung & PINs</h3>
+                <form action="/admin/clear-chat" method="POST" onsubmit="return confirm('Wirklich den gesamten globalen Chat löschen?');" style="margin-bottom: 20px;">
+                    <button type="submit" class="btn danger-btn" style="width: 100%;">Globalen Chat komplett leeren 🗑️</button>
+                </form>
+                
+                <h4 style="margin-bottom: 5px; color: #aaa;">PINs zurücksetzen</h4>
+                <div style="max-height: 120px; overflow-y: auto;">
+                    <table>
+                        <tbody>
+                            {% for schueler, pin in pins.items() %}
+                            <tr>
+                                <td>{{ meta.get(schueler, {}).get('display_name', schueler) }}</td>
+                                <td style="text-align: right;">
+                                    <form action="/admin/reset-pin/{{ schueler }}" method="POST" style="margin: 0;">
+                                        <button type="submit" class="btn danger-btn" style="padding: 4px 8px; font-size: 12px;">Reset</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
 </body>
 </html>
