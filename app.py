@@ -885,6 +885,10 @@ def login():
         eingabe_klasse = request.form.get('klasse')
         eingabe_name = request.form.get('nutzername', '').strip()
         eingabe_pin = request.form.get('pin', '').strip()
+
+        db_such_klasse = eingabe_klasse
+        if db_such_klasse.lower() == "g8c":
+            db_such_klasse = "Klasse G8c"
         
         erlaubt = AllowedStudent.query.filter(
             db.func.lower(AllowedStudent.name) == eingabe_name.lower(),
