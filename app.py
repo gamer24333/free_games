@@ -1951,5 +1951,10 @@ def submit_dino():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+
+        # NEU: Erstellt automatisch eine Klasse, damit der Admin sich einloggen kann
+        if SchoolClass.query.count() == 0:
+            db.session.add(SchoolClass(name="Admin-Bereich"))
+            db.session.commit()
             
     app.run(debug=True)
