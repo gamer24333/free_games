@@ -105,6 +105,24 @@
         .rank-list strong { color: #f1c40f; font-size: 16px; }
         .rank-list .reward { display: block; font-size: 12px; color: #2ecc71; margin-top: 3px; }
 
+        /* NEU: Amazon Button Styling */
+        .amazon-btn {
+            background-color: #ff9900; 
+            color: #111; 
+            padding: 10px 20px; 
+            font-weight: bold; 
+            border-radius: 8px; 
+            text-decoration: none; 
+            display: inline-block;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 10px rgba(255, 153, 0, 0.2);
+        }
+        .amazon-btn:hover {
+            background-color: #e68a00;
+            transform: scale(1.05);
+            box-shadow: 0 6px 15px rgba(255, 153, 0, 0.4);
+        }
+
         /* Rechtlicher Footer */
         footer { margin: 40px 0 20px 0; padding-top: 20px; border-top: 1px solid #333; }
         footer a { color: #888; font-size: 12px; text-decoration: none; }
@@ -341,6 +359,15 @@
     </div>
     {% endif %}
 
+    <!-- NEUER AMAZON PRODUKT-LINK -->
+    <div style="text-align: center; margin: 25px auto; max-width: 500px; background: #2a2a2a; padding: 20px; border-radius: 8px; border: 1px solid #555; box-shadow: 0 0 10px rgba(0,0,0,0.5);">
+        <h3 style="margin-top: 0; color: #ff9900; font-size: 18px;">🔥 Empfehlung des Tages</h3>
+        <p style="font-size: 14px; color: #ccc; margin-bottom: 15px;">Brauchst du noch ein Upgrade für dein Setup, um in den Spielen noch besser abzuräumen?</p>
+        <a href="https://link.amazon/B00Dx0uQO" target="_blank" rel="noopener noreferrer" class="amazon-btn">
+            🛒 Produkt auf Amazon ansehen
+        </a>
+    </div>
+
     <!-- Admin / Inventar Box unten -->
     <div class="admin-box">
         <a href="/shop" class="btn" style="background: #e67e22;">🎒 Inventar & Shop</a>
@@ -357,6 +384,7 @@
     <a href="/impressum">Impressum</a> | <a href="/datenschutz">Datenschutz</a>
     <div class="amazon-note">Als Amazon-Partner verdiene ich an qualifizierten Verkäufen.</div>
     </footer>
+
     <script>
     // --- SPENDEN MODAL STEUERUNG ---
     function openDonateModal() { document.getElementById('donateModal').style.display = 'flex'; }
