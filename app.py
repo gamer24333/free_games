@@ -979,7 +979,8 @@ def change_name():
         return {"status": "success", "new_name": new_name}
     return {"error": "Nutzer nicht gefunden"}, 404
 
-# --- ADMIN PANEL ---
+
+# Der Admin bereich
 @app.route('/admin')
 def admin_panel():
     if 'username' not in session: return redirect(url_for('login'))
@@ -991,13 +992,17 @@ def admin_panel():
     pins_dict = {u.username: u.pin for u in all_users if u.pin}
     admins_list = get_admins_list()
     
+    # NEU: Lädt die angelegten Klassen für das Dropdown
+    echte_klassen = SchoolClass.query.all()
+    
     banned_users = {}
     for u in all_users:
         if u.banned_until and u.banned_until > datetime.utcnow():
             if u.banned_until.year > 2090: banned_users[u.username] = "Permanent (Für immer)"
             else: banned_users[u.username] = u.banned_until.strftime("%d.%m.%Y - %H:%M Uhr")
     
-    return render_template('admin.html', pins=pins_dict, admins=admins_list, klassen_liste=[s.name for s in AllowedStudent.query.all()], banned_users=banned_users, meta=get_user_metadata())
+    # NEU: echte_klassen=echte_klassen am Ende hinzugefügt!
+    return render_template('admin.html', pins=pins_dict, admins=admins_list, klassen_liste=[s.name for s in AllowedStudent.query.all()], banned_users=banned_users, meta=get_user_metadata(), echte_klassen=echte_klassen)
 
 @app.route('/admin/make-admin', methods=['POST'])
 def make_admin():
