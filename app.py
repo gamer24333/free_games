@@ -27,6 +27,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 
 db = SQLAlchemy(app)
 
+"""
 # Feste Klassenliste
 KLASSEN_LISTE = [
     "Till", "Ben", "Matteo", "Louis", "Maxim", "Jonah P", "Jonah S", 
@@ -35,6 +36,7 @@ KLASSEN_LISTE = [
     "Janne", "Tom", "Levin", "Liam", "Tim", "Nathalie", "Richard", "Julius",
     "TestAccount"
 ]
+"""
 
 # RAM-Speicher
 last_active = {}
@@ -131,6 +133,7 @@ class UserSetting(db.Model):
     last_daily_claim = db.Column(db.DateTime, nullable=True)
     login_streak = db.Column(db.Integer, default=0)
     achievements = db.Column(db.Text, default='[]')
+    klasse = db.Column(db.String(50), nullable=True)
 
 class ChatMessage(db.Model):
     __tablename__ = 'chat_messages'
@@ -201,6 +204,16 @@ class RedeemedCode(db.Model):
     username = db.Column(db.String(50), nullable=False)
     code = db.Column(db.String(50), nullable=False)
 
+class SchoolClass(db.Model):
+    __tablename__ = 'school_classes'
+    name = db.Column(db.String(50), primary_key=True)
+
+class AllowedStudent(db.Model):
+    __tablename__ = 'allowed_students'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(50), nullable=False)
+    class_name = db.Column(db.String(50), nullable=False)
+
 
 # --- HILFSFUNKTIONEN ---
 def get_private_room_name(user1, user2):
@@ -251,6 +264,20 @@ def get_user_metadata():
         
         meta[u.username] = {"color": farbe, "title": titel_text, "display_name": display_n}
     return meta
+
+def get_klassen_liste_fuer_user(username):
+    # Findet heraus, in welcher Klasse der User ist
+    user = UserSetting.query.filter_by(username=username).first()
+    if not user or not user.klasse:
+        return ["Till"]
+        
+    # Lädt alle erlaubten Schüler dieser spezifischen Klasse
+    students = AllowedStudent.query.filter_by(class_name=user.klasse).all()
+    liste = [s.name for s in students]
+    
+    if "Till" not in liste: 
+        liste.append("Till") # Admin ist immer sichtbar
+    return liste
 
 
 # --- ROUTEN ---
@@ -352,7 +379,7 @@ def dashboard_stats():
         global_chat_len = ChatMessage.query.filter_by(room='global').count()
         
         private_chats_stats = {}
-        for schueler in KLASSEN_LISTE:
+        for schueler in get_klassen_liste_fuer_user(current_user):
             if schueler != current_user:
                 room_id = get_private_room_name(current_user, schueler)
                 private_chats_stats[schueler] = ChatMessage.query.filter_by(room=room_id).count()
@@ -682,7 +709,7 @@ def trade_coins():
     
     if betrag <= 0: return {"error": "Betrag muss größer als 0 sein!"}, 400
     if sender == empfaenger: return {"error": "Du kannst dir nicht selbst Coins schicken!"}, 400
-    if empfaenger not in KLASSEN_LISTE: return {"error": "Empfänger existiert nicht!"}, 400
+    if empfaenger not in get_klassen_liste_fuer_user(sender): return {"error": "Empfänger existiert nicht!"}, 400
     
     sender_u = UserSetting.query.filter_by(username=sender).first()
     if (sender_u.coins or 0) < betrag: return {"error": "Du hast nicht genug Coins!"}, 400
@@ -784,41 +811,57 @@ def login():
     if 'username' in session:
         return redirect(url_for('dashboard'))
         
+    # Lade alle existierenden Klassen für das Dropdown
+    alle_klassen = SchoolClass.query.all()
+        
     if request.method == 'POST':
+        eingabe_klasse = request.form.get('klasse')
         eingabe_name = request.form.get('nutzername', '').strip()
         eingabe_pin = request.form.get('pin', '').strip()
         
-        if eingabe_name not in KLASSEN_LISTE:
-            return render_template('login.html', fehler="Du bist nicht auf der Liste!")
+        # 1. Prüfen, ob der User in dieser Klasse erlaubt ist
+        erlaubt = AllowedStudent.query.filter_by(name=eingabe_name, class_name=eingabe_klasse).first()
+        
+        # Admins (z.B. Till) dürfen sich in jede Klasse einloggen
+        is_till = (eingabe_name == "Till")
+        
+        if not erlaubt and not is_till:
+            return render_template('login.html', klassen=alle_klassen, fehler=f'"{eingabe_name}" ist in der Klasse {eingabe_klasse} nicht eingetragen!', name_vorbefuellt=eingabe_name)
             
+        # 2. PIN und User checken
         user = UserSetting.query.filter_by(username=eingabe_name).first()
         
         if user and user.pin:
             if user.pin == eingabe_pin:
                 session['username'] = eingabe_name
+                session['klasse'] = eingabe_klasse # Speichere die Klasse in der Session!
                 last_active[eingabe_name] = datetime.now()
+                # Aktualisiere die Klasse des Users in der DB
+                user.klasse = eingabe_klasse
+                db.session.commit()
                 return redirect(url_for('dashboard'))
             else:
-                return render_template('login.html', fehler="Falsche PIN! 🤔", name_vorbefuellt=eingabe_name)
+                return render_template('login.html', klassen=alle_klassen, fehler="Falsche PIN! 🤔", name_vorbefuellt=eingabe_name)
         else:
             if len(eingabe_pin) < 4:
-                return render_template('login.html', info="Erstelle bitte eine mindestens 4-stellige PIN!", name_vorbefuellt=eingabe_name)
+                return render_template('login.html', klassen=alle_klassen, info="Erstelle bitte eine mindestens 4-stellige PIN!", name_vorbefuellt=eingabe_name)
             
             if not user:
-                is_till = (eingabe_name == "Till")
-                user = UserSetting(username=eingabe_name, display_name=eingabe_name, pin=eingabe_pin, is_admin=is_till)
+                user = UserSetting(username=eingabe_name, display_name=eingabe_name, pin=eingabe_pin, is_admin=is_till, klasse=eingabe_klasse)
                 db.session.add(user)
             else:
                 user.pin = eingabe_pin
+                user.klasse = eingabe_klasse
                 if not user.display_name:
                     user.display_name = eingabe_name
             db.session.commit()
             
             session['username'] = eingabe_name
+            session['klasse'] = eingabe_klasse
             last_active[eingabe_name] = datetime.now()
             return redirect(url_for('dashboard'))
             
-    return render_template('login.html')
+    return render_template('login.html', klassen=alle_klassen)
 
 @app.route('/welcome')
 def dashboard():
@@ -865,7 +908,7 @@ def dashboard():
     # Partner-Liste mit echtem Namen und Display-Name vorbereiten
     meta = get_user_metadata()
     chpartner = []
-    for s in sorted([s for s in KLASSEN_LISTE if s != me]):
+    for s in sorted([s for s in get_klassen_liste_fuer_user(session['username']) if s != session['username']]):
         d_name = meta.get(s, {}).get('display_name', s)
         chpartner.append({'username': s, 'display_name': d_name})
     
@@ -917,7 +960,7 @@ def change_name():
     current_user = session['username']
     
     # Schutz vor Identitätsfälschung (Impersonation)
-    if new_name in KLASSEN_LISTE and new_name != current_user:
+    if new_name in get_klassen_liste_fuer_user(current_user) and new_name != current_user:
         user = UserSetting.query.filter_by(username=current_user).first()
         if user:
             user.banned_until = datetime.utcnow() + timedelta(days=1)
@@ -954,7 +997,7 @@ def admin_panel():
             if u.banned_until.year > 2090: banned_users[u.username] = "Permanent (Für immer)"
             else: banned_users[u.username] = u.banned_until.strftime("%d.%m.%Y - %H:%M Uhr")
     
-    return render_template('admin.html', pins=pins_dict, admins=admins_list, klassen_liste=KLASSEN_LISTE, banned_users=banned_users, meta=get_user_metadata())
+    return render_template('admin.html', pins=pins_dict, admins=admins_list, klassen_liste=[s.name for s in AllowedStudent.query.all()], banned_users=banned_users, meta=get_user_metadata())
 
 @app.route('/admin/make-admin', methods=['POST'])
 def make_admin():
@@ -963,7 +1006,7 @@ def make_admin():
     user = UserSetting.query.filter_by(username=me).first()
     if not (me == "Till" or (user and user.is_admin)): return "403", 403
     neuer_admin = request.form.get('schueler')
-    if neuer_admin in KLASSEN_LISTE:
+    if True:
         target_user = UserSetting.query.filter_by(username=neuer_admin).first()
         if not target_user:
             target_user = UserSetting(username=neuer_admin, display_name=neuer_admin, is_admin=True)
@@ -1058,6 +1101,36 @@ def send_admin_message():
         db.session.commit()
     return redirect(url_for('admin_panel'))
 
+@app.route('/admin/add-class', methods=['POST'])
+def add_class():
+    if 'username' not in session: return "403", 403
+    me = session['username']
+    user = UserSetting.query.filter_by(username=me).first()
+    if not (me == "Till" or (user and user.is_admin)): return "403", 403
+
+    class_name = request.form.get('class_name').strip()
+    if class_name:
+        if not SchoolClass.query.filter_by(name=class_name).first():
+            db.session.add(SchoolClass(name=class_name))
+            db.session.commit()
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/add-student', methods=['POST'])
+def add_student():
+    if 'username' not in session: return "403", 403
+    me = session['username']
+    user = UserSetting.query.filter_by(username=me).first()
+    if not (me == "Till" or (user and user.is_admin)): return "403", 403
+
+    student_name = request.form.get('student_name').strip()
+    class_name = request.form.get('class_name').strip()
+    
+    if student_name and class_name:
+        if not AllowedStudent.query.filter_by(name=student_name, class_name=class_name).first():
+            db.session.add(AllowedStudent(name=student_name, class_name=class_name))
+            db.session.commit()
+    return redirect(url_for('admin_panel'))
+
 @app.route('/api/submit-feedback', methods=['POST'])
 def submit_feedback():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
@@ -1098,7 +1171,7 @@ def chat(room="global"):
     current_user = session['username']
     meta = get_user_metadata()
     chpartner = []
-    for schueler in sorted([s for s in KLASSEN_LISTE if s != current_user]):
+    for schueler in sorted(s [for s in get_klassen_liste_fuer_user(session['username']) if s != current_user]):
         d_name = meta.get(schueler, {}).get('display_name', schueler)
         chpartner.append({'username': schueler, 'display_name': d_name})
     
@@ -1330,7 +1403,7 @@ def game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: s.geometry_dash for s in all_scores}
-    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in get_klassen_liste_fuer_user(session['username'])], key=lambda x: x[1], reverse=True)
     meta = get_user_metadata()
     return render_template('geometry_dash.html', leaderboard=leaderboard, meta=meta)
     
@@ -1354,7 +1427,7 @@ def clicker_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: s.clicker for s in all_scores}
-    leaderboard = sorted([(s, scores_dict.get(s, 0) if scores_dict.get(s) is not None else 0) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in get_klassen_liste_fuer_user(session['username'])], key=lambda x: x[1], reverse=True)
     meta = get_user_metadata()
     return render_template('clicker.html', leaderboard=leaderboard, meta=meta)
     
@@ -1378,7 +1451,7 @@ def flappy_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: s.flappy for s in all_scores}
-    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in get_klassen_liste_fuer_user(session['username'])], key=lambda x: x[1], reverse=True)
     meta = get_user_metadata()
     return render_template('flappy.html', leaderboard=leaderboard, meta=meta)
 
@@ -1402,7 +1475,7 @@ def reaction_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: s.reaction for s in all_scores}
-    leaderboard = sorted([(s, scores_dict.get(s, 9999)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=False)
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in get_klassen_liste_fuer_user(session['username'])], key=lambda x: x[1], reverse=True)
     meta = get_user_metadata()
     return render_template('reaction.html', leaderboard=leaderboard, meta=meta)
 
@@ -1426,7 +1499,7 @@ def snake_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: (s.snake if s.snake is not None else 0) for s in all_scores}
-    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in get_klassen_liste_fuer_user(session['username'])], key=lambda x: x[1], reverse=True)
     meta = get_user_metadata()
     return render_template('snake.html', leaderboard=leaderboard, meta=meta)
 
@@ -1450,7 +1523,7 @@ def crossy_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: (s.crossy if s.crossy is not None else 0) for s in all_scores}
-    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in get_klassen_liste_fuer_user(session['username'])], key=lambda x: x[1], reverse=True)
     meta = get_user_metadata()
     return render_template('crossy.html', leaderboard=leaderboard, meta=meta)
 
@@ -1474,7 +1547,7 @@ def doodle_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: (s.doodle if s.doodle is not None else 0) for s in all_scores}
-    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in get_klassen_liste_fuer_user(session['username'])], key=lambda x: x[1], reverse=True)
     meta = get_user_metadata()
     return render_template('doodle.html', leaderboard=leaderboard, meta=meta)
 
@@ -1498,7 +1571,7 @@ def brickbreaker_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: (s.brickbreaker if hasattr(s, 'brickbreaker') and s.brickbreaker is not None else 0) for s in all_scores}
-    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in get_klassen_liste_fuer_user(session['username'])], key=lambda x: x[1], reverse=True)
     meta = get_user_metadata()
     return render_template('brickbreaker.html', leaderboard=leaderboard, meta=meta)
 
@@ -1523,7 +1596,7 @@ def speedtyping_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: (getattr(s, 'speedtyping', 0) or 0) for s in all_scores}
-    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in get_klassen_liste_fuer_user(session['username'])], key=lambda x: x[1], reverse=True)
     meta = get_user_metadata()
     return render_template('speedtyping.html', leaderboard=leaderboard, meta=meta)
 
@@ -1551,7 +1624,7 @@ def logout():
 @app.route('/tictactoe')
 def tictactoe_menu():
     if 'username' not in session: return redirect(url_for('login'))
-    gegner_liste = sorted([s for s in KLASSEN_LISTE if s != session['username']])
+    gegner_liste = sorted([s for s in get_klassen_liste_fuer_user(session['username']) if s != session['username']])
     return render_template('tictactoe_menu.html', gegner_liste=gegner_liste)
 
 @app.route('/tictactoe/invite', methods=['POST'])
@@ -1654,7 +1727,7 @@ def ttt_move(game_id):
 @app.route('/tankroyale')
 def tankroyale_menu():
     if 'username' not in session: return redirect(url_for('login'))
-    gegner_liste = sorted([s for s in KLASSEN_LISTE if s != session['username']])
+    gegner_liste = sorted([s for s in get_klassen_liste_fuer_user(session['username']) if s != session['username']])
     return render_template('tank_royale_menu.html', gegner_liste=gegner_liste, meta=get_user_metadata())
 
 @app.route('/tankroyale/invite', methods=['POST'])
@@ -1825,7 +1898,7 @@ def tower_stack_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: (getattr(s, 'tower', 0) or 0) for s in all_scores}
-    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in get_klassen_liste_fuer_user(session['username'])], key=lambda x: x[1], reverse=True)
     meta = get_user_metadata()
     return render_template('tower_stack.html', leaderboard=leaderboard, meta=meta)
 
@@ -1853,7 +1926,7 @@ def dino_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
     scores_dict = {s.username: (getattr(s, 'dino', 0) or 0) for s in all_scores}
-    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in KLASSEN_LISTE], key=lambda x: x[1], reverse=True)
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in get_klassen_liste_fuer_user(session['username'])], key=lambda x: x[1], reverse=True)
     meta = get_user_metadata()
     return render_template('dino.html', leaderboard=leaderboard, meta=meta)
 
