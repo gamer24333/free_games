@@ -1171,7 +1171,7 @@ def chat(room="global"):
     current_user = session['username']
     meta = get_user_metadata()
     chpartner = []
-    for schueler in sorted(s [for s in get_klassen_liste_fuer_user(session['username']) if s != current_user]):
+    for schueler in sorted([s for s in get_klassen_liste_fuer_user(session['username']) if s != current_user]):
         d_name = meta.get(schueler, {}).get('display_name', schueler)
         chpartner.append({'username': schueler, 'display_name': d_name})
     
