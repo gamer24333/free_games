@@ -999,6 +999,7 @@ def admin_panel():
     
     # NEU: Lädt die angelegten Klassen für das Dropdown
     echte_klassen = SchoolClass.query.all()
+    echte_schueler = AllowedStudent.query.all()
     
     banned_users = {}
     for u in all_users:
@@ -1007,7 +1008,7 @@ def admin_panel():
             else: banned_users[u.username] = u.banned_until.strftime("%d.%m.%Y - %H:%M Uhr")
     
     # NEU: echte_klassen=echte_klassen am Ende hinzugefügt!
-    return render_template('admin.html', pins=pins_dict, admins=admins_list, klassen_liste=[s.name for s in AllowedStudent.query.all()], banned_users=banned_users, meta=get_user_metadata(), echte_klassen=echte_klassen)
+    return render_template('admin.html', pins=pins_dict, admins=admins_list, klassen_liste=[s.name for s in AllowedStudent.query.all()], banned_users=banned_users, meta=get_user_metadata(), echte_klassen=echte_klassen, echte_schueler=echte_schueler)
 
 @app.route('/admin/make-admin', methods=['POST'])
 def make_admin():
@@ -1139,6 +1140,30 @@ def add_student():
         if not AllowedStudent.query.filter_by(name=student_name, class_name=class_name).first():
             db.session.add(AllowedStudent(name=student_name, class_name=class_name))
             db.session.commit()
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/remove-class/<class_name>', methods=['POST'])
+def remove_class(class_name):
+    if 'username' not in session: return "403", 403
+    me = session['username']
+    user = UserSetting.query.filter_by(username=me).first()
+    if not (me == "Till" or (user and user.is_admin)): return "403", 403
+
+    SchoolClass.query.filter_by(name=class_name).delete()
+    # Löscht auch alle Schüler, die in dieser Klasse waren von der Gästeliste
+    AllowedStudent.query.filter_by(class_name=class_name).delete()
+    db.session.commit()
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/remove-student/<int:student_id>', methods=['POST'])
+def remove_student_from_class(student_id):
+    if 'username' not in session: return "403", 403
+    me = session['username']
+    user = UserSetting.query.filter_by(username=me).first()
+    if not (me == "Till" or (user and user.is_admin)): return "403", 403
+
+    AllowedStudent.query.filter_by(id=student_id).delete()
+    db.session.commit()
     return redirect(url_for('admin_panel'))
 
 @app.route('/api/submit-feedback', methods=['POST'])
