@@ -892,7 +892,7 @@ def login():
         
         erlaubt = AllowedStudent.query.filter(
             db.func.lower(AllowedStudent.name) == eingabe_name.lower(),
-            db.func.lower(AllowedStudent.class_name) == eingabe_klasse.lower()
+            db.func.lower(AllowedStudent.class_name) == db_such_klasse.lower()
         ).first()
         is_till = (eingabe_name == "Till")
         
