@@ -27,17 +27,6 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 
 db = SQLAlchemy(app)
 
-"""
-# Feste Klassenliste
-KLASSEN_LISTE = [
-    "Till", "Ben", "Matteo", "Louis", "Maxim", "Jonah P", "Jonah S", 
-    "Mateo", "Hanna", "Emma", "Lia", "Mia", "Lena S", "Lena G", "Johann", 
-    "Lena D", "Dasha", "Daniel", "Bennet", "Erik", "Roman", "Meike",
-    "Janne", "Tom", "Levin", "Liam", "Tim", "Nathalie", "Richard", 
-    "TestAccount"
-]
-"""
-
 # RAM-Speicher
 last_active = {}
 user_activities = {}
@@ -46,6 +35,7 @@ user_activities = {}
 SHOP_ITEMS = {
     "title_destroyer": {"id": "title_destroyer", "type": "title", "name": "Titel: Der Zerstörer", "desc": "Ein bedrohlicher Titel im Chat.", "price": 250, "value": "Der Zerstörer"},
     "title_king": {"id": "title_king", "type": "title", "name": "Titel: King", "desc": "Zeig allen, wer der Boss ist.", "price": 500, "value": "King"},
+    "title_legend": {"id": "title_legend", "type": "title", "name": "Titel: Legende", "desc": "Exklusiver Titel für das Erreichen von Level 50.", "price": 0, "value": "Legende"},
     
     "color_gold": {"id": "color_gold", "type": "color", "name": "Name: Gold", "desc": "Dein Name leuchtet Gold.", "price": 300, "value": "#f1c40f"},
     "color_rainbow": {"id": "color_rainbow", "type": "color", "name": "Name: Regenbogen", "desc": "Bunter Chat-Name!", "price": 800, "value": "rainbow"},
@@ -246,8 +236,32 @@ def get_level_info(xp):
     else: rank = "Legende"
     return level, rank
 
+# --- NEU: Automatische Vergabe des Legende-Titels ---
+def check_legend_status(user):
+    if not user: 
+        return
+    lvl, rank = get_level_info(user.xp)
+    if rank == "Legende":
+        # 1. Inventar prüfen und ggf. Titel hinzufügen
+        inv = json.loads(user.inventory) if user.inventory else []
+        owned_ids = [i if isinstance(i, str) else i.get('id') for i in inv]
+        if "title_legend" not in owned_ids:
+            inv.append({"id": "title_legend", "bought_at": datetime.utcnow().isoformat()})
+            user.inventory = json.dumps(inv)
+        
+        # 2. Aktive Titel prüfen und Legende aktivieren falls noch nicht getan
+        try:
+            active_titles = json.loads(user.active_title) if user.active_title and user.active_title.startswith('[') else ([user.active_title] if user.active_title else [])
+        except:
+            active_titles = [user.active_title] if user.active_title else []
+        
+        if "Legende" not in active_titles:
+            active_titles.append("Legende")
+            user.active_title = json.dumps(active_titles)
+        
+        db.session.commit()
+
 def get_user_metadata():
-    import json
     all_users = UserSetting.query.all()
     meta = {}
     for u in all_users:
@@ -266,17 +280,15 @@ def get_user_metadata():
     return meta
 
 def get_klassen_liste_fuer_user(username):
-    # Findet heraus, in welcher Klasse der User ist
     user = UserSetting.query.filter_by(username=username).first()
     if not user or not user.klasse:
         return ["Till"]
         
-    # Lädt alle erlaubten Schüler dieser spezifischen Klasse
     students = AllowedStudent.query.filter_by(class_name=user.klasse).all()
     liste = [s.name for s in students]
     
     if "Till" not in liste: 
-        liste.append("Till") # Admin ist immer sichtbar
+        liste.append("Till")
     return liste
 
 
@@ -335,9 +347,8 @@ def ping_user():
         data = request.get_json(silent=True) or {}
         activity = data.get('activity', 'Im Portal')
         is_afk = data.get('is_afk', False)
-        is_bot = data.get('is_bot', False)  # <-- NEU: Bot-Flag auslesen
+        is_bot = data.get('is_bot', False) 
         
-        # Aktivitäten-Status updaten (sichtbar im Dashboard/Admin-Panel)
         if is_bot:
             user_activities[current_user] = f"{activity} (BOT VERDACHT)"
         elif is_afk:
@@ -345,7 +356,6 @@ def ping_user():
         else:
             user_activities[current_user] = activity
         
-        # <-- NEU: XP und Coins werden abgebrochen, wenn der User AFK ist ODER ein Bot erkannt wurde!
         if not is_afk and not is_bot:
             user = UserSetting.query.filter_by(username=current_user).first()
             if user:
@@ -353,6 +363,9 @@ def ping_user():
                 user.xp = (user.xp or 0) + 2 
                 if (user.playtime_total % 25) == 0: 
                     user.coins = (user.coins or 0) + 1
+
+                # Legende-Status prüfen, falls XP durch Ping das Level 50 geknackt hat
+                check_legend_status(user)
 
                 if activity.startswith("Spielt "):
                     game_name = activity.replace("Spielt ", "").lower()
@@ -372,7 +385,7 @@ def ping_user():
                     elif game_name == "speedtyping": score_entry.playtime_speedtyping = (score_entry.playtime_speedtyping or 0) + 5
                     elif game_name == "slither": score_entry.playtime_slither = (score_entry.playtime_slither or 0) + 5
                     elif game_name == "tower stack": score_entry.playtime_tower = (score_entry.playtime_tower or 0) + 5 
-                    elif game_name == "neon dino": score_entry.playtime_dino = (score_entry.playtime_dino or 0) + 5 # <-- NEU
+                    elif game_name == "neon dino": score_entry.playtime_dino = (score_entry.playtime_dino or 0) + 5 
             
                 db.session.commit()
         
@@ -569,10 +582,8 @@ def global_stats():
     if 'username' not in session: return redirect(url_for('login'))
     
     me = session['username']
-    # Holt nur die Namen der Leute aus der eigenen Klasse
     meine_klasse = get_klassen_liste_fuer_user(me)
     
-    # NEU: Zieht nur noch User und Scores, die in 'meine_klasse' sind!
     all_users = UserSetting.query.filter(UserSetting.username.in_(meine_klasse)).all()
     all_scores = GameScore.query.filter(GameScore.username.in_(meine_klasse)).all()
     
@@ -667,6 +678,7 @@ def redeem_code():
             elif typ == "xp":
                 user.xp = (user.xp or 0) + menge
                 msg = f"Code akzeptiert! +{menge} XP für dich! 🌟"
+                check_legend_status(user)
         except Exception:
             msg = "Code eingelöst!"
         
@@ -775,6 +787,7 @@ def spin_wheel():
     else: 
         gewinn, text, segment = 0, "XP-Boost! +500 XP 🌟", "xp"
         u.xp = (u.xp or 0) + 500
+        check_legend_status(u)
         
     u.coins += gewinn
     db.session.commit()
@@ -800,17 +813,18 @@ def spin_wheel_premium():
     u.coins -= einsatz
     
     rand = random.random()
-    if rand < 0.65: # 65% Niete (höheres Risiko)
+    if rand < 0.65: 
         gewinn, text, segment = 0, "Niete! 💸", "niete"
-    elif rand < 0.85: # 20% 40 Münzen
+    elif rand < 0.85: 
         gewinn, text, segment = 40, "40 Münzen! 🪙", "40coins"
-    elif rand < 0.95: # 10% 100 Münzen
+    elif rand < 0.95: 
         gewinn, text, segment = 100, "100 Münzen! 💰", "100coins"
-    elif rand < 0.99: # 4% 250 Münzen
+    elif rand < 0.99: 
         gewinn, text, segment = 250, "MEGA JACKPOT! 250 Münzen! 💎", "jackpot"
-    else: # 1% Mega XP-Boost
+    else: 
         gewinn, text, segment = 0, "MEGA XP-Boost! +1000 XP 🔥", "xp"
         u.xp = (u.xp or 0) + 1000
+        check_legend_status(u)
         
     u.coins += gewinn
     db.session.commit()
@@ -824,13 +838,11 @@ def login():
     if 'username' in session:
         return redirect(url_for('dashboard'))
         
-    # AUTOMATISCHER FALLBACK: Falls die Datenbank noch leer ist, direkt Erstklassen erstellen
     if SchoolClass.query.count() == 0:
         db.session.add(SchoolClass(name="Admin-Bereich"))
         db.session.add(SchoolClass(name="Klasse G8c"))
         db.session.commit()
         
-    # Lade alle existierenden Klassen für das Dropdown
     alle_klassen = SchoolClass.query.all()
         
     if request.method == 'POST':
@@ -838,16 +850,12 @@ def login():
         eingabe_name = request.form.get('nutzername', '').strip()
         eingabe_pin = request.form.get('pin', '').strip()
         
-        # 1. Prüfen, ob der User in dieser Klasse erlaubt ist
         erlaubt = AllowedStudent.query.filter_by(name=eingabe_name, class_name=eingabe_klasse).first()
-        
-        # Admins (z.B. Till) dürfen sich in jede Klasse einloggen
         is_till = (eingabe_name == "Till")
         
         if not erlaubt and not is_till:
             return render_template('login.html', klassen=alle_klassen, fehler=f'"{eingabe_name}" ist in der Klasse {eingabe_klasse} nicht eingetragen!', name_vorbefuellt=eingabe_name)
             
-        # 2. PIN und User checken
         user = UserSetting.query.filter_by(username=eingabe_name).first()
         
         if user and user.pin:
@@ -856,6 +864,7 @@ def login():
                 session['klasse'] = eingabe_klasse
                 last_active[eingabe_name] = datetime.now()
                 user.klasse = eingabe_klasse
+                check_legend_status(user)
                 db.session.commit()
                 return redirect(url_for('dashboard'))
             else:
@@ -872,6 +881,8 @@ def login():
                 user.klasse = eingabe_klasse
                 if not user.display_name:
                     user.display_name = eingabe_name
+            
+            check_legend_status(user)
             db.session.commit()
             
             session['username'] = eingabe_name
@@ -888,6 +899,10 @@ def dashboard():
     
     me = session['username']
     user = UserSetting.query.filter_by(username=me).first()
+    
+    # Check ob Legende erreicht wurde
+    check_legend_status(user)
+
     display_name = user.display_name if (user and user.display_name) else me
     
     admin_msg = AdminMessage.query.filter((AdminMessage.target == 'alle') | (AdminMessage.target == me)).order_by(AdminMessage.id.desc()).first()
@@ -923,7 +938,6 @@ def dashboard():
     
     lvl, rank = get_level_info(user.xp if user else 0)
     
-    # Partner-Liste mit echtem Namen und Display-Name vorbereiten
     meta = get_user_metadata()
     chpartner = []
     for s in sorted([s for s in get_klassen_liste_fuer_user(session['username']) if s != session['username']]):
@@ -977,7 +991,6 @@ def change_name():
         
     current_user = session['username']
     
-    # Schutz vor Identitätsfälschung (Impersonation)
     if new_name in get_klassen_liste_fuer_user(current_user) and new_name != current_user:
         user = UserSetting.query.filter_by(username=current_user).first()
         if user:
@@ -998,7 +1011,6 @@ def change_name():
     return {"error": "Nutzer nicht gefunden"}, 404
 
 
-# Der Admin bereich
 @app.route('/admin')
 def admin_panel():
     if 'username' not in session: return redirect(url_for('login'))
@@ -1010,7 +1022,6 @@ def admin_panel():
     pins_dict = {u.username: u.pin for u in all_users if u.pin}
     admins_list = get_admins_list()
     
-    # NEU: Lädt die angelegten Klassen für das Dropdown
     echte_klassen = SchoolClass.query.all()
     echte_schueler = AllowedStudent.query.all()
     
@@ -1020,7 +1031,6 @@ def admin_panel():
             if u.banned_until.year > 2090: banned_users[u.username] = "Permanent (Für immer)"
             else: banned_users[u.username] = u.banned_until.strftime("%d.%m.%Y - %H:%M Uhr")
     
-    # NEU: echte_klassen=echte_klassen am Ende hinzugefügt!
     return render_template('admin.html', pins=pins_dict, admins=admins_list, klassen_liste=[s.name for s in AllowedStudent.query.all()], banned_users=banned_users, meta=get_user_metadata(), echte_klassen=echte_klassen, echte_schueler=echte_schueler)
 
 @app.route('/admin/make-admin', methods=['POST'])
@@ -1163,7 +1173,6 @@ def remove_class(class_name):
     if not (me == "Till" or (user and user.is_admin)): return "403", 403
 
     SchoolClass.query.filter_by(name=class_name).delete()
-    # Löscht auch alle Schüler, die in dieser Klasse waren von der Gästeliste
     AllowedStudent.query.filter_by(class_name=class_name).delete()
     db.session.commit()
     return redirect(url_for('admin_panel'))
@@ -1234,7 +1243,6 @@ def send_message(room):
     current_user = session['username']
     user = UserSetting.query.filter_by(username=current_user).first()
     
-    # NEU: Wenn Raum "global" ist, nimm den Klassennamen. Sonst Privatchat.
     if room == "global": actual_room = f"Klasse_{user.klasse}"
     else: actual_room = get_private_room_name(current_user, room)
     
@@ -1249,7 +1257,6 @@ def api_chat_messages(room):
     current_user = session['username']
     user = UserSetting.query.filter_by(username=current_user).first()
     
-    # NEU: Automatische Umleitung in den Klassenraum
     if room == "global": 
         actual_room = f"Klasse_{user.klasse}"
         partner = None
@@ -1300,7 +1307,6 @@ def delete_message(room, msg_index):
     user = UserSetting.query.filter_by(username=current_user).first()
     admins = get_admins_list()
     
-    # NEU: Auch beim Löschen den echten Raum ermitteln
     if room == "global": actual_room = f"Klasse_{user.klasse}"
     else: actual_room = get_private_room_name(current_user, room)
     
@@ -2011,7 +2017,5 @@ def submit_dino():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-
         
-            
     app.run(debug=True)
