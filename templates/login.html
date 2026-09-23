@@ -5,13 +5,16 @@
     <title>Klassen-Portal Login</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; background-color: #222; color: white; }
-        .login-box { background: #333; padding: 30px; display: inline-block; border-radius: 10px; max-width: 350px; }
-        input, button { padding: 10px; margin: 10px; border-radius: 5px; border: none; box-sizing: border-box; }
-        input { width: 90%; background-color: #444; color: white; }
+        .login-box { background: #333; padding: 30px; display: inline-block; border-radius: 10px; max-width: 350px; width: 100%; box-sizing: border-box; }
+        input, select, button { padding: 12px; margin: 10px 0; border-radius: 5px; border: none; box-sizing: border-box; width: 100%; font-size: 16px; }
+        input, select { background-color: #444; color: white; }
         input::placeholder { color: #aaa; }
-        button { background-color: #00adb5; color: white; cursor: pointer; width: 90%; font-weight: bold; }
-        .error { color: #ff2e63; font-weight: bold; margin: 5px 10px; font-size: 14px; }
-        .info { color: #f9d423; margin: 5px 10px; font-size: 14px; }
+        select:required:invalid { color: #aaa; }
+        option[value=""][disabled] { display: none; }
+        button { background-color: #00adb5; color: white; cursor: pointer; font-weight: bold; margin-top: 15px; }
+        button:hover { background-color: #00939a; }
+        .error { color: #ff2e63; font-weight: bold; margin: 5px 0; font-size: 14px; }
+        .info { color: #f9d423; margin: 5px 0; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -28,9 +31,17 @@
         {% endif %}
         
         <form method="POST">
-            <input type="text" name="nutzername" value="{{ name_vorbefuellt if name_vorbefuellt else '' }}" placeholder="Dein Vorname" required><br>
+            <!-- NEU: Das Dropdown-Menü für die Klassen -->
+            <select name="klasse" required>
+                <option value="" disabled selected>Wähle deine Klasse</option>
+                {% for k in klassen %}
+                    <option value="{{ k.name }}">{{ k.name }}</option>
+                {% endfor %}
+            </select>
+
+            <input type="text" name="nutzername" value="{{ name_vorbefuellt if name_vorbefuellt else '' }}" placeholder="Dein Vorname" required>
             
-            <input type="password" name="pin" placeholder="Deine PIN (beim 1. Mal aussuchen)" required><br>
+            <input type="password" name="pin" placeholder="Deine PIN (beim 1. Mal aussuchen)" required>
             
             <button type="submit">Einlass fordern</button>
         </form>
