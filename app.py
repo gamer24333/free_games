@@ -238,7 +238,7 @@ def get_user_multiplier(username):
 def get_level_info(xp):
     xp = xp or 0
     # Neue Formel: Schneller am Anfang, fairer Grind am Ende. (Wurzel aus XP/20)
-    level = max(1, math.floor((xp / 15) ** 0.5) + 1)
+    level = max(1, math.floor((xp / 125) ** 0.5) + 1)
     level = min(100, level)  # Maximal Level 100
     
     if level < 10: rank = "Rookie"
