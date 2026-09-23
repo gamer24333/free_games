@@ -35,7 +35,16 @@ user_activities = {}
 SHOP_ITEMS = {
     "title_destroyer": {"id": "title_destroyer", "type": "title", "name": "Titel: Der Zerstörer", "desc": "Ein bedrohlicher Titel im Chat.", "price": 250, "value": "Der Zerstörer"},
     "title_king": {"id": "title_king", "type": "title", "name": "Titel: King", "desc": "Zeig allen, wer der Boss ist.", "price": 500, "value": "King"},
-    "title_legend": {"id": "title_legend", "type": "title", "name": "Titel: Legende", "desc": "Exklusiver Titel für das Erreichen von Level 50.", "price": 0, "value": "Legende"},
+    
+    # --- RANG TITEL ---
+    "title_profi": {"id": "title_profi", "type": "title", "name": "Titel: Profi", "desc": "Belohnung für Level 20.", "price": 0, "value": "Profi"},
+    "title_meister": {"id": "title_meister", "type": "title", "name": "Titel: Meister", "desc": "Belohnung für Level 30.", "price": 0, "value": "Meister"},
+    "title_grossmeister": {"id": "title_grossmeister", "type": "title", "name": "Titel: Großmeister", "desc": "Belohnung für Level 40.", "price": 0, "value": "Großmeister"},
+    "title_legend": {"id": "title_legend", "type": "title", "name": "Titel: Legende", "desc": "Exklusiver Titel für Level 50.", "price": 0, "value": "Legende"},
+    "title_mythos": {"id": "title_mythos", "type": "title", "name": "Titel: Mythos", "desc": "Belohnung für Level 65.", "price": 0, "value": "Mythos"},
+    "title_titan": {"id": "title_titan", "type": "title", "name": "Titel: Titan", "desc": "Belohnung für Level 80.", "price": 0, "value": "Titan"},
+    "title_halbgott": {"id": "title_halbgott", "type": "title", "name": "Titel: Halbgott", "desc": "Belohnung für Level 90.", "price": 0, "value": "Halbgott"},
+    "title_universum": {"id": "title_universum", "type": "title", "name": "Titel: Universum-Beherrscher", "desc": "Der ultimative Rang! Level 100.", "price": 0, "value": "Universum-Beherrscher"},
     
     "color_gold": {"id": "color_gold", "type": "color", "name": "Name: Gold", "desc": "Dein Name leuchtet Gold.", "price": 300, "value": "#f1c40f"},
     "color_rainbow": {"id": "color_rainbow", "type": "color", "name": "Name: Regenbogen", "desc": "Bunter Chat-Name!", "price": 800, "value": "rainbow"},
@@ -225,11 +234,11 @@ def get_user_multiplier(username):
         return user.score_multiplier
     return 1
 
-# --- NEU: Exponentielles / Krasseres Level-System bis Level 100 ---
+# --- NEU: Faireres Level-System bis Level 100 ---
 def get_level_info(xp):
     xp = xp or 0
-    # Quadratische Formel: Je höher das Level, desto krasser steigen die XP-Anforderungen!
-    level = max(1, math.floor((1 + math.sqrt(1 + (xp / 12.5))) / 2))
+    # Neue Formel: Schneller am Anfang, fairer Grind am Ende. (Wurzel aus XP/20)
+    level = max(1, math.floor((xp / 20) ** 0.5) + 1)
     level = min(100, level)  # Maximal Level 100
     
     if level < 10: rank = "Rookie"
@@ -245,29 +254,42 @@ def get_level_info(xp):
     
     return level, rank
 
-# --- Automatische Vergabe des Legende-Titels ab Level 50 ---
-def check_legend_status(user):
+# --- NEU: Automatische Titel-Vergabe für alle guten Ränge ---
+def check_rank_titles(user):
     if not user: 
         return
+        
     lvl, rank = get_level_info(user.xp)
-    if lvl >= 50:
-        # 1. Inventar prüfen und ggf. Titel hinzufügen
-        inv = json.loads(user.inventory) if user.inventory else []
-        owned_ids = [i if isinstance(i, str) else i.get('id') for i in inv]
-        if "title_legend" not in owned_ids:
-            inv.append({"id": "title_legend", "bought_at": datetime.utcnow().isoformat()})
-            user.inventory = json.dumps(inv)
-        
-        # 2. Aktive Titel prüfen und Legende aktivieren falls noch nicht getan
-        try:
-            active_titles = json.loads(user.active_title) if user.active_title and user.active_title.startswith('[') else ([user.active_title] if user.active_title else [])
-        except:
-            active_titles = [user.active_title] if user.active_title else []
-        
-        if "Legende" not in active_titles:
-            active_titles.append("Legende")
-            user.active_title = json.dumps(active_titles)
-        
+    
+    # Liste aller Titel, die der Spieler aufgrund seines Levels verdient hat
+    earned_titles = []
+    if lvl >= 20: earned_titles.append("title_profi")
+    if lvl >= 30: earned_titles.append("title_meister")
+    if lvl >= 40: earned_titles.append("title_grossmeister")
+    if lvl >= 50: earned_titles.append("title_legend")
+    if lvl >= 65: earned_titles.append("title_mythos")
+    if lvl >= 80: earned_titles.append("title_titan")
+    if lvl >= 90: earned_titles.append("title_halbgott")
+    if lvl >= 100: earned_titles.append("title_universum")
+
+    if not earned_titles:
+        return
+
+    # Inventar auslesen
+    inv = json.loads(user.inventory) if user.inventory else []
+    owned_ids = [i if isinstance(i, str) else i.get('id') for i in inv]
+    
+    changed = False
+    
+    # Fehlende Titel lautlos direkt ins Inventar legen
+    for title_id in earned_titles:
+        if title_id not in owned_ids:
+            inv.append({"id": title_id, "bought_at": datetime.utcnow().isoformat()})
+            changed = True
+            
+    # Nur speichern, wenn es etwas Neues gab (spart Server-Leistung)
+    if changed:
+        user.inventory = json.dumps(inv)
         db.session.commit()
 
 def get_user_metadata():
@@ -380,7 +402,7 @@ def ping_user():
                 if (user.playtime_total % 25) == 0: 
                     user.coins = (user.coins or 0) + 1
 
-                check_legend_status(user)
+                check_rank_titles(user)
 
                 if activity.startswith("Spielt "):
                     game_name = activity.replace("Spielt ", "").lower()
@@ -693,7 +715,7 @@ def redeem_code():
             elif typ == "xp":
                 user.xp = (user.xp or 0) + menge
                 msg = f"Code akzeptiert! +{menge} XP für dich! 🌟"
-                check_legend_status(user)
+                check_rank_titles(user)
         except Exception:
             msg = "Code eingelöst!"
         
@@ -802,7 +824,7 @@ def spin_wheel():
     else: 
         gewinn, text, segment = 0, "XP-Boost! +500 XP 🌟", "xp"
         u.xp = (u.xp or 0) + 500
-        check_legend_status(u)
+        check_rank_titles(u)
         
     u.coins += gewinn
     db.session.commit()
@@ -839,13 +861,12 @@ def spin_wheel_premium():
     else: 
         gewinn, text, segment = 0, "MEGA XP-Boost! +1000 XP 🔥", "xp"
         u.xp = (u.xp or 0) + 1000
-        check_legend_status(u)
+        check_rank_titles(u)
         
     u.coins += gewinn
     db.session.commit()
     
     return {"status": "success", "text": text, "new_balance": u.coins, "segment": segment}
-
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -879,7 +900,7 @@ def login():
                 session['klasse'] = eingabe_klasse
                 last_active[eingabe_name] = datetime.now()
                 user.klasse = eingabe_klasse
-                check_legend_status(user)
+                check_rank_titles(user)
                 db.session.commit()
                 return redirect(url_for('dashboard'))
             else:
@@ -897,7 +918,7 @@ def login():
                 if not user.display_name:
                     user.display_name = eingabe_name
             
-            check_legend_status(user)
+            check_rank_titles(user)
             db.session.commit()
             
             session['username'] = eingabe_name
@@ -915,7 +936,7 @@ def dashboard():
     me = session['username']
     user = UserSetting.query.filter_by(username=me).first()
     
-    check_legend_status(user)
+    check_rank_titles(user)
 
     display_name = user.display_name if (user and user.display_name) else me
     
