@@ -225,23 +225,32 @@ def get_user_multiplier(username):
         return user.score_multiplier
     return 1
 
+# --- NEU: Exponentielles / Krasseres Level-System bis Level 100 ---
 def get_level_info(xp):
     xp = xp or 0
-    level = min(50, 1 + (xp // 100))
+    # Quadratische Formel: Je höher das Level, desto krasser steigen die XP-Anforderungen!
+    level = max(1, math.floor((1 + math.sqrt(1 + (xp / 12.5))) / 2))
+    level = min(100, level)  # Maximal Level 100
+    
     if level < 10: rank = "Rookie"
     elif level < 20: rank = "Amateur"
     elif level < 30: rank = "Profi"
     elif level < 40: rank = "Meister"
     elif level < 50: rank = "Großmeister"
-    else: rank = "Legende"
+    elif level < 65: rank = "Legende"
+    elif level < 80: rank = "Mythos"
+    elif level < 90: rank = "Titan"
+    elif level < 100: rank = "Halbgott"
+    else: rank = "Universum-Beherrscher"
+    
     return level, rank
 
-# --- NEU: Automatische Vergabe des Legende-Titels ---
+# --- Automatische Vergabe des Legende-Titels ab Level 50 ---
 def check_legend_status(user):
     if not user: 
         return
     lvl, rank = get_level_info(user.xp)
-    if rank == "Legende":
+    if lvl >= 50:
         # 1. Inventar prüfen und ggf. Titel hinzufügen
         inv = json.loads(user.inventory) if user.inventory else []
         owned_ids = [i if isinstance(i, str) else i.get('id') for i in inv]
@@ -364,7 +373,6 @@ def ping_user():
                 if (user.playtime_total % 25) == 0: 
                     user.coins = (user.coins or 0) + 1
 
-                # Legende-Status prüfen, falls XP durch Ping das Level 50 geknackt hat
                 check_legend_status(user)
 
                 if activity.startswith("Spielt "):
@@ -900,7 +908,6 @@ def dashboard():
     me = session['username']
     user = UserSetting.query.filter_by(username=me).first()
     
-    # Check ob Legende erreicht wurde
     check_legend_status(user)
 
     display_name = user.display_name if (user and user.display_name) else me
