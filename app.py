@@ -886,7 +886,10 @@ def login():
         eingabe_name = request.form.get('nutzername', '').strip()
         eingabe_pin = request.form.get('pin', '').strip()
         
-        erlaubt = AllowedStudent.query.filter_by(name=eingabe_name, class_name=eingabe_klasse).first()
+        erlaubt = AllowedStudent.query.filter(
+            db.func.lower(AllowedStudent.name) == eingabe_name.lower(),
+            db.func.lower(AllowedStudent.class_name) == eingabe_klasse.lower()
+        ).first()
         is_till = (eingabe_name == "Till")
         
         if not erlaubt and not is_till:
