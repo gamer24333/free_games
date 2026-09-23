@@ -41,21 +41,35 @@
     <div class="container">
         <h1 style="text-align: center; margin-bottom: 30px;">🛠️ Admin-Steuerung</h1>
 
-        <!-- OBERSTE REIHE: Klassen & Schüler (Schnell-Eingabe) -->
+        <!-- OBERSTE REIHE: Klassen & Schüler (Schnell-Eingabe & Löschen) -->
         <div class="grid-2">
             <div class="card">
-                <h3>🏫 1. Neue Klasse anlegen</h3>
-                <p style="color: #aaa; font-size: 13px;">Leg hier zuerst die Klassen an (z.B. "8a" oder "Lehrer").</p>
-                <form action="/admin/add-class" method="POST" style="display: flex; gap: 10px;">
-                    <input type="text" name="class_name" placeholder="Klassenname..." required style="flex-grow: 1;">
+                <h3>🏫 1. Klassen verwalten</h3>
+                <form action="/admin/add-class" method="POST" style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <input type="text" name="class_name" placeholder="Neue Klasse..." required style="flex-grow: 1;">
                     <button type="submit" class="btn success-btn">Speichern</button>
                 </form>
+                
+                <!-- NEU: Liste der vorhandenen Klassen mit Lösch-Button -->
+                <div style="max-height: 120px; overflow-y: auto;">
+                    <table>
+                        {% for k in echte_klassen %}
+                        <tr>
+                            <td>{{ k.name }}</td>
+                            <td style="text-align: right;">
+                                <form action="/admin/remove-class/{{ k.name }}" method="POST" style="margin:0;" onsubmit="return confirm('ACHTUNG: Klasse und ALLE darin gelisteten Schüler löschen? (Ihre Coins & Spielstände bleiben aber erhalten)');">
+                                    <button type="submit" class="btn danger-btn" style="padding: 4px 8px; font-size: 12px; border-radius:4px;">❌</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
             </div>
 
             <div class="card">
-                <h3>👨‍🎓 2. Schüler eintragen</h3>
-                <p style="color: #aaa; font-size: 13px;">Weise Vornamen einer existierenden Klasse zu.</p>
-                <form action="/admin/add-student" method="POST" style="display: flex; gap: 10px;">
+                <h3>👨‍🎓 2. Schüler auf Gästeliste</h3>
+                <form action="/admin/add-student" method="POST" style="display: flex; gap: 10px; margin-bottom: 10px;">
                     <input type="text" name="student_name" placeholder="Vorname" required style="flex-grow: 1;">
                     <select name="class_name" required>
                         <option value="" disabled selected>Klasse...</option>
@@ -63,11 +77,26 @@
                             <option value="{{ k.name }}">{{ k.name }}</option>
                         {% endfor %}
                     </select>
-                    <button type="submit" class="btn success-btn">Hinzufügen</button>
+                    <button type="submit" class="btn success-btn">Plus</button>
                 </form>
+
+                <!-- NEU: Liste der erlaubten Schüler mit Lösch-Button -->
+                <div style="max-height: 120px; overflow-y: auto;">
+                    <table>
+                        {% for s in echte_schueler %}
+                        <tr>
+                            <td><b>{{ s.name }}</b> <span style="color:#aaa; font-size:11px;">({{ s.class_name }})</span></td>
+                            <td style="text-align: right;">
+                                <form action="/admin/remove-student/{{ s.id }}" method="POST" style="margin:0;">
+                                    <button type="submit" class="btn danger-btn" style="padding: 4px 8px; font-size: 12px; border-radius:4px;">❌</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
             </div>
         </div>
-
         <!-- ZWEITE REIHE: Nachrichten & Bans -->
         <div class="grid-2">
             <div class="card">
