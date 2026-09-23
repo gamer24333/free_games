@@ -239,9 +239,14 @@
         let hasSnakeLife = false;
         let lifeUsed = false;
         fetch('/api/shop/data').then(r=>r.json()).then(data=>{
-            if(data.inventory && data.inventory.includes('upg_snake_life')) hasSnakeLife = true;
+            if (data.inventory) {
+                // Prüft sowohl das alte (String) als auch das neue (Objekt) Format!
+                hasSnakeLife = data.inventory.some(item => 
+                    (typeof item === 'string' && item === 'upg_snake_life') || 
+                    (typeof item === 'object' && item.id === 'upg_snake_life')
+                );
+            }
         }).catch(e=>console.log(e));
-
         let audioCtx = null;
         let audioBuffer = null;
         let audioSource = null;
