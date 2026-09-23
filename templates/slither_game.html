@@ -59,7 +59,12 @@
         // --- SHOP UPGRADES LADEN ---
         let hasBoostUpgrade = false;
         fetch('/api/shop/data').then(r=>r.json()).then(data=>{
-            if(data.inventory && data.inventory.includes('upg_slither_boost')) hasBoostUpgrade = true;
+            if (data.inventory) {
+                hasBoostUpgrade = data.inventory.some(item => 
+                    (typeof item === 'string' && item === 'upg_slither_boost') || 
+                    (typeof item === 'object' && item.id === 'upg_slither_boost')
+                );
+            }
         }).catch(e=>console.log(e));
 
         const colors = ["#ff2e63", "#00adb5", "#2ecc71", "#f1c40f", "#9b59b6", "#e67e22"];
