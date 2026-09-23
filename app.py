@@ -733,8 +733,8 @@ def spin_wheel():
     elif rand < 0.99: 
         gewinn, text, segment = 100, "JACKPOT! 100 Münzen! 💎", "jackpot"
     else: 
-        gewinn, text, segment = 0, "XP-Boost! +1000 XP 🌟", "xp"
-        u.xp = (u.xp or 0) + 1000
+        gewinn, text, segment = 0, "XP-Boost! +500 XP 🌟", "xp"
+        u.xp = (u.xp or 0) + 500
         
     u.coins += gewinn
     db.session.commit()
@@ -769,8 +769,8 @@ def spin_wheel_premium():
     elif rand < 0.99: # 4% 250 Münzen
         gewinn, text, segment = 250, "MEGA JACKPOT! 250 Münzen! 💎", "jackpot"
     else: # 1% Mega XP-Boost
-        gewinn, text, segment = 0, "MEGA XP-Boost! +2500 XP 🔥", "xp"
-        u.xp = (u.xp or 0) + 2500
+        gewinn, text, segment = 0, "MEGA XP-Boost! +1000 XP 🔥", "xp"
+        u.xp = (u.xp or 0) + 1000
         
     u.coins += gewinn
     db.session.commit()
