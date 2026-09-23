@@ -814,7 +814,7 @@ def login():
     # AUTOMATISCHER FALLBACK: Falls die Datenbank noch leer ist, direkt Erstklassen erstellen
     if SchoolClass.query.count() == 0:
         db.session.add(SchoolClass(name="Admin-Bereich"))
-        db.session.add(SchoolClass(name="Klasse 8a"))
+        db.session.add(SchoolClass(name="Klasse G8c"))
         db.session.commit()
         
     # Lade alle existierenden Klassen für das Dropdown
