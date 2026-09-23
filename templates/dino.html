@@ -178,11 +178,9 @@
         }
 
         function spawnObstacle() {
-            // Ab 100 Punkten kommen auch fliegende Vögel hinzu
             let isBird = score > 100 && Math.random() < 0.35;
             
             if (isBird) {
-                // Vogel fliegt in mittlerer Höhe -> NICHT springen!
                 obstacles.push({
                     x: canvas.width,
                     y: GROUND_Y - 125,
@@ -213,6 +211,10 @@
             
             if ([' ', 'arrowup', 'w'].includes(k)) {
                 e.preventDefault();
+                
+                // LÖSUNG BUG 1: Blockiere gedrückt gehaltene Tasten (Auto-Repeat)
+                if (e.repeat) return; 
+
                 detectBot(e);
                 
                 if (!gameStarted) {
@@ -256,15 +258,19 @@
         function update(deltaTime) {
             if (!gameStarted || isGameOver || isPaused) return;
 
+            // LÖSUNG BUG 2: Mache Bewegungen unabhängig von der Bildrate (FPS)
+            // 0.0166 ist die Zeit pro Frame bei 60 FPS. 
+            // Hat jemand 30 FPS, ist timeScale = 2 (doppelte Sprünge, um es auszugleichen)
+            let timeScale = deltaTime / 0.01666;
+
             score += deltaTime * 10;
             scoreEl.textContent = Math.floor(score);
 
-            // Dynamische Beschleunigung
             gameSpeed = 6 + Math.floor(score / 100) * 0.5;
 
-            // Dino Physik
-            dino.dy += GRAVITY;
-            dino.y += dino.dy;
+            // Dino Physik mit timeScale multiplizieren
+            dino.dy += GRAVITY * timeScale;
+            dino.y += dino.dy * timeScale;
 
             if (dino.y > GROUND_Y - 55) {
                 dino.y = GROUND_Y - 55;
@@ -272,7 +278,7 @@
                 dino.grounded = true;
             }
 
-            // Hindernisse bewegen
+            // Hindernisse bewegen (deltaTime nutzen)
             obstacleTimer += deltaTime;
             if (obstacleTimer > (1.2 - Math.min(gameSpeed * 0.03, 0.6))) {
                 spawnObstacle();
@@ -281,9 +287,10 @@
 
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 let obs = obstacles[i];
-                obs.x -= gameSpeed;
+                // Bewegung mit timeScale multiplizieren
+                obs.x -= gameSpeed * timeScale;
 
-                // Kollisionsabfrage (AABB)
+                // Kollisionsabfrage
                 if (
                     dino.x < obs.x + obs.w &&
                     dino.x + dino.w > obs.x &&
@@ -293,7 +300,7 @@
                     triggerGameOver();
                 }
 
-                // Entfernen, wenn aus dem Bild
+                // Entfernen
                 if (obs.x + obs.w < 0) {
                     obstacles.splice(i, 1);
                 }
@@ -319,10 +326,8 @@
                 ctx.shadowColor = obs.color;
                 ctx.beginPath();
                 if (obs.isBird) {
-                    // Vogel Form
                     if (ctx.roundRect) ctx.roundRect(obs.x, obs.y, obs.w, obs.h, 8);
                     else ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
-                    // Schnabel/Details
                     ctx.fillStyle = '#ffffff';
                     ctx.fillRect(obs.x + 32, obs.y + 10, 8, 4);
                 } else {
@@ -343,7 +348,6 @@
             ctx.fill();
             ctx.shadowBlur = 0;
 
-            // Dino Auge
             ctx.fillStyle = '#111';
             ctx.fillRect(dino.x + 24, dino.y + 10, 5, 5);
 
@@ -405,6 +409,7 @@
             if (!timestamp) timestamp = performance.now();
             let deltaTime = (timestamp - lastTime) / 1000;
             lastTime = timestamp;
+            // Absicherung, falls Tab verlassen wird
             if (deltaTime > 0.1) deltaTime = 0.016;
 
             update(deltaTime);
@@ -425,18 +430,12 @@
         function resetAFK() {
             isAFK = false;
             clearTimeout(afkTimer);
-            afkTimer = setTimeout(() => {
-                isAFK = true;
-            }, 120000); 
+            afkTimer = setTimeout(() => { isAFK = true; }, 120000); 
         }
 
         function detectBot(e) {
             resetAFK();
-            
-            if (e && !e.isTrusted) {
-                isAutoclicker = true;
-                return;
-            }
+            if (e && !e.isTrusted) { isAutoclicker = true; return; }
 
             let now = performance.now();
             actionTimes.push(now);
@@ -444,7 +443,8 @@
 
             if (actionTimes.length === 8) {
                 let timeDiff = actionTimes[7] - actionTimes[0];
-                if (timeDiff < 150) {
+                // Schwelle für Bot-Erkennung toleranter gemacht (von 150 auf 80)
+                if (timeDiff < 80) {
                     isAutoclicker = true;
                 }
 
@@ -455,7 +455,7 @@
                 let avg = intervals.reduce((a,b) => a+b, 0) / intervals.length;
                 let variance = intervals.reduce((a,b) => a + Math.abs(b - avg), 0) / intervals.length;
                 
-                if (variance < 2 && avg > 10) {
+                if (variance < 1.0 && avg > 10) {
                     isAutoclicker = true;
                 }
             }
@@ -471,12 +471,11 @@
         resetAFK();
 
         setInterval(() => {
-            let currentActivity = "Spielt Neon Dino"; 
             fetch('/api/ping', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    activity: currentActivity, 
+                    activity: "Spielt Neon Dino", 
                     is_afk: isAFK,
                     is_bot: isAutoclicker
                 }) 
