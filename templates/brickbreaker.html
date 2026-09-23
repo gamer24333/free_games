@@ -126,9 +126,14 @@
         // --- SHOP UPGRADES LADEN ---
         let hasFireUpgrade = false;
         fetch('/api/shop/data').then(r=>r.json()).then(data=>{
-            if(data.inventory && data.inventory.includes('upg_brick_fire')) hasFireUpgrade = true;
+            if (data.inventory) {
+                hasFireUpgrade = data.inventory.some(item => 
+                    (typeof item === 'string' && item === 'upg_brick_fire') || 
+                    (typeof item === 'object' && item.id === 'upg_brick_fire')
+                );
+            }
         }).catch(e=>console.log(e));
-
+        
         let audioCtx = null;
         let audioBuffer = null;
         let audioSource = null;
