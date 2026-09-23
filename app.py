@@ -811,6 +811,12 @@ def login():
     if 'username' in session:
         return redirect(url_for('dashboard'))
         
+    # AUTOMATISCHER FALLBACK: Falls die Datenbank noch leer ist, direkt Erstklassen erstellen
+    if SchoolClass.query.count() == 0:
+        db.session.add(SchoolClass(name="Admin-Bereich"))
+        db.session.add(SchoolClass(name="Klasse 8a"))
+        db.session.commit()
+        
     # Lade alle existierenden Klassen für das Dropdown
     alle_klassen = SchoolClass.query.all()
         
@@ -834,9 +840,8 @@ def login():
         if user and user.pin:
             if user.pin == eingabe_pin:
                 session['username'] = eingabe_name
-                session['klasse'] = eingabe_klasse # Speichere die Klasse in der Session!
+                session['klasse'] = eingabe_klasse
                 last_active[eingabe_name] = datetime.now()
-                # Aktualisiere die Klasse des Users in der DB
                 user.klasse = eingabe_klasse
                 db.session.commit()
                 return redirect(url_for('dashboard'))
@@ -1957,9 +1962,6 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
 
-        # NEU: Erstellt automatisch eine Klasse, damit der Admin sich einloggen kann
-        if SchoolClass.query.count() == 0:
-            db.session.add(SchoolClass(name="Admin-Bereich"))
-            db.session.commit()
+        
             
     app.run(debug=True)
