@@ -105,23 +105,62 @@
         .rank-list strong { color: #f1c40f; font-size: 16px; }
         .rank-list .reward { display: block; font-size: 12px; color: #2ecc71; margin-top: 3px; }
 
-        /* NEU: Amazon Button Styling */
-        .amazon-btn {
+        /* NEU: Amazon Floating Widget (unten links) */
+        .amazon-widget {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 250px;
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #555;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            text-align: left;
+            z-index: 1000;
+        }
+        .amazon-widget h3 {
+            margin-top: 0;
+            color: #ff9900;
+            font-size: 15px;
+            margin-bottom: 8px;
+        }
+        .amazon-widget p {
+            font-size: 12px;
+            color: #ccc;
+            margin-bottom: 12px;
+            line-height: 1.3;
+        }
+        .amazon-btn-small {
             background-color: #ff9900; 
             color: #111; 
-            padding: 10px 20px; 
+            padding: 8px 12px; 
+            font-size: 12px;
             font-weight: bold; 
-            border-radius: 8px; 
+            border-radius: 6px; 
             text-decoration: none; 
-            display: inline-block;
+            display: block;
+            text-align: center;
             transition: all 0.2s ease-in-out;
-            box-shadow: 0 4px 10px rgba(255, 153, 0, 0.2);
+            box-shadow: 0 2px 5px rgba(255, 153, 0, 0.2);
         }
-        .amazon-btn:hover {
+        .amazon-btn-small:hover {
             background-color: #e68a00;
-            transform: scale(1.05);
-            box-shadow: 0 6px 15px rgba(255, 153, 0, 0.4);
+            transform: scale(1.02);
         }
+        .close-widget {
+            position: absolute;
+            top: 5px;
+            right: 8px;
+            color: #888;
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+        .close-widget:hover { color: white; }
 
         /* Rechtlicher Footer */
         footer { margin: 40px 0 20px 0; padding-top: 20px; border-top: 1px solid #333; }
@@ -136,6 +175,16 @@
     <button class="btn code-btn" onclick="openCodeModal()">🎁 Code eingeben</button>
     <button class="settings-gear" onclick="openSettingsModal()" title="Einstellungen">⚙️</button>
     <button class="donate-btn" onclick="openDonateModal()" title="Projekt unterstützen">☕ Spenden</button>
+
+    <!-- NEUER AMAZON PRODUKT-LINK (Jetzt als kleines Widget unten links) -->
+    <div class="amazon-widget" id="amazonWidget">
+        <button class="close-widget" onclick="document.getElementById('amazonWidget').style.display='none'" title="Ausblenden">&times;</button>
+        <h3>🔥 Empfehlung</h3>
+        <p>Brauchst du ein Upgrade für dein Setup, um in den Spielen besser abzuräumen?</p>
+        <a href="https://link.amazon/B00Dx0uQO" target="_blank" rel="noopener noreferrer" class="amazon-btn-small">
+            🛒 Produkt ansehen
+        </a>
+    </div>
 
     <!-- SPENDEN MODAL -->
     <div id="donateModal" class="modal-overlay">
@@ -358,15 +407,6 @@
         {% endfor %}
     </div>
     {% endif %}
-
-    <!-- NEUER AMAZON PRODUKT-LINK -->
-    <div style="text-align: center; margin: 25px auto; max-width: 500px; background: #2a2a2a; padding: 20px; border-radius: 8px; border: 1px solid #555; box-shadow: 0 0 10px rgba(0,0,0,0.5);">
-        <h3 style="margin-top: 0; color: #ff9900; font-size: 18px;">🔥 Empfehlung des Tages</h3>
-        <p style="font-size: 14px; color: #ccc; margin-bottom: 15px;">Brauchst du noch ein Upgrade für dein Setup, um in den Spielen noch besser abzuräumen?</p>
-        <a href="https://link.amazon/B00Dx0uQO" target="_blank" rel="noopener noreferrer" class="amazon-btn">
-            🛒 Produkt auf Amazon ansehen
-        </a>
-    </div>
 
     <!-- Admin / Inventar Box unten -->
     <div class="admin-box">
