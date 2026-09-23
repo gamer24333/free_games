@@ -321,6 +321,10 @@ def index():
 def impressum_page():
     return render_template('impressum.html')
 
+@app.route('/datenschutz')
+def datenschutz():
+    return render_template('datenschutz.html')
+
 
 @app.route('/api/ping', methods=['POST'])
 def ping_user():
