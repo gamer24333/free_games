@@ -317,6 +317,10 @@ def check_if_banned():
 def index():
     return redirect(url_for('login'))
 
+@app.route('/impressum')
+def impressum_page():
+    return render_template('impressum.html')
+
 
 @app.route('/api/ping', methods=['POST'])
 def ping_user():
