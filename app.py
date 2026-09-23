@@ -1115,9 +1115,17 @@ def admin_clear_chat():
     me = session['username']
     user = UserSetting.query.filter_by(username=me).first()
     if not (me == "Till" or (user and user.is_admin)): return "403", 403
+    
+    # Löscht den alten "global" Chat UND alle neuen Klassen-Chats (die mit "Klasse_" anfangen)
+    ChatMessage.query.filter(ChatMessage.room.like('Klasse_%')).delete()
     ChatMessage.query.filter_by(room='global').delete()
-    system_msg = ChatMessage(room='global', sender='System', text='Der Chat wurde vom Admin aufgeräumt! 🧹')
-    db.session.add(system_msg)
+    
+    # Systemnachricht in alle existierenden Klassen schicken
+    alle_klassen = SchoolClass.query.all()
+    for klasse in alle_klassen:
+        system_msg = ChatMessage(room=f"Klasse_{klasse.name}", sender='System', text='Der Chat wurde vom Admin aufgeräumt! 🧹')
+        db.session.add(system_msg)
+        
     db.session.commit()
     return redirect(url_for('admin_panel'))
 
