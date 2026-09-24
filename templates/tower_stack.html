@@ -127,7 +127,7 @@
                 if (audioCtx.state === 'suspended') await audioCtx.resume();
 
                 if (!audioBuffer) {
-                    let response = await fetch('/static/tower_stack.mp3');
+                    let response = await fetch('https://cdn.jsdelivr.net/gh/gamer24333/free_games@main/static/tower_stack.mp3');
                     if (!response.ok) return;
                     let arrayBuffer = await response.arrayBuffer();
                     audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
