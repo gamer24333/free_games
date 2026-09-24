@@ -36,19 +36,29 @@ SHOP_ITEMS = {
     "title_destroyer": {"id": "title_destroyer", "type": "title", "name": "Titel: Der Zerstörer", "desc": "Ein bedrohlicher Titel im Chat.", "price": 250, "value": "Der Zerstörer"},
     "title_king": {"id": "title_king", "type": "title", "name": "Titel: King", "desc": "Zeig allen, wer der Boss ist.", "price": 500, "value": "King"},
     
-    # --- RANG TITEL ---
-    "title_profi": {"id": "title_profi", "type": "title", "name": "Titel: Profi", "desc": "Belohnung für Level 20.", "price": 0, "value": "Profi"},
-    "title_meister": {"id": "title_meister", "type": "title", "name": "Titel: Meister", "desc": "Belohnung für Level 30.", "price": 0, "value": "Meister"},
-    "title_grossmeister": {"id": "title_grossmeister", "type": "title", "name": "Titel: Großmeister", "desc": "Belohnung für Level 40.", "price": 0, "value": "Großmeister"},
-    "title_legend": {"id": "title_legend", "type": "title", "name": "Titel: Legende", "desc": "Exklusiver Titel für Level 50.", "price": 0, "value": "Legende"},
-    "title_mythos": {"id": "title_mythos", "type": "title", "name": "Titel: Mythos", "desc": "Belohnung für Level 65.", "price": 0, "value": "Mythos"},
-    "title_titan": {"id": "title_titan", "type": "title", "name": "Titel: Titan", "desc": "Belohnung für Level 80.", "price": 0, "value": "Titan"},
-    "title_halbgott": {"id": "title_halbgott", "type": "title", "name": "Titel: Halbgott", "desc": "Belohnung für Level 90.", "price": 0, "value": "Halbgott"},
-    "title_universum": {"id": "title_universum", "type": "title", "name": "Titel: Universum-Beherrscher", "desc": "Der ultimative Rang! Level 100.", "price": 0, "value": "Universum-Beherrscher"},
+    # --- NEUE COOLE TITEL (kaufbar) ---
+    "title_vip": {"id": "title_vip", "type": "title", "name": "Titel: VIP", "desc": "Nur für echte Very Important Player.", "price": 800, "value": "VIP"},
+    "title_ninja": {"id": "title_ninja", "type": "title", "name": "Titel: Ninja", "desc": "Lautlos und tödlich.", "price": 400, "value": "Ninja"},
+    "title_hacker": {"id": "title_hacker", "type": "title", "name": "Titel: Hacker", "desc": "Du kennst den Code.", "price": 600, "value": "Hacker"},
+    
+    # --- RANG TITEL (rank_only hinzugefügt!) ---
+    "title_profi": {"id": "title_profi", "type": "title", "name": "Titel: Profi", "desc": "Belohnung für Level 20.", "price": 0, "value": "Profi", "rank_only": True},
+    "title_meister": {"id": "title_meister", "type": "title", "name": "Titel: Meister", "desc": "Belohnung für Level 30.", "price": 0, "value": "Meister", "rank_only": True},
+    "title_grossmeister": {"id": "title_grossmeister", "type": "title", "name": "Titel: Großmeister", "desc": "Belohnung für Level 40.", "price": 0, "value": "Großmeister", "rank_only": True},
+    "title_legend": {"id": "title_legend", "type": "title", "name": "Titel: Legende", "desc": "Exklusiver Titel für Level 50.", "price": 0, "value": "Legende", "rank_only": True},
+    "title_mythos": {"id": "title_mythos", "type": "title", "name": "Titel: Mythos", "desc": "Belohnung für Level 65.", "price": 0, "value": "Mythos", "rank_only": True},
+    "title_titan": {"id": "title_titan", "type": "title", "name": "Titel: Titan", "desc": "Belohnung für Level 80.", "price": 0, "value": "Titan", "rank_only": True},
+    "title_halbgott": {"id": "title_halbgott", "type": "title", "name": "Titel: Halbgott", "desc": "Belohnung für Level 90.", "price": 0, "value": "Halbgott", "rank_only": True},
+    "title_universum": {"id": "title_universum", "type": "title", "name": "Titel: Universum-Beherrscher", "desc": "Der ultimative Rang! Level 100.", "price": 0, "value": "Universum-Beherrscher", "rank_only": True},
     
     "color_gold": {"id": "color_gold", "type": "color", "name": "Name: Gold", "desc": "Dein Name leuchtet Gold.", "price": 300, "value": "#f1c40f"},
     "color_rainbow": {"id": "color_rainbow", "type": "color", "name": "Name: Regenbogen", "desc": "Bunter Chat-Name!", "price": 800, "value": "rainbow"},
     "color_neon": {"id": "color_neon", "type": "color", "name": "Name: Neon Cyan", "desc": "Helles Hacker-Blau.", "price": 300, "value": "#00adb5"},
+    
+    # --- NEUE COOLE FARBEN (kaufbar) ---
+    "color_blood": {"id": "color_blood", "type": "color", "name": "Name: Blood Red", "desc": "Dunkelrot wie Blut.", "price": 400, "value": "#8a0303"},
+    "color_toxic": {"id": "color_toxic", "type": "color", "name": "Name: Toxic Green", "desc": "Giftiges, leuchtendes Grün.", "price": 350, "value": "#39ff14"},
+    "color_pink": {"id": "color_pink", "type": "color", "name": "Name: Hot Pink", "desc": "Auffällig und stylisch.", "price": 300, "value": "#ff66cc"},
     
     "title_admin": {"id": "title_admin", "type": "title", "name": "Titel: Admin", "desc": "Offizieller Admin-Titel.", "price": 0, "value": "Admin", "admin_only": True},
     "title_crown": {"id": "title_crown", "type": "title", "name": "Titel: Krone", "desc": "Das Zeichen des Bosses.", "price": 0, "value": "👑", "admin_only": True},
@@ -297,13 +307,14 @@ def get_user_metadata():
     meta = {}
     for u in all_users:
         titles = []
+        
         if u.active_title:
             try:
                 titles = json.loads(u.active_title) if u.active_title.startswith('[') else [u.active_title]
             except:
                 titles = [u.active_title]
         
-        titel_text = f"[{titles[0]}]" if len(titles) > 0 and titles[0] else ""
+        titel_text = "".join([f"[{t}]" for t in titles if t])
         farbe = u.active_color if u.active_color else "white"
         display_n = u.display_name if u.display_name else u.username
         
@@ -510,6 +521,10 @@ def shop_buy():
 
     if SHOP_ITEMS[item_id].get("admin_only") and not is_admin_user:
         return {"error": "Dieses Item ist exklusiv für Admins!"}, 403
+
+    # --- NEU: Verhindern, dass jemand per direkter API-Anfrage Rang-Titel kauft ---
+    if SHOP_ITEMS[item_id].get("rank_only"):
+        return {"error": "Dieser Titel wird automatisch durch Level-Ups freigeschaltet und kann nicht gekauft werden!"}, 403
     
     owned_ids = [i if isinstance(i, str) else i.get('id') for i in inv]
     if item_id in owned_ids: return {"error": "Du besitzt dieses Item bereits!"}, 400
