@@ -256,7 +256,7 @@
             if (audioCtx.state === 'suspended') await audioCtx.resume();
             if (!audioBuffer) {
                 try {
-                    let response = await fetch('/static/snake.mp3');
+                    let response = await fetch('https://cdn.jsdelivr.net/gh/gamer24333/free_games@main/static/snake.mp3');
                     let arrayBuffer = await response.arrayBuffer();
                     audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                 } catch (e) { console.error("Audio Fehler:", e); return; }
