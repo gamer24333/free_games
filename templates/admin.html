@@ -50,7 +50,7 @@
                     <button type="submit" class="btn success-btn">Speichern</button>
                 </form>
                 
-                <!-- NEU: Liste der vorhandenen Klassen mit Lösch-Button -->
+                <!-- Liste der vorhandenen Klassen mit Lösch-Button -->
                 <div style="max-height: 120px; overflow-y: auto;">
                     <table>
                         {% for k in echte_klassen %}
@@ -80,7 +80,7 @@
                     <button type="submit" class="btn success-btn">Plus</button>
                 </form>
 
-                <!-- NEU: Liste der erlaubten Schüler mit Lösch-Button -->
+                <!-- Liste der erlaubten Schüler mit Lösch-Button -->
                 <div style="max-height: 120px; overflow-y: auto;">
                     <table>
                         {% for s in echte_schueler %}
@@ -97,6 +97,7 @@
                 </div>
             </div>
         </div>
+
         <!-- ZWEITE REIHE: Nachrichten & Bans -->
         <div class="grid-2">
             <div class="card">
@@ -221,6 +222,38 @@
             </div>
         </div>
 
+        <!-- VIERTE REIHE: Feedback -->
+        <div class="card" style="margin-bottom: 20px;">
+            <h3>💡 Neues Feedback der Schüler</h3>
+            {% if feedback_liste %}
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                {% for fb in feedback_liste %}
+                    <li style="background: #1a1a1a; padding: 15px; margin-bottom: 10px; border-radius: 6px; border-left: 4px solid #9b59b6;">
+                        <strong style="color: #00adb5;">Von: {{ fb.sender }}</strong>
+                        <p style="color: #ccc; margin: 8px 0 12px 0;">{{ fb.message }}</p>
+                        <button onclick="markAsRead({{ fb.id }})" class="btn success-btn" style="padding: 6px 12px; font-size: 12px;">Erledigt / Gelesen</button>
+                    </li>
+                {% endfor %}
+                </ul>
+            {% else %}
+                <p style="color: #aaa;">Aktuell gibt es kein neues Feedback. Alles erledigt! 🎉</p>
+            {% endif %}
+        </div>
+
     </div>
+
+    <!-- Script für das Feedback-System -->
+    <script>
+    async function markAsRead(id) {
+        try {
+            const res = await fetch(`/api/admin/feedback/read/${id}`, { method: 'POST' });
+            if (res.ok) {
+                window.location.reload(); 
+            }
+        } catch(e) {
+            alert("Fehler beim Markieren der Nachricht.");
+        }
+    }
+    </script>
 </body>
 </html>
