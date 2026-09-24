@@ -106,7 +106,8 @@ GEHEIME_CODES = {
     "TILLISTDERBESTEADMIN": "double_score",
     "REICHTUM": "1000_coins",
     "ESREGNETMÜNZEN": "100_coins",
-    "WHEELXP": "100_xp"
+    "WHEELXP": "100_xp",
+    "ISLIEBEGAMBLING": "150_coins"
 }
 
 # --- DATENBANK MODELLE ---
