@@ -98,6 +98,8 @@
                 }
 
                 if (!isOwned) {
+                    if (item.rank_only) continue; // NEU: Rang-Titel nicht im Shop-Tab anzeigen!
+                    
                     hasShopItems = true;
                     shopItemsHTML[type] += `
                     <div class="shop-item">
