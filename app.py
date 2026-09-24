@@ -4,6 +4,7 @@ import uuid
 import time
 import json
 import math
+import urllib.parse
 from datetime import datetime, timedelta
 from flask import Flask, redirect, render_template, request, session, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
@@ -1301,6 +1302,7 @@ def mark_feedback_read(fb_id):
 @app.route('/chat')
 @app.route('/chat/<room>')
 def chat(room="global"):
+    room = urllib.parse.unquote(room) # <-- FIX: Wandelt %20 in ein echtes Leerzeichen um
     if 'username' not in session: return redirect(url_for('login'))
     zwei_minuten_ago = datetime.utcnow() - timedelta(minutes=2)
     online_users = UserSetting.query.filter(UserSetting.last_seen >= zwei_minuten_ago).all()
@@ -1318,6 +1320,7 @@ def chat(room="global"):
 
 @app.route('/chat/<room>/send', methods=['POST'])
 def send_message(room):
+    room = urllib.parse.unquote(room) # <-- FIX
     if 'username' not in session: return {"error": "Login erforderlich"}, 401
     nachricht_text = request.form.get('message', '').strip()
     if not nachricht_text: return {"status": "empty"}, 400
@@ -1334,6 +1337,7 @@ def send_message(room):
 
 @app.route('/api/chat-messages/<room>')
 def api_chat_messages(room):
+    room = urllib.parse.unquote(room) # <-- FIX
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
     current_user = session['username']
     user = UserSetting.query.filter_by(username=current_user).first()
@@ -1383,6 +1387,7 @@ def api_chat_messages(room):
 
 @app.route('/chat/<room>/delete/<int:msg_index>', methods=['POST'])
 def delete_message(room, msg_index):
+    room = urllib.parse.unquote(room) # <-- FIX
     if 'username' not in session: return redirect(url_for('login'))
     current_user = session['username']
     user = UserSetting.query.filter_by(username=current_user).first()
