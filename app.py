@@ -1087,8 +1087,21 @@ def admin_panel():
         if u.banned_until and u.banned_until > datetime.utcnow():
             if u.banned_until.year > 2090: banned_users[u.username] = "Permanent (Für immer)"
             else: banned_users[u.username] = u.banned_until.strftime("%d.%m.%Y - %H:%M Uhr")
+
     
-    return render_template('admin.html', pins=pins_dict, admins=admins_list, klassen_liste=[s.name for s in AllowedStudent.query.all()], banned_users=banned_users, meta=get_user_metadata(), echte_klassen=echte_klassen, echte_schueler=echte_schueler)
+    # --- NEU: Feedback aus der Datenbank laden ---
+    ungelesenes_feedback = Feedback.query.filter_by(is_read=False).all()
+    
+    # --- NEU: feedback_liste=ungelesenes_feedback am Ende hinzufügen ---
+    return render_template('admin.html', 
+                           pins=pins_dict, 
+                           admins=admins_list, 
+                           klassen_liste=[s.name for s in AllowedStudent.query.all()], 
+                           banned_users=banned_users, 
+                           meta=get_user_metadata(), 
+                           echte_klassen=echte_klassen, 
+                           echte_schueler=echte_schueler,
+                           feedback_liste=ungelesenes_feedback)
 
 @app.route('/admin/make-admin', methods=['POST'])
 def make_admin():
@@ -1256,7 +1269,10 @@ def remove_student_from_class(student_id):
 @app.route('/api/submit-feedback', methods=['POST'])
 def submit_feedback():
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
-    msg = request.json.get('message', '').strip()
+        
+    data = request.get_json(silent=True) or {}
+    msg = data.get('message', '').strip()
+    
     if not msg: return {"error": "Leere Nachricht"}, 400
     new_fb = Feedback(sender=session['username'], message=msg, is_read=False)
     db.session.add(new_fb)
