@@ -44,7 +44,8 @@
                 
                 <h3>Direktnachrichten</h3>
                 {% for p in partner %}
-                <a href="/chat/{{ p.username }}" class="partner-btn" data-partner="{{ p.username }}" style="position: relative;">
+                <!-- FIX: urlencode sorgt dafür, dass Leerzeichen im Backend-Link als %20 umgewandelt werden -->
+                <a href="/chat/{{ p.username|urlencode }}" class="partner-btn" data-partner="{{ p.username }}" style="position: relative;">
                     <span>👤 {{ p.display_name }} <span id="status-{{ p.username }}" class="status-dot"></span></span>
                     <span id="badge-{{ p.username }}" class="badge" style="background: #ff2e63; color: white; border-radius: 50%; padding: 2px 6px; font-size: 11px; display: none;">0</span>
                 </a>
@@ -60,7 +61,7 @@
                     <b style="color: #00adb5;">
                         {{ msg.name }}
                     </b>
-                    </b>
+                    <!-- FIX: Ein überflüssiges </b> Tag wurde hier entfernt -->
                     <span>
                         {% if msg.text.startswith('[IMAGE]') %}
                             <img src="{{ msg.text.replace('[IMAGE]', '') }}" style="max-width: 200px; border-radius: 8px; display: block; margin-top: 5px; cursor: pointer;" onclick="window.open(this.src)">
@@ -72,7 +73,8 @@
                     </span>
                     
                     {% if msg.name == session['username'] %}
-                    <form action="/chat/{{ room }}/delete/{{ loop.index0 }}" method="POST" style="position: absolute; right: 8px; top: 8px; margin: 0;">
+                    <!-- FIX: Leerzeichen sicher behandeln -->
+                    <form action="/chat/{{ room|urlencode }}/delete/{{ loop.index0 }}" method="POST" style="position: absolute; right: 8px; top: 8px; margin: 0;">
                         <button type="submit" style="background: none; border: none; color: #ff2e63; cursor: pointer; font-size: 14px; padding: 0;">🗑️</button>
                     </form>
                     {% endif %}
@@ -141,8 +143,8 @@
     function appendTemporaryMessage(contentHtml) {
         const tempIndex = chatBox.children.length;
         const isMeAdmin = adminList.includes(currentUsername);
-        const nameColor = "#00adb5"; // Jeder kriegt kurz die Standard-Farbe
-        const crown = ""; // Keine erzwungene Krone mehr!
+        const nameColor = "#00adb5"; 
+        const crown = ""; 
         chatBox.innerHTML += `
         <div class="message" style="position: relative; padding-right: 40px; opacity: 0.6;" id="msg-temp-${tempIndex}">
             <b style="color: ${nameColor};">${crown}${currentUsername}</b>
@@ -168,7 +170,8 @@
             const formData = new FormData();
             formData.append('message', mediaData);
 
-            const response = await fetch(`/chat/${currentRoom}/send`, {
+            // FIX: encodeURIComponent für Räume mit Leerzeichen (Jonah P)
+            const response = await fetch(`/chat/${encodeURIComponent(currentRoom)}/send`, {
                 method: 'POST',
                 body: formData
             });
@@ -193,7 +196,8 @@
 
             if (isAudioPlaying) return;
 
-            const response = await fetch(`/api/chat-messages/${currentRoom}`);
+            // FIX: encodeURIComponent für Leerzeichen
+            const response = await fetch(`/api/chat-messages/${encodeURIComponent(currentRoom)}`);
             if (response.ok) {
                 const rawNachrichten = await response.json();
                 const nachrichten = rawNachrichten.slice(-150); 
@@ -208,7 +212,9 @@
                 
                 const wasAtBottom = chatBox.scrollHeight - chatBox.clientHeight <= chatBox.scrollTop + 50;
                 
-                chatBox.innerHTML = '';
+                // PERFORMANCE FIX: Statt bei jedem Durchlauf "innerHTML +=" zu nutzen (sehr langsam),
+                // sammeln wir das HTML im "neuerChatHTML" String und updaten das Fenster am Ende nur 1x!
+                let neuerChatHTML = '';
                 
                 nachrichten.forEach((msg, index) => {
                     let deleteButton = '';
@@ -216,9 +222,8 @@
 
                     const isSenderAdmin = adminList.includes(msg.name);
                     const isMeAdmin = adminList.includes(currentUsername);
-                    const crown = ""; // Krone wird jetzt wie ein normaler Shop-Titel behandelt
+                    const crown = ""; 
                     
-                    // --- FARBEN & TITEL KORREKT PARSEN ---
                     let nameStyle = '';
                     if (msg.color) {
                         if (msg.color === 'rainbow') {
@@ -227,7 +232,7 @@
                             nameStyle = `color: ${msg.color}; font-weight: bold;`;
                         }
                     } else {
-                        nameStyle = 'color: #00adb5; font-weight: bold;'; // Standard-Farbe für ALLE, auch für Undercover-Admins
+                        nameStyle = 'color: #00adb5; font-weight: bold;'; 
                     }
 
                     let titleBadges = '';
@@ -253,8 +258,9 @@
                     let levelBadge = `<span style="color:#aaa; font-size:10px; margin-right:5px;">[Lv.${msg.level || 1}]</span>`;
                     
                     if (msg.name === currentUsername || isMeAdmin) {
+                        // FIX: currentRoom encodieren wegen Leerzeichen ("Jonah P")
                         deleteButton = `
-                        <form action="/chat/${currentRoom}/delete/${index}" method="POST" style="position: absolute; right: 8px; top: 8px; margin: 0;">
+                        <form action="/chat/${encodeURIComponent(currentRoom)}/delete/${index}" method="POST" style="position: absolute; right: 8px; top: 8px; margin: 0;">
                             <button type="submit" style="background: none; border: none; color: #ff2e63; cursor: pointer; font-size: 14px; padding: 0;">🗑️</button>
                         </form>`;
                         
@@ -267,7 +273,8 @@
                         }
                     }
 
-                    chatBox.innerHTML += `
+                    // HTML sammeln statt DOM belasten
+                    neuerChatHTML += `
                     <div class="message" style="position: relative; padding-right: 40px;">
                         <b style="${nameStyle}">${levelBadge} ${titleBadges} ${crown}${msg.name}</b>
                         <span>${formatMessageText(msg.text)}</span>
@@ -275,6 +282,9 @@
                         ${deleteButton}
                     </div>`;
                 });
+                
+                // PERFORMANCE FIX: Nur 1x am Ende den DOM updaten (verhindert das Ruckeln / Einfrieren)
+                chatBox.innerHTML = neuerChatHTML;
                 
                 if (wasAtBottom) scrollToBottom();
             }
@@ -337,9 +347,7 @@
                     voiceBtn.style.background = "#e74c3c";
                     stream.getTracks().forEach(track => track.stop());
                 };
-                //Test
 
-                
                 mediaRecorder.start(10);
                 voiceStatus.textContent = "🔴 Aufnahme läuft... (Nochmal drücken zum Stoppen)";
                 voiceBtn.style.background = "#2c3e50";
@@ -377,6 +385,8 @@
                 const localPrivateStorage = JSON.parse(localStorage.getItem('last_seen_messages_private') || '{}');
                 
                 for (const [partner, currentCount] of Object.entries(stats.private_messages_stats)) {
+                    // Falls partner ein Leerzeichen enthält, klappt getElementById trotzdem glücklicherweise, da IDs mit Leerzeichen in HTML5 gültig sein können,
+                    // aber generell wäre es clever, solche IDs zu vermeiden. Da es aktuell klappt, belassen wir es so.
                     const badgeElement = document.getElementById(`badge-${partner}`);
                     if (badgeElement) {
                         if (currentRoom === partner) {
