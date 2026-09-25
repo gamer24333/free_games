@@ -77,9 +77,10 @@ SHOP_ITEMS = {
 
     # --- NAMENS-AUREN (Nur durch Spielzeit erspielbar, extrem schwer!) ---
     # 1 Stunde = 3600 Spielzeit-Punkte (Ping alle 5 Sek.)
-    "aura_fire": {"id": "aura_fire", "type": "color", "name": "🔥 Feuer-Aura", "desc": "Freigeschaltet ab 10 Stunden Spielzeit!", "price": 0, "value": "aura_fire", "playtime_req": 36000},
-    "aura_lightning": {"id": "aura_lightning", "type": "color", "name": "⚡ Blitz-Aura", "desc": "Freigeschaltet ab 25 Stunden Spielzeit!", "price": 0, "value": "aura_lightning", "playtime_req": 90000},
-    "aura_galaxy": {"id": "aura_galaxy", "type": "color", "name": "🌌 Galaxie-Aura", "desc": "Freigeschaltet ab 50 Stunden Spielzeit!", "price": 0, "value": "aura_galaxy", "playtime_req": 180000},
+    # --- NAMENS-AUREN ---
+    "aura_fire": {"id": "aura_fire", "type": "aura", "name": "🔥 Feuer-Aura", "desc": "Wird ab 10 Stunden Spielzeit automatisch freigeschaltet!", "price": 0, "value": "aura_fire", "playtime_req": 36000},
+    "aura_lightning": {"id": "aura_lightning", "type": "aura", "name": "⚡ Blitz-Aura", "desc": "Wird ab 25 Stunden Spielzeit automatisch freigeschaltet!", "price": 0, "value": "aura_lightning", "playtime_req": 90000},
+    "aura_galaxy": {"id": "aura_galaxy", "type": "aura", "name": "🌌 Galaxie-Aura", "desc": "Wird ab 50 Stunden Spielzeit automatisch freigeschaltet!", "price": 0, "value": "aura_galaxy", "playtime_req": 180000},
 
     # --- LOOTBOXEN (Kaufbar) ---
     "box_common": {"id": "box_common", "type": "lootbox", "name": "📦 Gewöhnliche Kiste", "desc": "Chance auf XP, Coins oder Standard-Items.", "price": 100},
@@ -707,7 +708,7 @@ def shop_equip():
             active_titles.append(item["value"])
         u.active_title = json.dumps(active_titles)
         
-    elif item["type"] == "color":
+    elif item["type"] in ["color", "aura"]:
         if u.active_color == item["value"]:
             u.active_color = None
         else:
