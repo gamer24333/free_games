@@ -449,6 +449,11 @@ def dashboard_stats():
         current_user = session['username']
         user = UserSetting.query.filter_by(username=current_user).first()
         global_chat_len = ChatMessage.query.filter_by(room=f"Klasse_{user.klasse}").count()
+
+        # --- NEU: Wenn der User nicht existiert, Cookie löschen und abbrechen ---
+        if not user:
+            session.pop('username', None)
+            return {"error": "Nicht autorisiert"}, 401
         
         private_chats_stats = {}
         for schueler in get_klassen_liste_fuer_user(current_user):
@@ -1338,6 +1343,10 @@ def send_message(room):
     if not nachricht_text: return {"status": "empty"}, 400
     current_user = session['username']
     user = UserSetting.query.filter_by(username=current_user).first()
+
+    if not user:
+        session.pop('username', None)
+        return redirect(url_for('login'))
     
     if room == "global": actual_room = f"Klasse_{user.klasse}"
     else: actual_room = get_private_room_name(current_user, room)
@@ -1353,6 +1362,10 @@ def api_chat_messages(room):
     if 'username' not in session: return {"error": "Nicht autorisiert"}, 401
     current_user = session['username']
     user = UserSetting.query.filter_by(username=current_user).first()
+
+    if not user:
+        session.pop('username', None)
+        return {"error": "Nicht autorisiert"}, 401
     
     if room == "global": 
         actual_room = f"Klasse_{user.klasse}"
