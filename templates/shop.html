@@ -10,7 +10,7 @@
         .btn:hover { filter: brightness(1.2); }
         
         .shop-container { max-width: 600px; margin: 20px auto; background: #2a2a2a; border: 2px solid #e67e22; border-radius: 12px; padding: 30px; box-shadow: 0 0 20px rgba(230, 126, 34, 0.3); }
-        .shop-tabs { display: flex; justify-content: center; margin-bottom: 20px; gap: 10px; }
+        .shop-tabs { display: flex; justify-content: center; margin-bottom: 20px; gap: 10px; flex-wrap: wrap; }
         .shop-tab-btn { background: #444; color: #fff; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 16px; }
         .shop-tab-btn.active { background: #e67e22; }
         
@@ -39,6 +39,7 @@
         <div class="shop-tabs">
             <button class="shop-tab-btn active" onclick="switchShopTab('shop')">🛒 Shop</button>
             <button class="shop-tab-btn" onclick="switchShopTab('inventory')">🎒 Mein Inventar</button>
+            <button class="shop-tab-btn" onclick="switchShopTab('trade')" style="background: #3498db;">🔄 Handeln</button>
         </div>
 
         <div id="shop-view">
@@ -47,6 +48,22 @@
 
         <div id="inventory-view" style="display: none;">
             <p>Lädt Inventar...</p>
+        </div>
+
+        <!-- NEU: Das Trading Menü im Shop -->
+        <div id="trade-view" style="display: none;">
+            <h2 style="color: #3498db;">🔄 Tauschbörse</h2>
+            <p style="color: #aaa;">Hier kannst du bald deine Items mit Mitschülern tauschen!</p>
+            <div style="background: #333; padding: 20px; border-radius: 10px; margin-top: 20px;">
+                <select id="trade-player" style="padding: 10px; border-radius: 5px; margin: 10px; width: 80%; background: #222; color: white; border: 1px solid #555;">
+                    <option value="">Spieler auswählen...</option>
+                </select>
+                <select id="trade-item" style="padding: 10px; border-radius: 5px; margin: 10px; width: 80%; background: #222; color: white; border: 1px solid #555;">
+                    <option value="">Dein Item auswählen...</option>
+                </select>
+                <br>
+                <button class="btn" style="background: #3498db; margin-top: 15px;" onclick="alert('Trading-Backend wird bald verbunden!')">Tauschanfrage senden</button>
+            </div>
         </div>
     </div>
 
@@ -57,14 +74,19 @@
             const tabs = document.querySelectorAll('.shop-tab-btn');
             tabs.forEach(t => t.classList.remove('active'));
             
+            document.getElementById('shop-view').style.display = 'none';
+            document.getElementById('inventory-view').style.display = 'none';
+            document.getElementById('trade-view').style.display = 'none';
+
             if (tab === 'shop') {
                 tabs[0].classList.add('active');
                 document.getElementById('shop-view').style.display = 'block';
-                document.getElementById('inventory-view').style.display = 'none';
-            } else {
+            } else if (tab === 'inventory') {
                 tabs[1].classList.add('active');
-                document.getElementById('shop-view').style.display = 'none';
                 document.getElementById('inventory-view').style.display = 'block';
+            } else if (tab === 'trade') {
+                tabs[2].classList.add('active');
+                document.getElementById('trade-view').style.display = 'block';
             }
         }
 
@@ -78,27 +100,27 @@
             const invView = document.getElementById('inventory-view');
             
             let shopItemsHTML = { "title": "", "color": "", "upgrade": "" };
-            let invItemsHTML = { "title": "", "color": "", "upgrade": "" };
+            let invItemsHTML = { "title": "", "color": "", "upgrade": "", "aura": "" }; // Aura hinzugefügt
             
             let hasShopItems = false;
             let hasInvItems = false;
 
             for (const [id, item] of Object.entries(data.shop_items)) {
-                // Inventar-Einträge können entweder Strings (Altlasten) oder Objekte {id, bought_at} sein
                 const ownedEntry = data.inventory.find(i => (typeof i === 'string' ? i === id : i.id === id));
                 const isOwned = !!ownedEntry;
                 
-                const type = item.type; // title, color, upgrade
+                const type = item.type; // title, color, upgrade, aura
                 
                 let isEquipped = false;
                 if (type === 'title') {
                     isEquipped = Array.isArray(data.active_title) ? data.active_title.includes(item.value) : (data.active_title === item.value);
-                } else if (type === 'color') {
+                } else if (type === 'color' || type === 'aura') { // Auren wie Farben behandeln
                     isEquipped = (data.active_color === item.value);
                 }
 
                 if (!isOwned) {
-                    if (item.rank_only) continue; // NEU: Rang-Titel nicht im Shop-Tab anzeigen!
+                    // NEU: Weder Rang-Titel NOCH Auren (playtime_req) im Shop anzeigen!
+                    if (item.rank_only || item.playtime_req) continue; 
                     
                     hasShopItems = true;
                     shopItemsHTML[type] += `
@@ -113,7 +135,6 @@
                 if (isOwned) {
                     hasInvItems = true;
                     
-                    // Prüfen, ob das Item innerhalb der letzten 24 Stunden gekauft wurde und einen Preis hat
                     let returnButtonHTML = '';
                     if (typeof ownedEntry === 'object' && ownedEntry.bought_at && item.price > 0) {
                         const boughtTime = new Date(ownedEntry.bought_at).getTime();
@@ -136,7 +157,6 @@
                             </div>
                         </div>`;
                     } else if (type === 'lootbox') {
-                        // Kisten können geöffnet werden
                         invItemsHTML.color += `
                         <div class="shop-item">
                             <div>
@@ -144,8 +164,7 @@
                             </div>
                             <button class="shop-btn" style="background: #8e44ad;" onclick="openBox('${id}')">🎁 Öffnen</button>
                         </div>`;
-                    } else {
-                        // Normale Farben und Titel
+                    } else { // Für color, title und aura
                         invItemsHTML[type] += `
                         <div class="shop-item">
                             <div>
@@ -159,7 +178,7 @@
                             </div>
                         </div>`;
                     }
-                } // <-- NEU: Diese fehlte (schließt if isOwned)
+                }
             }
             
             shopView.innerHTML = "";
@@ -170,6 +189,7 @@
             if (!hasShopItems) shopView.innerHTML = '<p>Du hast bereits alles gekauft, was es gibt!</p>';
 
             invView.innerHTML = "";
+            if(invItemsHTML.aura) invView.innerHTML += `<div class="category-title">✨ Meine Auren</div>` + invItemsHTML.aura; // Auren ganz oben!
             if(invItemsHTML.color) invView.innerHTML += `<div class="category-title">🎨 Chat-Farben (Skins)</div>` + invItemsHTML.color;
             if(invItemsHTML.title) invView.innerHTML += `<div class="category-title">🏷️ Chat-Titel</div>` + invItemsHTML.title;
             if(invItemsHTML.upgrade) invView.innerHTML += `<div class="category-title">⚡ Spiel-Upgrades</div>` + invItemsHTML.upgrade;
@@ -179,46 +199,27 @@
 
         async function openBox(itemId) {
             if (!confirm("Möchtest du diese Kiste jetzt öffnen?")) return;
-            const res = await fetch('/api/shop/open-box', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId })
-            });
+            const res = await fetch('/api/shop/open-box', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId }) });
             const data = await res.json();
-            if (res.ok) {
-                alert("🎉 " + data.message);
-                loadShopData(); // Inventar und Coins sofort updaten!
-            } else {
-                alert("❌ " + data.error);
-            }
+            if (res.ok) { alert("🎉 " + data.message); loadShopData(); } else { alert("❌ " + data.error); }
         }
         
         async function buyItem(itemId) {
-            const res = await fetch('/api/shop/buy', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId })
-            });
+            const res = await fetch('/api/shop/buy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId }) });
             const data = await res.json();
-            if (res.ok) { loadShopData(); } 
-            else { alert("❌ " + data.error); }
+            if (res.ok) { loadShopData(); } else { alert("❌ " + data.error); }
         }
 
         async function equipItem(itemId) {
-            const res = await fetch('/api/shop/equip', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId })
-            });
+            const res = await fetch('/api/shop/equip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId }) });
             if (res.ok) { loadShopData(); }
         }
 
         async function returnItem(itemId) {
-            if (!confirm("Möchtest du dieses Item wirklich zurückgeben und deine Münzen vollständig erstattet bekommen?")) return;
-            const res = await fetch('/api/shop/return', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId })
-            });
+            if (!confirm("Möchtest du dieses Item zurückgeben?")) return;
+            const res = await fetch('/api/shop/return', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId }) });
             const data = await res.json();
-            if (res.ok) {
-                alert("✅ Item erfolgreich zurückgegeben!");
-                loadShopData();
-            } else {
-                alert("❌ " + (data.error || "Fehler beim Rückgabeprozess."));
-            }
+            if (res.ok) { alert("✅ Item zurückgegeben!"); loadShopData(); } else { alert("❌ " + (data.error || "Fehler")); }
         }
     </script>
 </body>
