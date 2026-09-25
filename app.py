@@ -78,9 +78,9 @@ SHOP_ITEMS = {
     # --- NAMENS-AUREN (Nur durch Spielzeit erspielbar, extrem schwer!) ---
     # 1 Stunde = 3600 Spielzeit-Punkte (Ping alle 5 Sek.)
     # --- NAMENS-AUREN ---
-    "aura_fire": {"id": "aura_fire", "type": "aura", "name": "🔥 Feuer-Aura", "desc": "Wird ab 10 Stunden Spielzeit automatisch freigeschaltet!", "price": 0, "value": "aura_fire", "playtime_req": 36000},
-    "aura_lightning": {"id": "aura_lightning", "type": "aura", "name": "⚡ Blitz-Aura", "desc": "Wird ab 25 Stunden Spielzeit automatisch freigeschaltet!", "price": 0, "value": "aura_lightning", "playtime_req": 90000},
-    "aura_galaxy": {"id": "aura_galaxy", "type": "aura", "name": "🌌 Galaxie-Aura", "desc": "Wird ab 50 Stunden Spielzeit automatisch freigeschaltet!", "price": 0, "value": "aura_galaxy", "playtime_req": 180000},
+    "aura_fire": {"id": "aura_fire", "type": "aura", "name": "🔥 Feuer-Aura", "desc": "Wird ab 10 Stunden Spielzeit automatisch freigeschaltet!", "price": 0, "value": "white; text-shadow: 0 0 10px #ff9900, 0 0 20px #ff3300; font-weight: bold;", "playtime_req": 36000},
+    "aura_lightning": {"id": "aura_lightning", "type": "aura", "name": "⚡ Blitz-Aura", "desc": "Wird ab 25 Stunden Spielzeit automatisch freigeschaltet!", "price": 0, "value": "white; text-shadow: 0 0 10px #00ffff, 0 0 20px #0055ff; font-weight: bold;", "playtime_req": 90000},
+    "aura_galaxy": {"id": "aura_galaxy", "type": "aura", "name": "🌌 Galaxie-Aura", "desc": "Wird ab 50 Stunden Spielzeit automatisch freigeschaltet!", "price": 0, "value": "white; text-shadow: 0 0 10px #cc00ff, 0 0 20px #00ffff; font-weight: bold;", "playtime_req": 180000},
 
     # --- LOOTBOXEN (Kaufbar) ---
     "box_common": {"id": "box_common", "type": "lootbox", "name": "📦 Gewöhnliche Kiste", "desc": "Chance auf XP, Coins oder Standard-Items.", "price": 100},
@@ -778,7 +778,73 @@ def shop_page():
     me = session['username']
     user = UserSetting.query.filter_by(username=me).first()
     display_name = user.display_name if (user and user.display_name) else me
-    return render_template('shop.html', name=display_name, user_coins=(user.coins if user else 0))
+    
+    # NEU: Liste der Mitschüler für das Trading-Dropdown holen
+    klasskameraden = sorted([s for s in get_klassen_liste_fuer_user(me) if s != me])
+    
+    return render_template('shop.html', name=display_name, user_coins=(user.coins if user else 0), klasskameraden=klasskameraden)
+
+@app.route('/api/trade/send', methods=['POST'])
+def trade_send():
+    if 'username' not in session: return {"error": "401"}, 401
+    me = session['username']
+    data = request.json or {}
+    target = data.get('target')
+    item_id = data.get('item_id')
+    coins = data.get('coins', 0)
+    
+    if not target or not item_id: return {"error": "Fehlende Daten!"}, 400
+    
+    sender_user = UserSetting.query.filter_by(username=me).first()
+    target_user = UserSetting.query.filter_by(username=target).first()
+    
+    if not target_user: return {"error": "Spieler nicht gefunden!"}, 404
+    
+    if item_id == 'coins':
+        if not isinstance(coins, int) or coins <= 0:
+            return {"error": "Ungültiger Betrag!"}, 400
+        if (sender_user.coins or 0) < coins:
+            return {"error": "Nicht genug Münzen!"}, 400
+        
+        sender_user.coins -= coins
+        target_user.coins = (target_user.coins or 0) + coins
+        
+        # Pop-Up Nachricht an den Empfänger schicken
+        msg = AdminMessage(sender='System', target=target, title='💸 Geld erhalten!', message=f'{me} hat dir {coins} 🪙 gesendet!')
+        db.session.add(msg)
+        
+        db.session.commit()
+        return {"status": "success", "message": f"Du hast {target} erfolgreich {coins} Münzen gesendet!"}
+        
+    else:
+        # Item senden
+        sender_inv = json.loads(sender_user.inventory) if sender_user.inventory else []
+        target_inv = json.loads(target_user.inventory) if target_user.inventory else []
+        
+        # Prüfen ob Absender das Item hat
+        item_index = next((i for i, item in enumerate(sender_inv) if (item if isinstance(item, str) else item.get('id')) == item_id), -1)
+        if item_index == -1: return {"error": "Du besitzt dieses Item nicht!"}, 400
+        
+        # Prüfen ob Empfänger es schon hat
+        target_has = any((item if isinstance(item, str) else item.get('id')) == item_id for item in target_inv)
+        if target_has: return {"error": "Der Spieler besitzt dieses Item bereits!"}, 400
+        
+        # Item transferieren
+        transferred_item = sender_inv.pop(item_index)
+        target_inv.append(transferred_item)
+        
+        sender_user.inventory = json.dumps(sender_inv)
+        target_user.inventory = json.dumps(target_inv)
+        
+        # Ausrüsten entfernen falls der Sender es aktiv hatte
+        if sender_user.active_color == item_id: sender_user.active_color = None
+        
+        item_name = SHOP_ITEMS.get(item_id, {}).get("name", "Ein Item")
+        msg = AdminMessage(sender='System', target=target, title='🎁 Geschenk erhalten!', message=f'{me} hat dir {item_name} geschenkt!')
+        db.session.add(msg)
+        
+        db.session.commit()
+        return {"status": "success", "message": f"Du hast {target} das Item '{item_name}' gesendet!"}
 
 @app.route('/api/redeem-code', methods=['POST'])
 def redeem_code():
