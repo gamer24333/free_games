@@ -903,26 +903,37 @@ def login():
         eingabe_name = request.form.get('nutzername', '').strip()
         eingabe_pin = request.form.get('pin', '').strip()
 
+        # --- NEU: Prüfen, ob der eingegebene Name ein geänderter Anzeigename (display_name) ist ---
+        user_by_display = UserSetting.query.filter(db.func.lower(UserSetting.display_name) == eingabe_name.lower()).first()
+        
+        # Wenn wir einen passenden display_name finden, nehmen wir den dazugehörigen echten username
+        if user_by_display:
+            echter_username = user_by_display.username
+        else:
+            # Ansonsten gehen wir davon aus, dass der echte Name eingegeben wurde
+            echter_username = eingabe_name
+
         db_such_klasse = eingabe_klasse
         if db_such_klasse.lower() == "g8c":
             db_such_klasse = "Klasse G8c"
         
+        # Wir prüfen den ECHTEN Namen in der Erlaubt-Liste
         erlaubt = AllowedStudent.query.filter(
-            db.func.lower(AllowedStudent.name) == eingabe_name.lower(),
+            db.func.lower(AllowedStudent.name) == echter_username.lower(),
             db.func.lower(AllowedStudent.class_name) == db_such_klasse.lower()
         ).first()
-        is_till = (eingabe_name == "Till")
+        is_till = (echter_username == "Till")
         
         if not erlaubt and not is_till:
             return render_template('login.html', klassen=alle_klassen, fehler=f'"{eingabe_name}" ist in der Klasse {eingabe_klasse} nicht eingetragen!', name_vorbefuellt=eingabe_name)
             
-        user = UserSetting.query.filter_by(username=eingabe_name).first()
+        user = UserSetting.query.filter_by(username=echter_username).first()
         
         if user and user.pin:
             if user.pin == eingabe_pin:
-                session['username'] = eingabe_name
+                session['username'] = echter_username  # Session läuft immer über den echten Namen
                 session['klasse'] = eingabe_klasse
-                last_active[eingabe_name] = datetime.now()
+                last_active[echter_username] = datetime.now()
                 user.klasse = eingabe_klasse
                 check_rank_titles(user)
                 db.session.commit()
@@ -934,20 +945,20 @@ def login():
                 return render_template('login.html', klassen=alle_klassen, info="Erstelle bitte eine mindestens 4-stellige PIN!", name_vorbefuellt=eingabe_name)
             
             if not user:
-                user = UserSetting(username=eingabe_name, display_name=eingabe_name, pin=eingabe_pin, is_admin=is_till, klasse=eingabe_klasse)
+                user = UserSetting(username=echter_username, display_name=echter_username, pin=eingabe_pin, is_admin=is_till, klasse=eingabe_klasse)
                 db.session.add(user)
             else:
                 user.pin = eingabe_pin
                 user.klasse = eingabe_klasse
                 if not user.display_name:
-                    user.display_name = eingabe_name
+                    user.display_name = echter_username
             
             check_rank_titles(user)
             db.session.commit()
             
-            session['username'] = eingabe_name
+            session['username'] = echter_username
             session['klasse'] = eingabe_klasse
-            last_active[eingabe_name] = datetime.now()
+            last_active[echter_username] = datetime.now()
             return redirect(url_for('dashboard'))
             
     return render_template('login.html', klassen=alle_klassen)
