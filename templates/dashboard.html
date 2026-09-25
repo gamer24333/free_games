@@ -167,6 +167,19 @@
         footer a { color: #888; font-size: 12px; text-decoration: none; }
         footer a:hover { color: #00adb5; text-decoration: underline; }
         .amazon-note { color: #666; font-size: 10px; margin-top: 4px; }
+
+        #toast-container { 
+        position: fixed; top: 20px; left: 50%; transform: translateX(-50%); 
+        z-index: 9999; display: flex; flex-direction: column; gap: 10px; 
+        }
+        .chat-toast { 
+            background: #3498db; color: white; padding: 15px 25px; border-radius: 8px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6); font-weight: bold; font-size: 16px;
+            animation: slideDown 0.5s, fadeOut 0.5s 4.5s forwards; cursor: pointer; border: 2px solid #2980b9;
+        }
+        @keyframes slideDown { from { top: -50px; opacity: 0; } to { top: 0; opacity: 1; } }
+        @keyframes fadeOut { to { opacity: 0; visibility: hidden; } }
+        
     </style>
 </head>
 <body>
@@ -578,11 +591,26 @@
 
     // --- CHAT NOTIFICATIONS (Polling) ---
     let lastKnownMessageCount = 0;
+    let lastMsgCounts = null; // NEU: Speichert den Stand für die Pop-Ups
+
     async function checkNewMessages() {
         try {
             const response = await fetch('/api/dashboard-stats');
             if (response.ok) {
                 const stats = await response.json();
+                
+                // --- NEU: Pop-Ups (Toasts) für neue Chat-Nachrichten anzeigen ---
+                if (lastMsgCounts) {
+                    for (const [user, count] of Object.entries(stats.private_messages_stats)) {
+                        // Wenn der User mehr Nachrichten hat als beim letzten Check -> Pop-Up!
+                        if (count > (lastMsgCounts[user] || 0)) {
+                            showChatToast(`💬 Neue Nachricht von ${user}!`, user);
+                        }
+                    }
+                }
+                lastMsgCounts = stats.private_messages_stats; // Aktuellen Stand speichern
+
+                // --- ALTE LOGIK (Badge auf dem Button & PC-Benachrichtigungen) ---
                 const lastSeenGlobal = localStorage.getItem('last_seen_messages_global') || 0;
                 const newGlobal = stats.global_messages_count - lastSeenGlobal;
                 
@@ -598,7 +626,7 @@
                 
                 if (totalNewMessages > lastKnownMessageCount && "Notification" in window && Notification.permission === "granted") {
                     const diff = totalNewMessages - lastKnownMessageCount;
-                    new Notification("Neue Nachricht erhalten! 💬", { body: `Du hast ${diff} neue ungelesene Nachricht(en).`, icon: "/static/favicon.ico" }).onclick = () => { window.location.href = "/chat"; };
+                    new Notification("Neue Nachricht erhalten! 💬", { body: `Du hast ${diff} ungelesene Nachricht(en).`, icon: "/static/favicon.ico" }).onclick = () => { window.location.href = "/chat"; };
                 }
                 
                 lastKnownMessageCount = totalNewMessages;
@@ -610,6 +638,24 @@
                 }
             }
         } catch (e) { console.error(e); }
+    }
+
+    // --- NEU: Die Funktion, die das Pop-Up ins Bild rutschen lässt ---
+    function showChatToast(text, sender) {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = 'chat-toast';
+        toast.innerText = text;
+        
+        // Bei Klick direkt in den Chat springen
+        toast.onclick = () => window.location.href = '/chat/' + sender;
+        
+        container.appendChild(toast);
+        
+        // Nach 5 Sekunden automatisch verschwinden lassen
+        setTimeout(() => {
+            if(toast.parentElement) toast.remove();
+        }, 5000);
     }
     
     document.addEventListener("DOMContentLoaded", function() {
