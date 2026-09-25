@@ -157,7 +157,7 @@ class UserSetting(db.Model):
     coins = db.Column(db.Integer, default=0)
     inventory = db.Column(db.Text, default='[]')
     active_title = db.Column(db.Text, default='[]')
-    active_color = db.Column(db.String(50), nullable=True)
+    active_color = db.Column(db.Text, nullable=True)
     last_daily_claim = db.Column(db.DateTime, nullable=True)
     login_streak = db.Column(db.Integer, default=0)
     achievements = db.Column(db.Text, default='[]')
