@@ -74,6 +74,16 @@ SHOP_ITEMS = {
     "upg_snake_life": {"id": "upg_snake_life", "type": "upgrade", "name": "Snake: Extra Leben", "desc": "Du kannst 1x pro Runde eine Wand berühren, ohne zu sterben.", "price": 1000, "value": "snake_life"},
     "upg_brick_fire": {"id": "upg_brick_fire", "type": "upgrade", "name": "BrickBreaker: Feuerball", "desc": "Dein Ball zerstört beim Start Blöcke sofort ohne abzuprallen.", "price": 1200, "value": "brick_fire"},
     "upg_slither_boost": {"id": "upg_slither_boost", "type": "upgrade", "name": "Slither: Sprint-Boost", "desc": "Verliere weniger Punkte, wenn du boostest.", "price": 1500, "value": "slither_boost"}
+
+    # --- NAMENS-AUREN (Nur durch Spielzeit erspielbar, extrem schwer!) ---
+    # 1 Stunde = 3600 Spielzeit-Punkte (Ping alle 5 Sek.)
+    "aura_fire": {"id": "aura_fire", "type": "color", "name": "🔥 Feuer-Aura", "desc": "Freigeschaltet ab 10 Stunden Spielzeit!", "price": 0, "value": "aura_fire", "playtime_req": 36000},
+    "aura_lightning": {"id": "aura_lightning", "type": "color", "name": "⚡ Blitz-Aura", "desc": "Freigeschaltet ab 25 Stunden Spielzeit!", "price": 0, "value": "aura_lightning", "playtime_req": 90000},
+    "aura_galaxy": {"id": "aura_galaxy", "type": "color", "name": "🌌 Galaxie-Aura", "desc": "Freigeschaltet ab 50 Stunden Spielzeit!", "price": 0, "value": "aura_galaxy", "playtime_req": 180000},
+
+    # --- LOOTBOXEN (Kaufbar) ---
+    "box_common": {"id": "box_common", "type": "lootbox", "name": "📦 Gewöhnliche Kiste", "desc": "Chance auf XP, Coins oder Standard-Items.", "price": 100},
+    "box_epic": {"id": "box_epic", "type": "lootbox", "name": "🎁 Epische Kiste", "desc": "Hohe Chance auf seltene Titel und dicke Gewinne!", "price": 400},
 }
 
 # --- SLITHER.IO RAM-SPEICHER ---
@@ -382,6 +392,8 @@ def check_if_banned():
                 db.session.commit()
 
 
+
+
 @app.route('/')
 def index():
     return redirect(url_for('login'))
@@ -422,6 +434,7 @@ def ping_user():
                     user.coins = (user.coins or 0) + 1
 
                 check_rank_titles(user)
+                check_playtime_auras(user)
 
                 if activity.startswith("Spielt "):
                     game_name = activity.replace("Spielt ", "").lower()
@@ -447,6 +460,67 @@ def ping_user():
         
         return {"status": "success"}
     return {"error": "Unauthorized"}, 401
+
+# --- NEU: Automatische Auren-Vergabe durch Spielzeit ---
+def check_playtime_auras(user):
+    if not user or not user.playtime_total: return
+    
+    inv = json.loads(user.inventory) if user.inventory else []
+    owned_ids = [i if isinstance(i, str) else i.get('id') for i in inv]
+    changed = False
+    
+    for item_id, data in SHOP_ITEMS.items():
+        if data.get("playtime_req") and user.playtime_total >= data["playtime_req"]:
+            if item_id not in owned_ids:
+                inv.append({"id": item_id, "bought_at": datetime.utcnow().isoformat()})
+                changed = True
+                
+    if changed:
+        user.inventory = json.dumps(inv)
+        db.session.commit()
+
+# --- NEU: Kisten öffnen API ---
+@app.route('/api/shop/open-box', methods=['POST'])
+def open_box():
+    if 'username' not in session: return {"error": "401"}, 401
+    item_id = request.json.get('item_id')
+    u = UserSetting.query.filter_by(username=session['username']).first()
+    inv = json.loads(u.inventory) if u.inventory else []
+    
+    # Kiste im Inventar suchen und entfernen
+    box_index = next((i for i, item in enumerate(inv) if (item if isinstance(item, str) else item.get('id')) == item_id), -1)
+    if box_index == -1 or SHOP_ITEMS[item_id]["type"] != "lootbox":
+        return {"error": "Kiste nicht gefunden!"}, 400
+        
+    inv.pop(box_index)
+    
+    # Belohnungs-Logik
+    rand = random.random()
+    gewinn_text = ""
+    if item_id == "box_common":
+        if rand < 0.5: 
+            gewinn = 150; u.coins = (u.coins or 0) + gewinn; gewinn_text = f"{gewinn} Coins! 🪙"
+        elif rand < 0.9: 
+            gewinn = 250; u.xp = (u.xp or 0) + gewinn; gewinn_text = f"{gewinn} XP! 🌟"
+        else:
+            gewinn_text = "Titel: Ninja! 🥷"
+            if "title_ninja" not in [i if isinstance(i, str) else i.get('id') for i in inv]:
+                inv.append({"id": "title_ninja", "bought_at": datetime.utcnow().isoformat()})
+                
+    elif item_id == "box_epic":
+        if rand < 0.4:
+            gewinn = 600; u.coins = (u.coins or 0) + gewinn; gewinn_text = f"MEGA: {gewinn} Coins! 💰"
+        elif rand < 0.8:
+            gewinn = 1000; u.xp = (u.xp or 0) + gewinn; gewinn_text = f"MEGA: {gewinn} XP! 🔥"
+        else:
+            gewinn_text = "Exklusiver Titel: Hacker! 💻"
+            if "title_hacker" not in [i if isinstance(i, str) else i.get('id') for i in inv]:
+                inv.append({"id": "title_hacker", "bought_at": datetime.utcnow().isoformat()})
+
+    u.inventory = json.dumps(inv)
+    check_rank_titles(u)
+    db.session.commit()
+    return {"status": "success", "message": f"Kiste geöffnet! Du erhältst: {gewinn_text}"}
 
 
 @app.route('/api/dashboard-stats')
@@ -789,37 +863,25 @@ def daily_page():
     return render_template('daily_bonus.html', streak=streak, can_claim=can_claim, coins=(user.coins or 0))
 
 
-@app.route('/api/trade/coins', methods=['POST'])
-def trade_coins():
+@app.route('/api/milestones')
+def class_milestones():
     if 'username' not in session: return {"error": "401"}, 401
-    sender = session['username']
-    data = request.json or {}
-    empfaenger = data.get('target')
-    betrag = int(data.get('amount', 0))
+    me = session['username']
+    meine_klasse = get_klassen_liste_fuer_user(me)
     
-    if betrag <= 0: return {"error": "Betrag muss größer als 0 sein!"}, 400
-    if sender == empfaenger: return {"error": "Du kannst dir nicht selbst Coins schicken!"}, 400
-    if empfaenger not in get_klassen_liste_fuer_user(sender): return {"error": "Empfänger existiert nicht!"}, 400
+    alle_user = UserSetting.query.filter(UserSetting.username.in_(meine_klasse)).all()
+    gesamt_playtime = sum([(u.playtime_total or 0) for u in alle_user])
+    gesamt_coins = sum([(u.coins or 0) for u in alle_user])
     
-    sender_u = UserSetting.query.filter_by(username=sender).first()
-    if (sender_u.coins or 0) < betrag: return {"error": "Du hast nicht genug Coins!"}, 400
+    # 1 Stunde = 3600 Punkte
+    playtime_stunden = round(gesamt_playtime / 3600, 1)
     
-    empfaenger_u = UserSetting.query.filter_by(username=empfaenger).first()
-    if not empfaenger_u:
-        empfaenger_u = UserSetting(username=empfaenger, display_name=empfaenger)
-        db.session.add(empfaenger_u)
-        
-    sender_u.coins -= betrag
-    empfaenger_u.coins = (empfaenger_u.coins or 0) + betrag
-    
-    room_id = get_private_room_name(sender, empfaenger)
-    benachrichtigungs_text = f"💸 Ich habe dir gerade {betrag} Coins gesendet!"
-    
-    new_msg = ChatMessage(room=room_id, sender=sender, text=benachrichtigungs_text)
-    db.session.add(new_msg)
-    
-    db.session.commit()
-    return {"status": "success", "new_balance": sender_u.coins}
+    return jsonify({
+        "playtime_hours": playtime_stunden,
+        "playtime_goal": 2000, # Ziel: 2000 Stunden gemeinsam
+        "total_coins": gesamt_coins,
+        "coins_goal": 50000 # Ziel: 50.000 Coins gemeinsam
+    })
 
 
 @app.route('/gluecksrad')
