@@ -277,25 +277,30 @@
         </div>
     </div>
 
-    <!-- TRADING MODAL -->
-    <div id="tradeModal" class="modal-overlay">
-        <div class="modal-box" style="border-color: #1abc9c;">
-            <h3 style="color: #1abc9c; margin-top: 0;">💸 Coins versenden</h3>
-            <p style="font-size: 13px; color: #aaa;">Schicke einem Klassenkameraden Münzen!</p>
-            <select id="tradeTarget">
-                <option value="">-- Empfänger wählen --</option>
-                {% for schueler in partner %}
-                    <option value="{{ schueler.username }}">{{ schueler.display_name }}</option>
-                {% endfor %}
-            </select>
-            <input type="number" id="tradeAmount" placeholder="Anzahl Coins" min="1" style="margin-top: 10px;">
-            <div style="margin-top: 15px; display: flex; gap: 10px;">
-                <button onclick="document.getElementById('tradeModal').style.display='none'" class="btn" style="background: #555; flex: 1;">Abbrechen</button>
-                <button onclick="sendCoins()" class="btn" style="background: #1abc9c; flex: 1;">Senden</button>
+    <!-- MEILENSTEINE MODAL -->
+    <div id="milestoneModal" class="modal-overlay">
+        <div class="modal-box" style="border-color: #e74c3c;">
+            <h3 style="color: #e74c3c; margin-top: 0;">🏆 Klassen-Meilensteine</h3>
+            <p style="font-size: 13px; color: #aaa;">Arbeitet als Klasse zusammen, um diese Ziele zu erreichen!</p>
+            
+            <div style="text-align: left; margin-top: 15px;">
+                <strong style="color: #00adb5;">Gemeinsame Spielzeit: <span id="ms-playtime-text">0 / 250h</span></strong>
+                <div style="background: #444; border-radius: 10px; height: 15px; margin-top: 5px; overflow: hidden;">
+                    <div id="ms-playtime-bar" style="background: #00adb5; height: 100%; width: 0%;"></div>
+                </div>
             </div>
+            
+            <div style="text-align: left; margin-top: 15px;">
+                <strong style="color: #f1c40f;">Gemeinsamer Reichtum: <span id="ms-coins-text">0 / 50.000 🪙</span></strong>
+                <div style="background: #444; border-radius: 10px; height: 15px; margin-top: 5px; overflow: hidden;">
+                    <div id="ms-coins-bar" style="background: #f1c40f; height: 100%; width: 0%;"></div>
+                </div>
+            </div>
+            
+            <button onclick="document.getElementById('milestoneModal').style.display='none'" class="btn" style="background: #555; width: 100%; margin-top: 20px;">Schließen</button>
         </div>
     </div>
-
+    
     <!-- RANG INFOS MODAL -->
     <div id="rankModal" class="modal-overlay">
         <div class="modal-box gold">
@@ -365,7 +370,7 @@
         <button onclick="openFeedbackModal()" class="btn" style="background: #9b59b6;">💡 Feedback</button>
         <a href="/gluecksrad" class="btn" style="background: #8e44ad;">🎰 Glücksrad</a>
         <a href="/daily" class="btn" style="background: #f1c40f; color: black;">🎁 Daily Bonus</a>
-        <button onclick="openTradeModal()" class="btn" style="background: #1abc9c;">💸 Trading</button>
+        <button onclick="openMilestoneModal()" class="btn" style="background: #e74c3c;">🏆 Klassen-Meilensteine</button>
     </div>
 
     {% if einladungen %}
@@ -558,25 +563,16 @@
     // --- TRADING ---
     function openTradeModal() { document.getElementById('tradeModal').style.display = 'flex'; }
     
-    async function sendCoins() {
-        const target = document.getElementById('tradeTarget').value;
-        const amount = parseInt(document.getElementById('tradeAmount').value);
-        
-        if (!target) return alert("Bitte wähle einen Empfänger aus!");
-        if (isNaN(amount) || amount <= 0) return alert("Bitte gib eine gültige Anzahl an Coins ein (nur positive Zahlen größer als 0)!");
-        
-        const res = await fetch('/api/trade/coins', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ target: target, amount: amount })
-        });
-        const data = await res.json();
+    async function openMilestoneModal() { 
+        document.getElementById('milestoneModal').style.display = 'flex'; 
+        const res = await fetch('/api/milestones');
         if (res.ok) {
-            alert(`✅ Du hast ${amount} Coins an ${target} gesendet!`);
-            document.getElementById('tradeModal').style.display = 'none';
-            document.getElementById('tradeTarget').value = '';
-            document.getElementById('tradeAmount').value = '';
-        } else {
-            alert("❌ " + data.error);
+            const data = await res.json();
+            document.getElementById('ms-playtime-text').innerText = `${data.playtime_hours}h / ${data.playtime_goal}h`;
+            document.getElementById('ms-playtime-bar').style.width = Math.min((data.playtime_hours / data.playtime_goal) * 100, 100) + "%";
+            
+            document.getElementById('ms-coins-text').innerText = `${data.total_coins} / ${data.coins_goal} 🪙`;
+            document.getElementById('ms-coins-bar').style.width = Math.min((data.total_coins / data.coins_goal) * 100, 100) + "%";
         }
     }
 
