@@ -11,7 +11,7 @@
         
         .shop-container { max-width: 600px; margin: 20px auto; background: #2a2a2a; border: 2px solid #e67e22; border-radius: 12px; padding: 30px; box-shadow: 0 0 20px rgba(230, 126, 34, 0.3); }
         .shop-tabs { display: flex; justify-content: center; margin-bottom: 20px; gap: 10px; flex-wrap: wrap; }
-        .shop-tab-btn { background: #444; color: #fff; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 16px; }
+        .shop-tab-btn { background: #444; color: #fff; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s; }
         .shop-tab-btn.active { background: #e67e22; }
         
         .category-title { color: #f1c40f; text-align: left; font-size: 20px; border-bottom: 1px solid #555; padding-bottom: 5px; margin-top: 25px; margin-bottom: 15px; }
@@ -23,7 +23,8 @@
         .shop-btn { background: #27ae60; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; }
         .shop-btn.equip { background: #3498db; }
         .shop-btn.equipped { background: #f39c12; }
-        .shop-btn.passive { background: #8e44ad; cursor: default; }
+        .shop-btn.passive { background: #555; cursor: default; }
+        .shop-btn.locked { background: #c0392b; cursor: default; }
     </style>
 </head>
 <body>
@@ -39,7 +40,7 @@
         <div class="shop-tabs">
             <button class="shop-tab-btn active" onclick="switchShopTab('shop')">🛒 Shop</button>
             <button class="shop-tab-btn" onclick="switchShopTab('inventory')">🎒 Mein Inventar</button>
-            <button class="shop-tab-btn" onclick="switchShopTab('trade')" style="background: #3498db;">🔄 Handeln</button>
+            <button class="shop-tab-btn" onclick="switchShopTab('trade')" style="background: #3498db;">🔄 Senden & Handeln</button>
         </div>
 
         <div id="shop-view">
@@ -50,19 +51,26 @@
             <p>Lädt Inventar...</p>
         </div>
 
-        <!-- NEU: Das Trading Menü im Shop -->
+        <!-- TRADING / SENDEN MENÜ -->
         <div id="trade-view" style="display: none;">
-            <h2 style="color: #3498db;">🔄 Tauschbörse</h2>
-            <p style="color: #aaa;">Hier kannst du bald deine Items mit Mitschülern tauschen!</p>
+            <h2 style="color: #3498db;">🔄 Überweisungen & Geschenke</h2>
+            <p style="color: #aaa; font-size: 14px;">Wähle einen Mitschüler und sende ihm Münzen oder Items aus deinem Inventar!</p>
             <div style="background: #333; padding: 20px; border-radius: 10px; margin-top: 20px;">
-                <select id="trade-player" style="padding: 10px; border-radius: 5px; margin: 10px; width: 80%; background: #222; color: white; border: 1px solid #555;">
-                    <option value="">Spieler auswählen...</option>
+                
+                <select id="trade-player" style="padding: 10px; border-radius: 5px; margin: 10px; width: 90%; background: #222; color: white; border: 1px solid #555; font-size: 16px;">
+                    <option value="">👤 Spieler auswählen...</option>
+                    {% for k in klasskameraden %}
+                        <option value="{{ k }}">{{ k }}</option>
+                    {% endfor %}
                 </select>
-                <select id="trade-item" style="padding: 10px; border-radius: 5px; margin: 10px; width: 80%; background: #222; color: white; border: 1px solid #555;">
-                    <option value="">Dein Item auswählen...</option>
+                
+                <select id="trade-item" style="padding: 10px; border-radius: 5px; margin: 10px; width: 90%; background: #222; color: white; border: 1px solid #555; font-size: 16px;">
+                    <option value="">🎁 Dein Item / Coins auswählen...</option>
+                    <!-- Wird durch JavaScript befüllt -->
                 </select>
                 <br>
-                <button class="btn" style="background: #3498db; margin-top: 15px;" onclick="alert('Trading-Backend wird bald verbunden!')">Tauschanfrage senden</button>
+                
+                <button class="btn" style="background: #3498db; margin-top: 15px; width: 90%; padding: 12px; font-size: 16px;" onclick="sendTrade()">📤 Senden</button>
             </div>
         </div>
     </div>
@@ -98,9 +106,14 @@
             
             const shopView = document.getElementById('shop-view');
             const invView = document.getElementById('inventory-view');
+            const tradeSelect = document.getElementById('trade-item');
             
-            let shopItemsHTML = { "title": "", "color": "", "upgrade": "" };
-            let invItemsHTML = { "title": "", "color": "", "upgrade": "", "aura": "" }; // Aura hinzugefügt
+            // Dropdown für Trading zurücksetzen
+            tradeSelect.innerHTML = '<option value="">🎁 Dein Item / Coins auswählen...</option>';
+            tradeSelect.innerHTML += '<option value="coins">🪙 Münzen senden (Betrag eingeben)</option>';
+            
+            let shopItemsHTML = { "aura": "", "title": "", "color": "", "upgrade": "", "lootbox": "" };
+            let invItemsHTML = { "aura": "", "title": "", "color": "", "upgrade": "", "lootbox": "" }; 
             
             let hasShopItems = false;
             let hasInvItems = false;
@@ -109,31 +122,45 @@
                 const ownedEntry = data.inventory.find(i => (typeof i === 'string' ? i === id : i.id === id));
                 const isOwned = !!ownedEntry;
                 
-                const type = item.type; // title, color, upgrade, aura
+                const type = item.type; 
                 
                 let isEquipped = false;
                 if (type === 'title') {
                     isEquipped = Array.isArray(data.active_title) ? data.active_title.includes(item.value) : (data.active_title === item.value);
-                } else if (type === 'color' || type === 'aura') { // Auren wie Farben behandeln
+                } else if (type === 'color' || type === 'aura') { 
                     isEquipped = (data.active_color === item.value);
                 }
 
+                // 1. ITEMS IM SHOP ANZEIGEN
                 if (!isOwned) {
-                    // NEU: Weder Rang-Titel NOCH Auren (playtime_req) im Shop anzeigen!
-                    if (item.rank_only || item.playtime_req) continue; 
+                    if (item.rank_only) continue; // Rang-Titel weiterhin ausblenden
                     
                     hasShopItems = true;
+                    let actionBtn = `<button class="shop-btn" onclick="buyItem('${id}')">${item.price} 🪙</button>`;
+                    
+                    // NEU: Auren im Shop sichtbar machen, aber als "gesperrt" markieren
+                    if (item.playtime_req) {
+                        const requiredHours = item.playtime_req / 3600;
+                        actionBtn = `<button class="shop-btn locked">🔒 Ab ${requiredHours}h Spielzeit</button>`;
+                    }
+
                     shopItemsHTML[type] += `
                     <div class="shop-item">
                         <div>
                             <h4>${item.name}</h4><p>${item.desc}</p>
                         </div>
-                        <button class="shop-btn" onclick="buyItem('${id}')">${item.price} 🪙</button>
+                        ${actionBtn}
                     </div>`;
                 }
                 
+                // 2. ITEMS IM INVENTAR ANZEIGEN
                 if (isOwned) {
                     hasInvItems = true;
+                    
+                    // Trading-Dropdown befüllen (Lootboxen, Auren und Basis-Items wie Upgrades sind nicht handelbar)
+                    if (type === 'title' || type === 'color') {
+                        tradeSelect.innerHTML += `<option value="${id}">Senden: ${item.name}</option>`;
+                    }
                     
                     let returnButtonHTML = '';
                     if (typeof ownedEntry === 'object' && ownedEntry.bought_at && item.price > 0) {
@@ -141,7 +168,7 @@
                         const nowTime = new Date().getTime();
                         const hoursLeft = 24 - ((nowTime - boughtTime) / (1000 * 60 * 60));
                         if (hoursLeft > 0) {
-                            returnButtonHTML = `<button class="shop-btn" onclick="returnItem('${id}')" style="background: #e74c3c; margin-left: 8px;" title="Noch ${Math.ceil(hoursLeft)} Std. rückgabeberechtig">🔄 Zurückgeben (${item.price} 🪙)</button>`;
+                            returnButtonHTML = `<button class="shop-btn" onclick="returnItem('${id}')" style="background: #e74c3c; margin-left: 8px;" title="Noch ${Math.ceil(hoursLeft)} Std. rückgabeberechtig">🔄 Zurück (${item.price} 🪙)</button>`;
                         }
                     }
                     
@@ -157,7 +184,7 @@
                             </div>
                         </div>`;
                     } else if (type === 'lootbox') {
-                        invItemsHTML.color += `
+                        invItemsHTML.lootbox += `
                         <div class="shop-item">
                             <div>
                                 <h4>${item.name}</h4><p>${item.desc}</p>
@@ -181,20 +208,58 @@
                 }
             }
             
+            // Render Shop
             shopView.innerHTML = "";
+            if(shopItemsHTML.aura) shopView.innerHTML += `<div class="category-title">✨ Legendäre Auren</div>` + shopItemsHTML.aura;
+            if(shopItemsHTML.lootbox) shopView.innerHTML += `<div class="category-title">📦 Kisten</div>` + shopItemsHTML.lootbox;
             if(shopItemsHTML.color) shopView.innerHTML += `<div class="category-title">🎨 Chat-Farben (Skins)</div>` + shopItemsHTML.color;
             if(shopItemsHTML.title) shopView.innerHTML += `<div class="category-title">🏷️ Chat-Titel</div>` + shopItemsHTML.title;
             if(shopItemsHTML.upgrade) shopView.innerHTML += `<div class="category-title">⚡ Spiel-Upgrades</div>` + shopItemsHTML.upgrade;
             
             if (!hasShopItems) shopView.innerHTML = '<p>Du hast bereits alles gekauft, was es gibt!</p>';
 
+            // Render Inventar
             invView.innerHTML = "";
-            if(invItemsHTML.aura) invView.innerHTML += `<div class="category-title">✨ Meine Auren</div>` + invItemsHTML.aura; // Auren ganz oben!
+            if(invItemsHTML.lootbox) invView.innerHTML += `<div class="category-title">📦 Ungeöffnete Kisten</div>` + invItemsHTML.lootbox;
+            if(invItemsHTML.aura) invView.innerHTML += `<div class="category-title">✨ Meine Auren</div>` + invItemsHTML.aura;
             if(invItemsHTML.color) invView.innerHTML += `<div class="category-title">🎨 Chat-Farben (Skins)</div>` + invItemsHTML.color;
             if(invItemsHTML.title) invView.innerHTML += `<div class="category-title">🏷️ Chat-Titel</div>` + invItemsHTML.title;
             if(invItemsHTML.upgrade) invView.innerHTML += `<div class="category-title">⚡ Spiel-Upgrades</div>` + invItemsHTML.upgrade;
             
             if (!hasInvItems) invView.innerHTML = '<p>Dein Inventar ist noch leer.</p>';
+        }
+
+        // --- NEU: Trading API Aufruf ---
+        async function sendTrade() {
+            const player = document.getElementById('trade-player').value;
+            const item = document.getElementById('trade-item').value;
+            
+            if (!player) return alert("❌ Bitte wähle einen Spieler aus!");
+            if (!item) return alert("❌ Bitte wähle aus, was du senden möchtest!");
+            
+            let amount = 0;
+            if (item === 'coins') {
+                const input = prompt(`Wie viele Münzen möchtest du an ${player} senden?`);
+                amount = parseInt(input);
+                if (isNaN(amount) || amount <= 0) return alert("❌ Ungültiger Betrag!");
+            } else {
+                if (!confirm(`Bist du sicher, dass du dieses Item an ${player} verschenken möchtest? Es wird aus deinem Inventar entfernt.`)) return;
+            }
+            
+            try {
+                const res = await fetch('/api/trade/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target: player, item_id: item, coins: amount })
+                });
+                const result = await res.json();
+                if (res.ok) {
+                    alert("✅ " + result.message);
+                    loadShopData(); // Lädt Coins und Inventar neu
+                } else {
+                    alert("❌ " + result.error);
+                }
+            } catch(e) { alert("Fehler beim Senden!"); }
         }
 
         async function openBox(itemId) {
