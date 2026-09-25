@@ -135,7 +135,17 @@
                                 ${returnButtonHTML}
                             </div>
                         </div>`;
+                    } else if (type === 'lootbox') {
+                        // Kisten können geöffnet werden
+                        invItemsHTML.color += `
+                        <div class="shop-item">
+                            <div>
+                                <h4>${item.name}</h4><p>${item.desc}</p>
+                            </div>
+                            <button class="shop-btn" style="background: #8e44ad;" onclick="openBox('${id}')">🎁 Öffnen</button>
+                        </div>`;
                     } else {
+                        // Normale Farben und Titel
                         invItemsHTML[type] += `
                         <div class="shop-item">
                             <div>
@@ -149,8 +159,6 @@
                             </div>
                         </div>`;
                     }
-                }
-            }
             
             shopView.innerHTML = "";
             if(shopItemsHTML.color) shopView.innerHTML += `<div class="category-title">🎨 Chat-Farben (Skins)</div>` + shopItemsHTML.color;
@@ -167,6 +175,20 @@
             if (!hasInvItems) invView.innerHTML = '<p>Dein Inventar ist noch leer.</p>';
         }
 
+        async function openBox(itemId) {
+            if (!confirm("Möchtest du diese Kiste jetzt öffnen?")) return;
+            const res = await fetch('/api/shop/open-box', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert("🎉 " + data.message);
+                loadShopData(); // Inventar und Coins sofort updaten!
+            } else {
+                alert("❌ " + data.error);
+            }
+        }
+        
         async function buyItem(itemId) {
             const res = await fetch('/api/shop/buy', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId })
