@@ -14,8 +14,14 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev_secret")
 
 # --- DATENBANK KONFIGURATION (NEON.TECH) ---
 db_url = os.environ.get("DATABASE_URL")
-if db_url and db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
+if db_url:
+    # Wir schneiden das Protokoll ab, egal was Vercel liefert...
+    if "://" in db_url:
+        rest_der_url = db_url.split("://", 1)[1]
+        # ...und zwingen SQLAlchemy, exakt unseren installierten psycopg2-Treiber zu nehmen!
+        db_url = f"postgresql+psycopg2://{rest_der_url}"
+
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///local_portal.db'
 
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///local_portal.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
