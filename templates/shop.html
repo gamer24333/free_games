@@ -159,6 +159,8 @@
                             </div>
                         </div>`;
                     }
+                } // <-- NEU: Diese fehlte (schließt if isOwned)
+            }
             
             shopView.innerHTML = "";
             if(shopItemsHTML.color) shopView.innerHTML += `<div class="category-title">🎨 Chat-Farben (Skins)</div>` + shopItemsHTML.color;
