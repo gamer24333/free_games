@@ -51,7 +51,7 @@
                 </form>
                 
                 <!-- Liste der vorhandenen Klassen mit Lösch-Button -->
-                <div style="max-height: 120px; overflow-y: auto;">
+                <div style="max-height: 400px; overflow-y: auto;">
                     <table>
                         {% for k in echte_klassen %}
                         <tr>
@@ -81,7 +81,7 @@
                 </form>
 
                 <!-- Liste der erlaubten Schüler mit Lösch-Button -->
-                <div style="max-height: 120px; overflow-y: auto;">
+                <div style="max-height: 400px; overflow-y: auto;">
                     <table>
                         {% for s in echte_schueler %}
                         <tr>
@@ -203,7 +203,7 @@
                 </form>
                 
                 <h4 style="margin-bottom: 5px; color: #aaa;">PINs zurücksetzen</h4>
-                <div style="max-height: 120px; overflow-y: auto;">
+                <div style="max-height: 400px; overflow-y: auto;">
                     <table>
                         <tbody>
                             {% for schueler, pin in pins.items() %}
