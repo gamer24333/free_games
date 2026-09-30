@@ -172,6 +172,7 @@
 
         async function spinWheel() {
             if (isSpinning) return;
+            isSpinning = true;
             
             const resultDiv = document.getElementById('result');
             const wheel = document.getElementById('wheel');
@@ -188,7 +189,7 @@
                     return;
                 }
 
-                isSpinning = true;
+                
                 document.getElementById('spinBtn').style.opacity = '0.5';
 
                 const range = segmentAngles[data.segment] || {min: 10, max: 200};
