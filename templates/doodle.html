@@ -267,7 +267,7 @@
             if (player.x < -player.w) player.x = canvas.width;
             if (player.x > canvas.width) player.x = -player.w;
 
-            player.dy += GRAVITY;
+            player.dy += GRAVITY * timeScale;
             player.y += player.dy * timeScale;
 
             if (player.y < canvas.height / 2) {
