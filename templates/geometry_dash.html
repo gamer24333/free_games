@@ -166,6 +166,7 @@
         let spawnTimeout;
         let reloadTimeout = null;
         let runId = 0;
+        let deathTime = 0;
 
         // --- MUSIK EINBINDEN (WEB AUDIO API) ---
         let audioCtx = null;
@@ -234,7 +235,10 @@
         function doAction() {
             if (isPaused) return; 
             if (isGameOver) {
-                resetGame();
+                // 500ms warten, damit man nicht sofort versehentlich neustartet
+                if (performance.now() - deathTime > 500) {
+                    resetGame();
+                }
                 return; 
             }
             if (!gameStarted) {
@@ -242,7 +246,6 @@
               playMusic();
           }
 
-            // Cube und Ball springen bei Klick einmalig
             if (player.mode === 'cube') {
                 if (player.isGrounded) {
                     player.vy = player.jumpForce;
@@ -301,7 +304,8 @@
         function createPortal() {
             let modes = ['cube', 'ball', 'ship'].filter(m => m !== player.mode);
             let nextMode = modes[Math.floor(Math.random() * modes.length)];
-            return { x: canvas.width, y: ceilingY, width: 45, height: floorY - ceilingY, type: 'portal', targetMode: nextMode };
+            // NEU: gibt nun einen Punkt (givesPoint: true)
+            return { x: canvas.width, y: ceilingY, width: 45, height: floorY - ceilingY, type: 'portal', targetMode: nextMode, givesPoint: true };
         }
 
         function spawnObstacle() {
@@ -322,9 +326,9 @@
                 else {
                     let onCeiling = Math.random() > 0.5;
                     if (Math.random() > 0.4) {
-                        obstacles.push({ x: canvas.width, y: onCeiling ? ceilingY : floorY, width: 30, height: 35, type: 'spike', ceil: onCeiling });
+                        obstacles.push({ x: canvas.width, y: onCeiling ? ceilingY : floorY, width: 30, height: 35, type: 'spike', ceil: onCeiling, givesPoint: true });
                     } else {
-                        obstacles.push({ x: canvas.width, y: onCeiling ? ceilingY + 35 : floorY, width: 35, height: 35, type: 'block', ceil: onCeiling });
+                        obstacles.push({ x: canvas.width, y: onCeiling ? ceilingY + 35 : floorY, width: 35, height: 35, type: 'block', ceil: onCeiling, givesPoint: true });
                     }
                 }
             } 
@@ -337,7 +341,7 @@
                     let gapSize = 125; 
                     let gapY = ceilingY + 30 + Math.random() * (floorY - ceilingY - gapSize - 60);
                     
-                    obstacles.push({ x: canvas.width, y: ceilingY, width: 45, height: gapY - ceilingY, type: 'block', ceil: true });
+                    obstacles.push({ x: canvas.width, y: ceilingY, width: 45, height: gapY - ceilingY, type: 'block', ceil: true, givesPoint: true });
                     obstacles.push({ x: canvas.width, y: floorY, width: 45, height: floorY - (gapY + gapSize), type: 'block', ceil: false });
                 }
             }
@@ -347,13 +351,14 @@
                     obsDelayMultiplier = 1.5;
                 }
                 else if (rand < 0.40) {
-                    obstacles.push({ x: canvas.width, y: floorY, width: 30, height: 35, type: 'spike', ceil: false });
+                    obstacles.push({ x: canvas.width, y: floorY, width: 30, height: 35, type: 'spike', ceil: false, givesPoint: true });
                 } 
                 else if (rand < 0.65) {
                     let height1 = floorY - 65;
                     let height2 = floorY - 110; 
                     
-                    obstacles.push({ x: canvas.width, y: height1, width: 90, height: 20, type: 'platform', mustTouch: false });
+                    // NEU: Nur das ERSTE Objekt der Gruppe hat givesPoint: true!
+                    obstacles.push({ x: canvas.width, y: height1, width: 90, height: 20, type: 'platform', mustTouch: false, givesPoint: true });
                     obstacles.push({ x: canvas.width + 140, y: height2, width: 90, height: 20, type: 'platform', mustTouch: false });
                     
                     obstacles.push({ x: canvas.width + 30, y: floorY, width: 30, height: 35, type: 'spike', ceil: false });
@@ -362,7 +367,7 @@
                     obsDelayMultiplier = 1.2;
                 } 
                 else {
-                    obstacles.push({ x: canvas.width, y: floorY, width: 35, height: 35, type: 'block', ceil: false });
+                    obstacles.push({ x: canvas.width, y: floorY, width: 35, height: 35, type: 'block', ceil: false, givesPoint: true });
                 }
             }
 
@@ -377,15 +382,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ score: finalScore })
                 });
-                if (response.ok) {
-                    if (runId === currentRunId && isGameOver) {
-                        reloadTimeout = setTimeout(() => {
-                            if (runId === currentRunId && isGameOver) {
-                                window.location.reload();
-                            }
-                        }, 1500);
-                    }
-                }
+                // Das Neuladen (window.location.reload) wurde hier entfernt, 
+                // da die resetGame() Funktion bereits alles sauber zurücksetzt!
             } catch (e) { console.error("Score-Übertragungsfehler", e); }
         }
 
@@ -393,6 +391,7 @@
             if (isGameOver) return;
             isGameOver = true;
             gameStarted = false;
+            deathTime = performance.now(); // Zeitpunkt des Todes speichern
             
             stopMusic();
             
@@ -537,8 +536,10 @@
 
                 if (!isPaused && gameStarted && obs.x + obs.width < player.x && !obs.passed) {
                     obs.passed = true;
-                    score++;
-                    if (score % 5 === 0) level++;
+                    if (obs.givesPoint) { // Punkt wird nur vergeben, wenn die Gruppe markiert ist
+                        score++;
+                        if (score % 5 === 0) level++;
+                    }
                 }
 
                 if (obs.x < -obs.width) obstacles.splice(i, 1);
