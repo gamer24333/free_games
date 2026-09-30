@@ -148,6 +148,7 @@ class UserSetting(db.Model):
     username = db.Column(db.String(50), primary_key=True)
     display_name = db.Column(db.String(50), nullable=True)
     pin = db.Column(db.String(20), nullable=True)
+    session_token = db.Column(db.String(100), nullable=True)
     is_admin = db.Column(db.Boolean, default=False)
     last_seen = db.Column(db.DateTime, nullable=True)
     banned_until = db.Column(db.DateTime, nullable=True)
@@ -391,6 +392,18 @@ def check_if_banned():
             else:
                 user.banned_until = None
                 db.session.commit()
+
+@app.before_request
+def check_session_token():
+    if request.endpoint in ['login', 'static']:
+        return
+    if 'username' in session:
+        user = UserSetting.query.filter_by(username=session['username']).first()
+        if user:
+            # Wenn das Token in der DB nicht mit dem Cookie übereinstimmt -> Rauswurf!
+            if user.session_token and session.get('session_token') != user.session_token:
+                session.clear()
+                return redirect(url_for('login'))
 
 
 
@@ -1073,6 +1086,11 @@ def login():
             if user.pin == eingabe_pin:
                 session['username'] = echter_username  # Session läuft immer über den echten Namen
                 session['klasse'] = eingabe_klasse
+
+                new_token = str(uuid.uuid4())
+                user.session_token = new_token
+                session['session_token'] = new_token
+                
                 last_active[echter_username] = datetime.now()
                 user.klasse = eingabe_klasse
                 check_rank_titles(user)
@@ -1184,7 +1202,11 @@ def change_pin():
     user = UserSetting.query.filter_by(username=current_user).first()
     if user:
         user.pin = new_pin
+        # Token ändern sorgt dafür, dass sofort alle rausfliegen
+        user.session_token = str(uuid.uuid4()) 
         db.session.commit()
+        # Aktuellen User ebenfalls ausloggen
+        session.clear() 
         return {"status": "success"}
     return {"error": "Nutzer nicht gefunden"}, 404
 
