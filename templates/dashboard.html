@@ -381,6 +381,21 @@
         <a href="/shop" class="btn" style="background: #e67e22;">🎒 Inventar & Shop</a>
         {% if is_admin %}
         <a href="/admin" class="btn" style="background: #e74c3c;">🛠️ Admin-Panel</a>
+        <!-- NEU: Admin-Nachrichten direkt vom Dashboard senden -->
+        <div class="invite-box" style="border-color: #00adb5; margin-top: 20px;">
+            <h3 style="margin-top: 0; color: #00adb5;">📢 Schnelle System-Nachricht</h3>
+            <form action="/admin/send-message" method="POST">
+                <select name="target" style="width: 100%; margin-bottom: 10px; padding: 10px; background: #333; color: white; border: 1px solid #555; border-radius: 6px;">
+                    <option value="alle">🌍 AN ALLE SCHÜLER SENDEN</option>
+                    {% for p in partner %}
+                        <option value="{{ p.username }}">{{ p.display_name }}</option>
+                    {% endfor %}
+                </select>
+                <input type="text" name="title" placeholder="Titel (z.B. Wichtig! 📢)" required style="width: 100%; margin-bottom: 10px; padding: 10px; background: #333; color: white; border: 1px solid #555; border-radius: 6px; box-sizing: border-box;">
+                <textarea name="message" rows="3" placeholder="Nachrichtentext..." required style="width: 100%; margin-bottom: 10px; padding: 10px; background: #333; color: white; border: 1px solid #555; border-radius: 6px; box-sizing: border-box;"></textarea>
+                <button type="submit" class="btn" style="background: #00adb5; width: 100%; margin: 0;">🚀 Nachricht aussenden</button>
+            </form>
+        </div>
         {% endif %}
     </div>
     
