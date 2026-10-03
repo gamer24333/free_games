@@ -1814,8 +1814,8 @@ def submit_flappy():
 def reaction_game():
     if 'username' not in session: return redirect(url_for('login'))
     all_scores = GameScore.query.all()
-    scores_dict = {s.username: s.reaction for s in all_scores}
-    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in get_klassen_liste_fuer_user(session['username'])], key=lambda x: x[1], reverse=True)
+    scores_dict = {s.username: (s.reaction if s.reaction is not None else 9999) for s in all_scores}
+    leaderboard = sorted([(s, scores_dict.get(s, 0)) for s in get_klassen_liste_fuer_user(session['username'])], key=lambda x: x[1], reverse=False)
     meta = get_user_metadata()
     return render_template('reaction.html', leaderboard=leaderboard, meta=meta)
 
