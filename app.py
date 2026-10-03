@@ -2336,11 +2336,6 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
         
-        # --- NEU: Standard Meme Button erstellen ---
-        if MemeButton.query.count() == 0:
-            # Beispielhafter jsDelivr Link, der Admin kann ihn später ändern oder du tauschst ihn aus
-            default_url = "https://cdn.jsdelivr.net/gh/gamer24333/free_games@main/16_zoll.mp3"
-            db.session.add(MemeButton(name="16 Zoll", audio_url=default_url))
-            db.session.commit()
+        
             
     app.run(debug=True)
