@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klassen Memes</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 40px; }
+        .btn-back { display: inline-block; padding: 10px 20px; background: #555; color: white; text-decoration: none; border-radius: 8px; margin-bottom: 20px; }
+        
+        /* Das MyInstants-Style Grid */
+        .meme-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            max-width: 900px;
+            margin: 0 auto 40px auto;
+        }
+        
+        /* Die lustigen runden Buttons */
+        .meme-button-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 120px;
+        }
+        .meme-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #ff4d4d 0%, #cc0000 100%);
+            border: 4px solid #770000;
+            box-shadow: 0 8px #550000, 0 15px 15px rgba(0,0,0,0.5);
+            cursor: pointer;
+            transition: all 0.1s;
+            margin-bottom: 10px;
+        }
+        .meme-btn:active {
+            transform: translateY(8px);
+            box-shadow: 0 0 #550000, 0 5px 5px rgba(0,0,0,0.5);
+        }
+        .meme-name { font-size: 14px; font-weight: bold; word-wrap: break-word; }
+
+        /* Report Sektion */
+        .report-box { background: #333; padding: 15px; border-radius: 8px; max-width: 500px; margin: 20px auto; border-left: 5px solid #e74c3c; text-align: left; }
+        .report-btn { background: #e74c3c; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        
+        /* Admin Sektion */
+        .admin-box { background: #2a2a2a; border: 2px dashed #00adb5; padding: 20px; border-radius: 8px; max-width: 500px; margin: 40px auto; }
+        .admin-input { width: 90%; padding: 10px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #555; background: #333; color: white; }
+        .admin-btn { background: #00adb5; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 95%; }
+    </style>
+</head>
+<body>
+
+    <a href="/welcome" class="btn-back">⬅️ Zurück zum Dashboard</a>
+    <h1>🔊 Klassen Soundboard</h1>
+    <p>Klick auf die Buttons, um die Memes abzuspielen!</p>
+
+    <!-- MEME GRID -->
+    <div class="meme-grid">
+        {% for meme in memes %}
+            <div class="meme-button-container">
+                <button class="meme-btn" onclick="playAudio('{{ meme.audio_url }}')"></button>
+                <div class="meme-name">{{ meme.name }}</div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- REPORT BOX -->
+    <div class="report-box">
+        <h3 style="color: #e74c3c; margin-top: 0;">⚠️ Wichtiger Hinweis</h3>
+        <p style="font-size: 14px; color: #ccc;">Wenn deine Stimme hier gegen deinen Willen missbraucht wird, kannst du hier eine Nachricht an alle Admins schicken. Wir kümmern uns sofort darum.</p>
+        <button class="report-btn" onclick="reportAbuse()">🚨 Missbrauch melden</button>
+    </div>
+
+    <!-- ADMIN BEREICH (Unsichtbar für normale Spieler) -->
+    {% if is_admin %}
+    <div class="admin-box">
+        <h3 style="color: #00adb5; margin-top: 0;">🛠️ Admin: Neues Meme hinzufügen</h3>
+        <p style="font-size: 12px; color: #aaa;">Lade die MP3 auf GitHub hoch und nutze einen <b>jsDelivr</b> Link, um Server-Bandbreite zu sparen!</p>
+        
+        <input type="text" id="memeName" class="admin-input" placeholder="Name (z.B. 16 Zoll)">
+        <input type="text" id="memeUrl" class="admin-input" placeholder="MP3 URL (z.B. https://cdn.jsdelivr.net/.../16_zoll.mp3)">
+        
+        <button class="admin-btn" onclick="addMeme()">Hinzufügen 💾</button>
+    </div>
+    {% endif %}
+
+    <script>
+        // Audio global speichern, damit sich Sounds nicht überlagern (optional)
+        let currentAudio = null;
+
+        function playAudio(url) {
+            // Wenn schon was läuft, abbrechen
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+            }
+            currentAudio = new Audio(url);
+            currentAudio.play().catch(e => alert("Audio konnte nicht abgespielt werden. Link fehlerhaft?"));
+        }
+
+        async function reportAbuse() {
+            if(!confirm("Möchtest du die Admins alarmieren, dass eine Stimme ohne Erlaubnis genutzt wird?")) return;
+            
+            try {
+                const res = await fetch('/api/memes/report', { method: 'POST' });
+                if(res.ok) alert("Deine Meldung wurde erfolgreich an alle Admins gesendet!");
+            } catch (e) {
+                alert("Fehler beim Senden der Meldung.");
+            }
+        }
+
+        {% if is_admin %}
+        async function addMeme() {
+            const name = document.getElementById('memeName').value;
+            const url = document.getElementById('memeUrl').value;
+            
+            if(!name || !url) return alert("Bitte fülle beide Felder aus!");
+
+            try {
+                const res = await fetch('/api/memes/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, url: url })
+                });
+                
+                const data = await res.json();
+                if(res.ok) {
+                    alert("Erfolgreich hinzugefügt!");
+                    window.location.reload();
+                } else {
+                    alert(data.error);
+                }
+            } catch (e) {
+                alert("Fehler beim Hinzufügen.");
+            }
+        }
+        {% endif %}
+    </script>
+
+</body>
+</html>
