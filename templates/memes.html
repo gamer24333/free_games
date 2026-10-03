@@ -5,8 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Klassen Memes</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 40px; }
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 40px; padding-bottom: 80px; }
         .btn-back { display: inline-block; padding: 10px 20px; background: #555; color: white; text-decoration: none; border-radius: 8px; margin-bottom: 20px; }
+        
+        /* Suchfeld */
+        .search-container { margin-bottom: 30px; }
+        #searchInput {
+            width: 80%;
+            max-width: 400px;
+            padding: 12px 15px;
+            border-radius: 25px;
+            border: 2px solid #555;
+            background: #333;
+            color: white;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        #searchInput:focus { border-color: #00adb5; }
         
         /* Das MyInstants-Style Grid */
         .meme-grid {
@@ -42,14 +58,40 @@
         }
         .meme-name { font-size: 14px; font-weight: bold; word-wrap: break-word; }
 
-        /* Report Sektion */
-        .report-box { background: #333; padding: 15px; border-radius: 8px; max-width: 500px; margin: 20px auto; border-left: 5px solid #e74c3c; text-align: left; }
-        .report-btn { background: #e74c3c; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        /* Report Sektion (Klein in der Ecke) */
+        .report-box { 
+            position: fixed; 
+            bottom: 20px; 
+            right: 20px; 
+            background: rgba(51, 51, 51, 0.9); 
+            padding: 12px; 
+            border-radius: 8px; 
+            width: 220px; 
+            border-left: 4px solid #e74c3c; 
+            text-align: left; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+        .report-box h3 { color: #e74c3c; margin: 0 0 5px 0; font-size: 14px; }
+        .report-box p { font-size: 11px; color: #ccc; margin: 0 0 10px 0; line-height: 1.3; }
+        .report-btn { background: #e74c3c; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; width: 100%; transition: 0.2s; }
+        .report-btn:hover { background: #c0392b; }
         
         /* Admin Sektion */
         .admin-box { background: #2a2a2a; border: 2px dashed #00adb5; padding: 20px; border-radius: 8px; max-width: 500px; margin: 40px auto; }
         .admin-input { width: 90%; padding: 10px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #555; background: #333; color: white; }
         .admin-btn { background: #00adb5; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 95%; }
+
+        /* Mobile Anpassung für die Report-Box */
+        @media (max-width: 600px) {
+            .report-box {
+                width: calc(100% - 40px);
+                bottom: 10px;
+                right: 10px;
+                left: 10px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -58,8 +100,13 @@
     <h1>🔊 Klassen Soundboard</h1>
     <p>Klick auf die Buttons, um die Memes abzuspielen!</p>
 
+    <!-- SUCHE -->
+    <div class="search-container">
+        <input type="text" id="searchInput" onkeyup="filterMemes()" placeholder="🔍 Meme suchen...">
+    </div>
+
     <!-- MEME GRID -->
-    <div class="meme-grid">
+    <div class="meme-grid" id="memeGrid">
         {% for meme in memes %}
             <div class="meme-button-container">
                 <button class="meme-btn" onclick="playAudio('{{ meme.audio_url }}')"></button>
@@ -68,11 +115,11 @@
         {% endfor %}
     </div>
 
-    <!-- REPORT BOX -->
+    <!-- REPORT BOX (Klein in der Ecke) -->
     <div class="report-box">
-        <h3 style="color: #e74c3c; margin-top: 0;">⚠️ Wichtiger Hinweis</h3>
-        <p style="font-size: 14px; color: #ccc;">Wenn deine Stimme hier gegen deinen Willen missbraucht wird, kannst du hier eine Nachricht an alle Admins schicken. Wir kümmern uns sofort darum.</p>
-        <button class="report-btn" onclick="reportAbuse()">🚨 Missbrauch melden</button>
+        <h3>⚠️ Stimmen-Missbrauch?</h3>
+        <p>Wird deine Stimme hier gegen deinen Willen genutzt? Melde es den Admins.</p>
+        <button class="report-btn" onclick="reportAbuse()">🚨 Melden</button>
     </div>
 
     <!-- ADMIN BEREICH (Unsichtbar für normale Spieler) -->
@@ -89,17 +136,31 @@
     {% endif %}
 
     <script>
-        // Audio global speichern, damit sich Sounds nicht überlagern (optional)
+        // Audio global speichern
         let currentAudio = null;
 
         function playAudio(url) {
-            // Wenn schon was läuft, abbrechen
             if (currentAudio) {
                 currentAudio.pause();
                 currentAudio.currentTime = 0;
             }
             currentAudio = new Audio(url);
             currentAudio.play().catch(e => alert("Audio konnte nicht abgespielt werden. Link fehlerhaft?"));
+        }
+
+        // Suchfunktion
+        function filterMemes() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const containers = document.querySelectorAll('.meme-button-container');
+
+            containers.forEach(container => {
+                const name = container.querySelector('.meme-name').innerText.toLowerCase();
+                if (name.includes(query)) {
+                    container.style.display = 'flex';
+                } else {
+                    container.style.display = 'none';
+                }
+            });
         }
 
         async function reportAbuse() {
