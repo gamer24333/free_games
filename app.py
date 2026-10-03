@@ -1965,7 +1965,7 @@ def logout():
 def tictactoe_menu():
     if 'username' not in session: return redirect(url_for('login'))
     gegner_liste = sorted([s for s in get_klassen_liste_fuer_user(session['username']) if s != session['username']])
-    return render_template('tictactoe_menu.html', gegner_liste=gegner_liste)
+    return render_template('tictactoe_menu.html', gegner_liste=gegner_liste, meta=get_user_metadata())
 
 @app.route('/tictactoe/invite', methods=['POST'])
 def tictactoe_invite():
