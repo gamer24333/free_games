@@ -243,6 +243,12 @@ class AllowedStudent(db.Model):
     name = db.Column(db.String(50), nullable=False)
     class_name = db.Column(db.String(50), nullable=False)
 
+class MemeButton(db.Model):
+    __tablename__ = 'meme_buttons'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(100), nullable=False)
+    audio_url = db.Column(db.String(500), nullable=False)
+
 
 # --- HILFSFUNKTIONEN ---
 def get_private_room_name(user1, user2):
@@ -2282,8 +2288,59 @@ def submit_dino():
     db.session.commit()
     return {"status": "success"}
 
+@app.route('/memes')
+def memes_page():
+    if 'username' not in session: return redirect(url_for('login'))
+    me = session['username']
+    user = UserSetting.query.filter_by(username=me).first()
+    is_admin = True if (me == "Till" or (user and user.is_admin)) else False
+    
+    # Alle Memes aus der DB laden
+    all_memes = MemeButton.query.all()
+    
+    return render_template('memes.html', memes=all_memes, is_admin=is_admin, name=session['username'])
+
+@app.route('/api/memes/add', methods=['POST'])
+def add_meme():
+    if 'username' not in session: return {"error": "401"}, 401
+    me = session['username']
+    user = UserSetting.query.filter_by(username=me).first()
+    if not (me == "Till" or (user and user.is_admin)): return {"error": "Keine Rechte!"}, 403
+    
+    data = request.json or {}
+    name = data.get('name', '').strip()
+    url = data.get('url', '').strip()
+    
+    if not name or not url:
+        return {"error": "Bitte Name und Audio-URL angeben!"}, 400
+        
+    new_meme = MemeButton(name=name, audio_url=url)
+    db.session.add(new_meme)
+    db.session.commit()
+    
+    return {"status": "success", "message": "Meme erfolgreich hinzugefügt!"}
+
+@app.route('/api/memes/report', methods=['POST'])
+def report_meme():
+    if 'username' not in session: return {"error": "401"}, 401
+    
+    # Wir nutzen dein bestehendes Feedback-System für die Meldung
+    report_msg = "[STIMMEN-MISSBRAUCH GEMELDET] Ein User meldet, dass seine Stimme gegen seinen Willen verwendet wird. Bitte prüfen!"
+    new_fb = Feedback(sender=session['username'], message=report_msg, is_read=False)
+    db.session.add(new_fb)
+    db.session.commit()
+    
+    return {"status": "success"}
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
         
+        # --- NEU: Standard Meme Button erstellen ---
+        if MemeButton.query.count() == 0:
+            # Beispielhafter jsDelivr Link, der Admin kann ihn später ändern oder du tauschst ihn aus
+            default_url = "https://cdn.jsdelivr.net/gh/DeinName/DeinRepo@main/16_zoll.mp3"
+            db.session.add(MemeButton(name="16 Zoll", audio_url=default_url))
+            db.session.commit()
+            
     app.run(debug=True)
