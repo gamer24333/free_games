@@ -107,7 +107,13 @@
                                 <span style="font-size: 11px; color: #aaa; margin-left: 5px;">{{ p_meta.title }}</span>
                             {% endif %}
                         </td>
-                        <td>{{ score }}</td>
+                        <td>
+                        {% if score == 9999 or score <= 0 %}
+                            -
+                        {% else %}
+                            {{ score }} ms
+                        {% endif %}
+                    </td>
                     </tr>
                     {% endfor %}
                 </tbody>
