@@ -8,8 +8,8 @@
         body { font-family: Arial, sans-serif; text-align: center; background-color: #222; color: white; margin-top: 40px; padding-bottom: 80px; }
         .btn-back { display: inline-block; padding: 10px 20px; background: #555; color: white; text-decoration: none; border-radius: 8px; margin-bottom: 20px; }
         
-        /* Suchfeld */
-        .search-container { margin-bottom: 30px; }
+        /* Suchfeld & Lautstärke */
+        .search-container { margin-bottom: 20px; }
         #searchInput {
             width: 80%;
             max-width: 400px;
@@ -23,6 +23,19 @@
             transition: border-color 0.3s;
         }
         #searchInput:focus { border-color: #00adb5; }
+
+        .volume-container {
+            margin-bottom: 30px;
+            background: #2a2a2a;
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 1px solid #444;
+        }
+        .volume-container input[type=range] {
+            accent-color: #ff4d4d;
+            cursor: pointer;
+        }
         
         /* Das MyInstants-Style Grid */
         .meme-grid {
@@ -100,6 +113,13 @@
     <h1>🔊 Klassen Soundboard</h1>
     <p>Klick auf die Buttons, um die Memes abzuspielen!</p>
 
+    <!-- LAUTSTÄRKE REGLER -->
+    <div class="volume-container">
+        <label for="volumeSlider" style="font-size: 14px; margin-right: 8px;">🔊 Lautstärke:</label>
+        <input type="range" id="volumeSlider" min="1" max="4" step="0.1" value="2.5" oninput="updateVolumeLabel(this.value)">
+        <span id="volumeLabel" style="font-size: 14px; margin-left: 8px; font-weight: bold; color: #ff4d4d;">250%</span>
+    </div>
+
     <!-- SUCHE -->
     <div class="search-container">
         <input type="text" id="searchInput" onkeyup="filterMemes()" placeholder="🔍 Meme suchen...">
@@ -136,16 +156,45 @@
     {% endif %}
 
     <script>
-        // Audio global speichern
-        let currentAudio = null;
+        let audioCtx = null;
 
-        function playAudio(url) {
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio.currentTime = 0;
+        function updateVolumeLabel(val) {
+            document.getElementById('volumeLabel').innerText = Math.round(val * 100) + '%';
+        }
+
+        async function playAudio(url) {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
-            currentAudio = new Audio(url);
-            currentAudio.play().catch(e => alert("Audio konnte nicht abgespielt werden. Link fehlerhaft?"));
+            if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+            }
+
+            try {
+                const response = await fetch(url);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+                const source = audioCtx.createBufferSource();
+                source.buffer = audioBuffer;
+
+                const gainNode = audioCtx.createGain();
+                const volControl = document.getElementById('volumeSlider');
+                // Verstärkung anwenden (1.0 = 100%, 2.5 = 250%, bis zu 4.0 = 400%)
+                gainNode.gain.value = volControl ? parseFloat(volControl.value) : 2.5;
+
+                source.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                source.start(0);
+            } catch (e) {
+                console.error(e);
+                // Fallback falls fetch blockiert wird
+                const fallbackAudio = new Audio(url);
+                const volControl = document.getElementById('volumeSlider');
+                fallbackAudio.volume = Math.min(1.0, volControl ? parseFloat(volControl.value) / 4.0 : 1.0);
+                fallbackAudio.play().catch(err => alert("Audio konnte nicht abgespielt werden. Link fehlerhaft?"));
+            }
         }
 
         // Suchfunktion
